@@ -1,4 +1,4 @@
-import { integer, sqliteTable, text } from "drizzle-orm/sqlite-core";
+import { integer, real, sqliteTable, text } from "drizzle-orm/sqlite-core";
 import { prompt_versions } from "./prompt-versions";
 import { test_cases } from "./test-cases";
 
@@ -20,6 +20,10 @@ export const runs = sqliteTable("runs", {
   human_comment: text("human_comment"),
   is_discarded: integer("is_discarded").notNull().default(0),
   created_at: integer("created_at").notNull(),
+  // 実行時設定スナップショット（project_settings からコピー）
+  model: text("model").notNull(),
+  temperature: real("temperature").notNull(),
+  api_provider: text("api_provider").notNull(),
 });
 
 // Drizzle推論型のエクスポート
