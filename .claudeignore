@@ -1,0 +1,14 @@
+node_modules/
+dist/
+coverage/
+
+# Tauri ビルド成果物
+packages/desktop/src-tauri/target/
+
+# ロックファイル
+pnpm-lock.yaml
+
+# SQLite
+*.db
+*.db-shm
+*.db-wal

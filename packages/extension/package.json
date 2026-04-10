@@ -1,0 +1,9 @@
+{
+  "name": "@prompt-reviewer/extension",
+  "version": "0.0.1",
+  "private": true,
+  "type": "module",
+  "dependencies": {
+    "@prompt-reviewer/ui": "workspace:*"
+  }
+}

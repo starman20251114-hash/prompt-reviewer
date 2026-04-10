@@ -1,0 +1,27 @@
+node_modules/
+dist/
+.turbo/
+
+# Tauri
+src-tauri/target/
+
+# SQLite
+*.db
+*.db-shm
+*.db-wal
+
+# env
+.env
+.env.local
+.env.*.local
+
+# IDE
+.vscode/
+.idea/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Test coverage
+coverage/
