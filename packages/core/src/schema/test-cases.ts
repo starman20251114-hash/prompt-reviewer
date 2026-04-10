@@ -1,21 +1,36 @@
 import { integer, sqliteTable, text } from "drizzle-orm/sqlite-core";
-import { projects } from "./projects.js";
+import { projects } from "./projects";
 
 /**
  * テストケーステーブル
  * システムプロンプトを評価するためのマルチターン入力ケースを管理する
+ *
+ * turns: JSON文字列として保存するマルチターン会話 [{role, content}]
+ * context_content: {{context}} プレースホルダーに挿入するテキスト
  */
 export const test_cases = sqliteTable("test_cases", {
   id: integer("id").primaryKey({ autoIncrement: true }),
   project_id: integer("project_id")
     .notNull()
     .references(() => projects.id),
+  title: text("title").notNull(),
   turns: text("turns").notNull(),
-  context_refs: text("context_refs").notNull().default("[]"),
+  context_content: text("context_content").notNull().default(""),
   expected_description: text("expected_description"),
+  display_order: integer("display_order").notNull().default(0),
   created_at: integer("created_at").notNull(),
+  updated_at: integer("updated_at").notNull(),
 });
 
 // Drizzle推論型のエクスポート
 export type TestCase = typeof test_cases.$inferSelect;
 export type NewTestCase = typeof test_cases.$inferInsert;
+
+/**
+ * turnsカラムのJSONスキーマ型
+ * text型で保存されるため、アプリケーション側でパース/シリアライズを行う
+ */
+export type Turn = {
+  role: "user" | "assistant";
+  content: string;
+};
