@@ -1,6 +1,6 @@
 import { integer, sqliteTable, text } from "drizzle-orm/sqlite-core";
-import { prompt_versions } from "./prompt-versions.js";
-import { test_cases } from "./test-cases.js";
+import { prompt_versions } from "./prompt-versions";
+import { test_cases } from "./test-cases";
 
 /**
  * 実行結果テーブル

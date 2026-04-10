@@ -2,7 +2,7 @@
  * スキーマのエクスポートエントリポイント
  * 全テーブル定義と型定義をまとめてエクスポートする
  */
-export * from "./projects.js";
-export * from "./test-cases.js";
-export * from "./prompt-versions.js";
-export * from "./runs.js";
+export * from "./projects";
+export * from "./test-cases";
+export * from "./prompt-versions";
+export * from "./runs";

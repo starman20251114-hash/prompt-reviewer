@@ -1,5 +1,5 @@
 import { type AnySQLiteColumn, integer, sqliteTable, text } from "drizzle-orm/sqlite-core";
-import { projects } from "./projects.js";
+import { projects } from "./projects";
 
 /**
  * プロンプトバージョンテーブル
