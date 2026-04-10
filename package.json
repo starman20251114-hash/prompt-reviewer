@@ -3,6 +3,7 @@
   "private": true,
   "type": "module",
   "scripts": {
+    "dev": "concurrently -n server,ui -c blue,green \"pnpm --filter @prompt-reviewer/server dev\" \"pnpm --filter @prompt-reviewer/ui dev\"",
     "check": "biome check .",
     "check:fix": "biome check --write .",
     "typecheck": "tsc --noEmit",
@@ -15,6 +16,7 @@
   },
   "devDependencies": {
     "@biomejs/biome": "^1.9.4",
+    "concurrently": "^9.2.1",
     "typescript": "^5.7.0",
     "vitest": "^2.1.0"
   }
