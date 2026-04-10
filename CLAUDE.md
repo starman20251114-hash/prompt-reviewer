@@ -39,6 +39,10 @@
 
 → [`doc/spec.md`](doc/spec.md)
 
+## 環境情報
+
+- **Python**: `uv` でインストール済み。`better-sqlite3` などネイティブモジュールのビルドに使用可能。代替パッケージ（`@libsql/client` 等）に切り替える必要はない。
+
 ## 実装手順
 
 ### 1. 前準備（Worktree作成前）
