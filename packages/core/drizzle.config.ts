@@ -1,10 +1,10 @@
 import { defineConfig } from "drizzle-kit";
 
 export default defineConfig({
-  dialect: "turso",
+  dialect: "sqlite",
   schema: "./src/db/schema.ts",
   out: "./drizzle",
   dbCredentials: {
-    url: `file:${process.env.DB_PATH ?? "./dev.db"}`,
+    url: process.env["DB_PATH"] ?? "./dev.db",
   },
 });
