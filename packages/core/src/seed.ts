@@ -19,7 +19,7 @@ const db = drizzle(sqlite, { schema });
  * returning() の結果から最初の要素を取得する。
  * undefined の場合はエラーをスローして型安全性を確保する。
  */
-function findFirstOrThrow<T>(rows: T[], label: string): T {
+function getFirstOrThrow<T>(rows: T[], label: string): T {
   const row = rows[0];
   if (row === undefined) {
     throw new Error(`${label} の挿入に失敗しました: returning() が空を返しました`);
@@ -41,7 +41,7 @@ async function seed() {
 
   // 1. プロジェクト作成
   const now = Date.now();
-  const project = findFirstOrThrow(
+  const project = getFirstOrThrow(
     await db
       .insert(schema.projects)
       .values({
@@ -56,7 +56,7 @@ async function seed() {
   console.log(`プロジェクト作成: id=${project.id}`);
 
   // 2. プロジェクト設定作成
-  const settings = findFirstOrThrow(
+  const settings = getFirstOrThrow(
     await db
       .insert(schema.project_settings)
       .values({
@@ -86,7 +86,7 @@ async function seed() {
     { role: "user", content: "30日以上経過しているのですが、それでも返品できますか？" },
   ] satisfies ConversationMessage[]);
 
-  const testCase1 = findFirstOrThrow(
+  const testCase1 = getFirstOrThrow(
     await db
       .insert(schema.test_cases)
       .values({
@@ -106,7 +106,7 @@ async function seed() {
   );
   console.log(`テストケース1作成: id=${testCase1.id}`);
 
-  const testCase2 = findFirstOrThrow(
+  const testCase2 = getFirstOrThrow(
     await db
       .insert(schema.test_cases)
       .values({
@@ -127,7 +127,7 @@ async function seed() {
   console.log(`テストケース2作成: id=${testCase2.id}`);
 
   // 4. プロンプトバージョン作成
-  const promptV1 = findFirstOrThrow(
+  const promptV1 = getFirstOrThrow(
     await db
       .insert(schema.prompt_versions)
       .values({
@@ -144,7 +144,7 @@ async function seed() {
   );
   console.log(`プロンプトバージョン1作成: id=${promptV1.id}`);
 
-  const promptV2 = findFirstOrThrow(
+  const promptV2 = getFirstOrThrow(
     await db
       .insert(schema.prompt_versions)
       .values({
@@ -177,7 +177,7 @@ async function seed() {
     },
   ] satisfies ConversationMessage[]);
 
-  const run1 = findFirstOrThrow(
+  const run1 = getFirstOrThrow(
     await db
       .insert(schema.runs)
       .values({
@@ -205,7 +205,7 @@ async function seed() {
     },
   ] satisfies ConversationMessage[]);
 
-  const run2 = findFirstOrThrow(
+  const run2 = getFirstOrThrow(
     await db
       .insert(schema.runs)
       .values({
@@ -225,7 +225,7 @@ async function seed() {
   console.log(`実行結果2作成: id=${run2.id} (ベスト回答)`);
 
   // 6. スコア（scores）作成
-  const score1 = findFirstOrThrow(
+  const score1 = getFirstOrThrow(
     await db
       .insert(schema.scores)
       .values({
@@ -243,7 +243,7 @@ async function seed() {
   );
   console.log(`スコア1作成: id=${score1.id}, human_score=${score1.human_score}`);
 
-  const score2 = findFirstOrThrow(
+  const score2 = getFirstOrThrow(
     await db
       .insert(schema.scores)
       .values({
