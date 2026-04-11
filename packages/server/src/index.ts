@@ -1,6 +1,8 @@
 import { serve } from "@hono/node-server";
+import { db } from "@prompt-reviewer/core";
 import { Hono } from "hono";
 import { cors } from "hono/cors";
+import { createTestCasesRouter } from "./routes/test-cases.js";
 
 const app = new Hono();
 
@@ -16,6 +18,8 @@ app.use(
 app.get("/health", (c) => {
   return c.json({ status: "ok" });
 });
+
+app.route("/api/projects/:projectId/test-cases", createTestCasesRouter(db));
 
 const port = Number(process.env.PORT ?? 3001);
 

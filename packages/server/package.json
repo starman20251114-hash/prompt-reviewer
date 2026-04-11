@@ -9,8 +9,11 @@
   },
   "dependencies": {
     "@hono/node-server": "^1.13.7",
+    "@hono/zod-validator": "^0.7.6",
     "@prompt-reviewer/core": "workspace:*",
-    "hono": "^4.7.9"
+    "drizzle-orm": "^0.44.7",
+    "hono": "^4.7.9",
+    "zod": "^4.3.6"
   },
   "devDependencies": {
     "@types/node": "^25.5.2",
