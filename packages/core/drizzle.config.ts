@@ -7,6 +7,7 @@ export default defineConfig({
     "./src/schema/test-cases.ts",
     "./src/schema/prompt-versions.ts",
     "./src/schema/runs.ts",
+    "./src/schema/scores.ts",
   ],
   out: "./drizzle",
   dbCredentials: {
