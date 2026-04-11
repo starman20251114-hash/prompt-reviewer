@@ -3,6 +3,7 @@ import { db } from "@prompt-reviewer/core";
 import { Hono } from "hono";
 import { cors } from "hono/cors";
 import { createProjectsRouter } from "./routes/projects.js";
+import { createTestCasesRouter } from "./routes/test-cases.js";
 
 const app = new Hono();
 
@@ -20,6 +21,7 @@ app.get("/health", (c) => {
 });
 
 app.route("/api/projects", createProjectsRouter(db));
+app.route("/api/projects/:projectId/test-cases", createTestCasesRouter(db));
 
 const port = Number(process.env.PORT ?? 3001);
 
