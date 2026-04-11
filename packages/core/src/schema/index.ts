@@ -6,3 +6,4 @@ export * from "./projects";
 export * from "./test-cases";
 export * from "./prompt-versions";
 export * from "./runs";
+export * from "./scores";

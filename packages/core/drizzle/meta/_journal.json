@@ -22,6 +22,13 @@
       "when": 1775828017900,
       "tag": "0002_overconfident_venus",
       "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "6",
+      "when": 1775865439087,
+      "tag": "0003_mute_king_bedlam",
+      "breakpoints": true
     }
   ]
 }
