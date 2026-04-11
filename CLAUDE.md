@@ -43,6 +43,31 @@
 
 - **Python**: `uv` でインストール済み。`better-sqlite3` などネイティブモジュールのビルドに使用可能。代替パッケージ（`@libsql/client` 等）に切り替える必要はない。
 
+## ハマりやすいポイント
+
+### drizzle-kit のスキーマ指定はグロブ不可
+
+`drizzle-kit` は CJS で動作するため、`drizzle.config.ts` のスキーマにグロブパターンを使うとエラーになる。
+ファイルを配列で個別指定すること。
+
+```ts
+// NG
+schema: "./src/schema/*.ts"
+
+// OK
+schema: [
+  "./src/schema/projects.ts",
+  "./src/schema/test-cases.ts",
+  "./src/schema/prompt-versions.ts",
+  "./src/schema/runs.ts",
+],
+```
+
+### better-sqlite3 のテストはDB接続しない
+
+`better-sqlite3` はネイティブバイナリのビルドが必要なため、Vitest からDBに接続するとビルドエラーになりやすい。
+スキーマのテストは `expectTypeOf` による型検証のみとし、実際のマイグレーション動作は `pnpm run migrate` で別途確認する。
+
 ## 実装手順
 
 ### 1. 前準備（Worktree作成前）
@@ -58,7 +83,7 @@
 ### 3. 実装
 - Issue内容を確認して実装してください。use context7
 - 実装完了後、必ずテストを実行して、問題があれば修正してください。
-- `npm run lint`と`npm run typecheck`でコード品質を確認して、問題があれば修正してください。
+- `pnpm run check`と`pnpm run typecheck`でコード品質を確認して、問題があれば修正してください。
 
 ### 4. プルリクエスト作成
 - 変更をコミットして、リモートにプッシュしてください。

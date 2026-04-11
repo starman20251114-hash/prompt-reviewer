@@ -2,6 +2,9 @@ node_modules/
 dist/
 coverage/
 
+# Worktrees
+worktrees/
+
 # Tauri ビルド成果物
 packages/desktop/src-tauri/target/
 
