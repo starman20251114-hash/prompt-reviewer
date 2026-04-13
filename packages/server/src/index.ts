@@ -19,7 +19,7 @@ app.use(
   }),
 );
 
-app.get("/health", (c) => {
+app.get("/api/health", (c) => {
   return c.json({ status: "ok" });
 });
 
