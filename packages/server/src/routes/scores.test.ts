@@ -26,7 +26,7 @@ type MockRun = {
   prompt_version_id: number;
   test_case_id: number;
   conversation: string;
-  is_best: number;
+  is_best: boolean;
   created_at: number;
   model: string;
   temperature: number;
@@ -40,7 +40,7 @@ type MockScore = {
   human_comment: string | null;
   judge_score: number | null;
   judge_reason: string | null;
-  is_discarded: number;
+  is_discarded: boolean;
   created_at: number;
   updated_at: number;
 };
@@ -86,7 +86,7 @@ const sampleRun: MockRun = {
   prompt_version_id: 1,
   test_case_id: 1,
   conversation: JSON.stringify([{ role: "user", content: "test" }]),
-  is_best: 0,
+  is_best: false,
   created_at: 1000000,
   model: "claude-sonnet-4-6",
   temperature: 0.7,
@@ -100,7 +100,7 @@ const sampleScore: MockScore = {
   human_comment: "良い回答",
   judge_score: null,
   judge_reason: null,
-  is_discarded: 0,
+  is_discarded: false,
   created_at: 1000000,
   updated_at: 1000000,
 };
@@ -135,7 +135,7 @@ describe("POST /api/runs/:runId/score", () => {
     const body = (await res.json()) as MockScore;
     expect(body.human_score).toBe(4);
     expect(body.run_id).toBe(1);
-    expect(body.is_discarded).toBe(0);
+    expect(body.is_discarded).toBe(false);
   });
 
   it("スコアが既に存在する場合は 409 を返す", async () => {
@@ -229,8 +229,8 @@ describe("POST /api/runs/:runId/score", () => {
     expect(res.status).toBe(201);
   });
 
-  it("is_discarded が 0 で初期化される", async () => {
-    const created = { ...sampleScore, is_discarded: 0 };
+  it("is_discarded が false で初期化される", async () => {
+    const created = { ...sampleScore, is_discarded: false };
 
     let capturedValues: Record<string, unknown> = {};
 
@@ -253,7 +253,7 @@ describe("POST /api/runs/:runId/score", () => {
       body: JSON.stringify({ human_score: 3 }),
     });
 
-    expect(capturedValues.is_discarded).toBe(0);
+    expect(capturedValues.is_discarded).toBe(false);
   });
 });
 
@@ -288,7 +288,7 @@ describe("PATCH /api/runs/:runId/score", () => {
   });
 
   it("is_discarded フラグを更新できる", async () => {
-    const updated = { ...sampleScore, is_discarded: 1, updated_at: 2000000 };
+    const updated = { ...sampleScore, is_discarded: true, updated_at: 2000000 };
 
     let capturedUpdateData: Record<string, unknown> = {};
 
@@ -310,13 +310,13 @@ describe("PATCH /api/runs/:runId/score", () => {
     const res = await app.request("/api/runs/1/score", {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ is_discarded: 1 }),
+      body: JSON.stringify({ is_discarded: true }),
     });
 
     expect(res.status).toBe(200);
-    expect(capturedUpdateData.is_discarded).toBe(1);
+    expect(capturedUpdateData.is_discarded).toBe(true);
     const body = (await res.json()) as MockScore;
-    expect(body.is_discarded).toBe(1);
+    expect(body.is_discarded).toBe(true);
   });
 
   it("Run が存在しない場合は 404 を返す", async () => {
@@ -435,8 +435,8 @@ describe("GET /api/projects/:projectId/prompt-versions/:id/summary", () => {
 
     // is_discarded=0 のスコア（DBクエリで is_discarded=0 にフィルタ済み）
     const validScores = [
-      { id: 1, run_id: 1, human_score: 4, judge_score: null, is_discarded: 0 },
-      { id: 2, run_id: 2, human_score: 2, judge_score: 5, is_discarded: 0 },
+      { id: 1, run_id: 1, human_score: 4, judge_score: null, is_discarded: false },
+      { id: 2, run_id: 2, human_score: 2, judge_score: 5, is_discarded: false },
       // run_id=3 はスコア未評価
     ];
 
@@ -473,8 +473,8 @@ describe("GET /api/projects/:projectId/prompt-versions/:id/summary", () => {
 
     // is_discarded=0 のスコア（run_id=2 は別バージョンのRunだが is_discarded=0）
     const validScores = [
-      { id: 1, run_id: 1, human_score: 5, judge_score: null, is_discarded: 0 },
-      { id: 2, run_id: 2, human_score: 1, judge_score: null, is_discarded: 0 },
+      { id: 1, run_id: 1, human_score: 5, judge_score: null, is_discarded: false },
+      { id: 2, run_id: 2, human_score: 1, judge_score: null, is_discarded: false },
     ];
 
     const db = {
@@ -503,7 +503,7 @@ describe("GET /api/projects/:projectId/prompt-versions/:id/summary", () => {
     const versionRuns = [{ id: 1 }];
 
     const validScores = [
-      { id: 1, run_id: 1, human_score: null, judge_score: null, is_discarded: 0 },
+      { id: 1, run_id: 1, human_score: null, judge_score: null, is_discarded: false },
     ];
 
     const db = {
@@ -553,9 +553,9 @@ describe("GET /api/projects/:projectId/prompt-versions/:id/summary", () => {
 
     // human_score: 1, 3, 5 → 平均 = 3.0（id=4のRunはスコアなし）
     const validScores = [
-      { id: 1, run_id: 1, human_score: 1, judge_score: null, is_discarded: 0 },
-      { id: 2, run_id: 2, human_score: 3, judge_score: null, is_discarded: 0 },
-      { id: 3, run_id: 3, human_score: 5, judge_score: null, is_discarded: 0 },
+      { id: 1, run_id: 1, human_score: 1, judge_score: null, is_discarded: false },
+      { id: 2, run_id: 2, human_score: 3, judge_score: null, is_discarded: false },
+      { id: 3, run_id: 3, human_score: 5, judge_score: null, is_discarded: false },
     ];
 
     const db = {

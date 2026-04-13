@@ -20,7 +20,7 @@ const updateScoreSchema = z.object({
   human_comment: z.string().nullable().optional(),
   judge_score: z.number().int().min(MIN_SCORE).max(MAX_SCORE).nullable().optional(),
   judge_reason: z.string().nullable().optional(),
-  is_discarded: z.number().int().min(0).max(1).optional(),
+  is_discarded: z.boolean().optional(),
 });
 
 /** 文字列または undefined を整数に変換する。無効・undefined の場合は null を返す */
@@ -72,7 +72,7 @@ export function createScoresRouter(db: DB) {
         human_comment: body.human_comment ?? null,
         judge_score: body.judge_score ?? null,
         judge_reason: body.judge_reason ?? null,
-        is_discarded: 0,
+        is_discarded: false,
         created_at: now,
         updated_at: now,
       })
@@ -112,7 +112,7 @@ export function createScoresRouter(db: DB) {
       human_comment?: string | null;
       judge_score?: number | null;
       judge_reason?: string | null;
-      is_discarded?: number;
+      is_discarded?: boolean;
       updated_at: number;
     } = { updated_at: Date.now() };
 
@@ -189,8 +189,8 @@ export function createVersionSummaryRouter(db: DB) {
       .from(scores)
       .where(
         and(
-          // is_discarded = 0 のみ
-          eq(scores.is_discarded, 0),
+          // is_discarded = false のみ
+          eq(scores.is_discarded, false),
         ),
       );
 

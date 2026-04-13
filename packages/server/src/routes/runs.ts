@@ -94,7 +94,7 @@ export function createRunsRouter(db: DB) {
         prompt_version_id: body.prompt_version_id,
         test_case_id: body.test_case_id,
         conversation: JSON.stringify(body.conversation),
-        is_best: 0,
+        is_best: false,
         model: body.model,
         temperature: body.temperature,
         api_provider: body.api_provider,
@@ -162,7 +162,7 @@ export function createRunsRouter(db: DB) {
     // 同一 prompt_version_id × test_case_id の既存フラグを解除
     await db
       .update(runs)
-      .set({ is_best: 0 })
+      .set({ is_best: false })
       .where(
         and(
           eq(runs.project_id, projectId),
@@ -174,7 +174,7 @@ export function createRunsRouter(db: DB) {
     // 対象Runにベスト回答フラグを設定
     const updateResult = await db
       .update(runs)
-      .set({ is_best: 1 })
+      .set({ is_best: true })
       .where(and(eq(runs.id, id), eq(runs.project_id, projectId)))
       .returning();
 

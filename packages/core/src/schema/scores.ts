@@ -20,7 +20,7 @@ export const scores = sqliteTable("scores", {
   human_comment: text("human_comment"),
   judge_score: integer("judge_score"),
   judge_reason: text("judge_reason"),
-  is_discarded: integer("is_discarded").notNull().default(0),
+  is_discarded: integer("is_discarded", { mode: "boolean" }).notNull().default(false),
   created_at: integer("created_at").notNull(),
   updated_at: integer("updated_at").notNull(),
 });
