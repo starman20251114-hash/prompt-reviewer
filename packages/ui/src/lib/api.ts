@@ -70,6 +70,10 @@ export function getProjects(): Promise<Project[]> {
   return api.get<Project[]>("/projects");
 }
 
+export function getProject(id: number): Promise<Project> {
+  return api.get<Project>(`/projects/${id}`);
+}
+
 export function createProject(data: {
   name: string;
   description?: string;

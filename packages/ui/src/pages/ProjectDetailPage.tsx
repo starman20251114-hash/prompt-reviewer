@@ -1,11 +1,26 @@
+import { useQuery } from "@tanstack/react-query";
 import { Link, useParams } from "react-router";
+import { getProject } from "../lib/api";
 
 export function ProjectDetailPage() {
   const { id } = useParams<{ id: string }>();
+  const projectId = Number(id);
+
+  const { data: project, isLoading, isError } = useQuery({
+    queryKey: ["project", projectId],
+    queryFn: () => getProject(projectId),
+    enabled: !Number.isNaN(projectId),
+  });
+
+  const title = isLoading
+    ? "読み込み中..."
+    : isError
+      ? "プロジェクト詳細"
+      : (project?.name ?? "プロジェクト詳細");
 
   return (
     <div>
-      <h2 style={{ margin: "0 0 16px", fontSize: "20px" }}>プロジェクト詳細</h2>
+      <h2 style={{ margin: "0 0 16px", fontSize: "20px" }}>{title}</h2>
       <p style={{ marginBottom: "16px", color: "#a6adc8" }}>
         プロジェクト ID: <code style={{ color: "#cba6f7" }}>{id}</code>
       </p>
