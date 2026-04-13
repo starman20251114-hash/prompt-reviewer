@@ -55,7 +55,7 @@ export type HealthResponse = {
 };
 
 export function getHealth(): Promise<HealthResponse> {
-  return api.get<HealthResponse>("/health");
+  return fetchJson<HealthResponse>("/health");
 }
 
 export type Project = {
