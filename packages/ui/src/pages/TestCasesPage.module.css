@@ -1,0 +1,483 @@
+/* ==================== Color tokens ==================== */
+.root {
+  --c-bg: #1e1e2e;
+  --c-card: #313244;
+  --c-border: #45475a;
+  --c-text: #cdd6f4;
+  --c-subtext: #a6adc8;
+  --c-accent: #cba6f7;
+  --c-danger: #f38ba8;
+  --c-overlay: #181825;
+  --c-muted: #6c7086;
+  --c-green: #a6e3a1;
+  --c-yellow: #f9e2af;
+}
+
+/* ==================== Page layout ==================== */
+.pageHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 8px;
+}
+
+.pageTitle {
+  margin: 0;
+  font-size: 20px;
+  color: var(--c-text);
+}
+
+.pageDescription {
+  color: var(--c-subtext);
+  margin: 0 0 24px;
+}
+
+.statusText {
+  text-align: center;
+  padding: 40px 0;
+}
+
+.loading {
+  color: var(--c-muted);
+}
+
+.error {
+  color: var(--c-danger);
+}
+
+.emptyState {
+  text-align: center;
+  padding: 60px 0;
+  color: var(--c-muted);
+}
+
+.emptyStateTitle {
+  margin: 0 0 8px;
+  font-size: 16px;
+}
+
+.emptyStateSubtext {
+  margin: 0;
+  font-size: 14px;
+}
+
+.listContainer {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+/* ==================== Shared buttons ==================== */
+.btnPrimary {
+  padding: 8px 18px;
+  background: var(--c-accent);
+  border: none;
+  border-radius: 8px;
+  color: var(--c-overlay);
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.btnSecondary {
+  padding: 8px 20px;
+  background: transparent;
+  border: 1px solid var(--c-border);
+  border-radius: 8px;
+  color: var(--c-subtext);
+  font-size: 14px;
+  cursor: pointer;
+}
+
+.btnDanger {
+  padding: 8px 20px;
+  background: var(--c-danger);
+  border: none;
+  border-radius: 8px;
+  color: var(--c-overlay);
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.btnDisabled {
+  cursor: not-allowed;
+  opacity: 0.6;
+}
+
+/* ==================== Modal ==================== */
+.modalOverlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.6);
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  z-index: 100;
+  overflow-y: auto;
+  padding: 40px 0;
+}
+
+.modalOverlayCentered {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.6);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 100;
+}
+
+.modalContent {
+  background: var(--c-overlay);
+  border: 1px solid var(--c-border);
+  border-radius: 12px;
+  padding: 28px;
+  width: 600px;
+  max-width: 90vw;
+}
+
+.modalContentSm {
+  background: var(--c-overlay);
+  border: 1px solid var(--c-border);
+  border-radius: 12px;
+  padding: 28px;
+  width: 420px;
+  max-width: 90vw;
+}
+
+.modalTitle {
+  margin: 0 0 20px;
+  font-size: 18px;
+  color: var(--c-text);
+}
+
+/* ==================== Form ==================== */
+.formActions {
+  display: flex;
+  gap: 12px;
+  justify-content: flex-end;
+}
+
+.fieldGroup {
+  margin-bottom: 16px;
+}
+
+.fieldGroupLg {
+  margin-bottom: 24px;
+}
+
+.fieldLabel {
+  display: block;
+  margin-bottom: 6px;
+  font-size: 14px;
+  color: var(--c-subtext);
+}
+
+.requiredMark {
+  color: var(--c-danger);
+  margin-left: 4px;
+}
+
+.fieldInput {
+  width: 100%;
+  padding: 10px 12px;
+  background: var(--c-card);
+  border: 1px solid var(--c-border);
+  border-radius: 8px;
+  color: var(--c-text);
+  font-size: 14px;
+  outline: none;
+  box-sizing: border-box;
+}
+
+.fieldTextarea {
+  width: 100%;
+  padding: 10px 12px;
+  background: var(--c-card);
+  border: 1px solid var(--c-border);
+  border-radius: 8px;
+  color: var(--c-text);
+  font-size: 14px;
+  outline: none;
+  resize: vertical;
+  box-sizing: border-box;
+  font-family: inherit;
+}
+
+.fieldTextareaContext {
+  width: 100%;
+  padding: 10px 12px;
+  background: var(--c-card);
+  border: 1px solid var(--c-border);
+  border-radius: 8px;
+  color: var(--c-text);
+  font-size: 13px;
+  outline: none;
+  resize: vertical;
+  box-sizing: border-box;
+  font-family: monospace;
+}
+
+/* ==================== Input mode toggle ==================== */
+.modeLabel {
+  font-size: 14px;
+  color: var(--c-subtext);
+  margin: 0 0 8px;
+}
+
+.modeToggle {
+  display: flex;
+  border-radius: 8px;
+  overflow: hidden;
+  border: 1px solid var(--c-border);
+}
+
+.btnModeBase {
+  flex: 1;
+  padding: 7px 0;
+  border: none;
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.btnModeRight {
+  border-left: 1px solid var(--c-border);
+}
+
+.btnModeActive {
+  background: var(--c-accent);
+  color: var(--c-overlay);
+  font-weight: 600;
+}
+
+.btnModeInactive {
+  background: transparent;
+  color: var(--c-subtext);
+  font-weight: 400;
+}
+
+.modeHint {
+  margin: 6px 0 0;
+  font-size: 12px;
+  color: var(--c-muted);
+}
+
+/* ==================== Turn editor ==================== */
+.turnItem {
+  margin-bottom: 12px;
+  padding: 12px;
+  background: var(--c-bg);
+  border-radius: 8px;
+  border: 1px solid var(--c-border);
+}
+
+.turnHeader {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  margin-bottom: 8px;
+}
+
+.turnNumber {
+  font-size: 13px;
+  color: var(--c-muted);
+  min-width: 40px;
+}
+
+.turnSelect {
+  padding: 4px 8px;
+  background: var(--c-card);
+  border: 1px solid var(--c-border);
+  border-radius: 6px;
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.turnSelectUser {
+  color: var(--c-accent);
+}
+
+.turnSelectAssistant {
+  color: var(--c-green);
+}
+
+.turnControls {
+  margin-left: auto;
+  display: flex;
+  gap: 4px;
+}
+
+.btnTurnBase {
+  padding: 2px 8px;
+  background: transparent;
+  border: 1px solid var(--c-border);
+  border-radius: 4px;
+  font-size: 12px;
+}
+
+.btnTurnMove {
+  color: var(--c-subtext);
+  cursor: pointer;
+}
+
+.btnTurnMoveDisabled {
+  color: var(--c-muted);
+  cursor: not-allowed;
+}
+
+.btnTurnDelete {
+  color: var(--c-danger);
+  cursor: pointer;
+}
+
+.turnTextarea {
+  width: 100%;
+  padding: 8px 10px;
+  background: var(--c-card);
+  border: 1px solid var(--c-border);
+  border-radius: 6px;
+  color: var(--c-text);
+  font-size: 13px;
+  outline: none;
+  resize: vertical;
+  box-sizing: border-box;
+  font-family: inherit;
+}
+
+.btnAddTurn {
+  padding: 6px 14px;
+  background: transparent;
+  border: 1px dashed var(--c-border);
+  border-radius: 6px;
+  color: var(--c-subtext);
+  font-size: 13px;
+  cursor: pointer;
+  width: 100%;
+  margin-top: 4px;
+}
+
+/* ==================== Test case card ==================== */
+.card {
+  background: var(--c-card);
+  border: 1px solid var(--c-border);
+  border-radius: 12px;
+  padding: 16px 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.cardHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 12px;
+}
+
+.cardTitle {
+  margin: 0;
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--c-text);
+  word-break: break-word;
+  line-height: 1.4;
+}
+
+.cardActions {
+  display: flex;
+  gap: 6px;
+  flex-shrink: 0;
+}
+
+.btnCardEdit {
+  padding: 4px 10px;
+  background: transparent;
+  border: 1px solid var(--c-border);
+  border-radius: 6px;
+  color: var(--c-accent);
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.btnCardDelete {
+  padding: 4px 10px;
+  background: transparent;
+  border: 1px solid var(--c-border);
+  border-radius: 6px;
+  color: var(--c-danger);
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.badgeRow {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.badge {
+  padding: 2px 8px;
+  background: var(--c-overlay);
+  border-radius: 4px;
+  font-size: 12px;
+  border: 1px solid var(--c-border);
+}
+
+.badgeTextMode {
+  color: var(--c-accent);
+}
+
+.badgeTurnCount {
+  color: var(--c-subtext);
+}
+
+.badgeUser {
+  color: var(--c-accent);
+}
+
+.badgeAssistant {
+  color: var(--c-green);
+}
+
+.badgeExpected {
+  color: var(--c-yellow);
+}
+
+.preview {
+  margin: 0;
+  font-size: 13px;
+  color: var(--c-muted);
+  line-height: 1.5;
+  overflow: hidden;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+}
+
+.previewMono {
+  font-family: monospace;
+}
+
+/* ==================== Delete dialog ==================== */
+.deleteDescription {
+  margin: 0 0 8px;
+  color: var(--c-subtext);
+  font-size: 14px;
+}
+
+.deleteName {
+  margin: 0 0 20px;
+  color: var(--c-text);
+  font-weight: 600;
+  font-size: 15px;
+  padding: 8px 12px;
+  background: var(--c-card);
+  border-radius: 6px;
+}
+
+.deleteWarning {
+  margin: 0 0 24px;
+  color: var(--c-danger);
+  font-size: 13px;
+}
