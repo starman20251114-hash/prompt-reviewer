@@ -89,27 +89,27 @@ export function createProjectSettingsRouter(db: DB) {
       }
 
       return c.json(updated);
+    } else {
+      // 新規作成
+      const insertResult = await db
+        .insert(project_settings)
+        .values({
+          project_id: projectId,
+          model: body.model,
+          temperature: body.temperature,
+          api_provider: body.api_provider,
+          created_at: now,
+          updated_at: now,
+        })
+        .returning();
+
+      const created = insertResult[0];
+      if (!created) {
+        return c.json({ error: "Failed to create Settings" }, 500);
+      }
+
+      return c.json(created, 201);
     }
-
-    // 新規作成
-    const insertResult = await db
-      .insert(project_settings)
-      .values({
-        project_id: projectId,
-        model: body.model,
-        temperature: body.temperature,
-        api_provider: body.api_provider,
-        created_at: now,
-        updated_at: now,
-      })
-      .returning();
-
-    const created = insertResult[0];
-    if (!created) {
-      return c.json({ error: "Failed to create Settings" }, 500);
-    }
-
-    return c.json(created, 201);
   });
 
   return router;
