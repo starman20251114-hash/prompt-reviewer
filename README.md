@@ -22,6 +22,21 @@ pnpm --filter @prompt-reviewer/core build
 cp .env.example .env
 ```
 
+### データベースのセットアップ
+
+初回起動前に、マイグレーションを実行してテーブルを作成してください。
+
+```bash
+pnpm --filter @prompt-reviewer/core migrate
+```
+
+DBファイルはモノレポルート直下の `dev.db` に作成されます。
+
+> **サンプルデータを投入する場合**
+> ```bash
+> pnpm --filter @prompt-reviewer/core seed
+> ```
+
 ### 開発サーバーの起動
 
 ```bash
