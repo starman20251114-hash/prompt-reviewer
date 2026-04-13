@@ -17,7 +17,7 @@ const colors = {
 };
 
 function formatDate(timestamp: number): string {
-  return new Date(timestamp * 1000).toLocaleDateString("ja-JP", {
+  return new Date(timestamp).toLocaleDateString("ja-JP", {
     year: "numeric",
     month: "short",
     day: "numeric",
