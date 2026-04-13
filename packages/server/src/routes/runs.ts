@@ -20,14 +20,25 @@ const createRunSchema = z.object({
   api_provider: z.string().min(1, "api_providerは1文字以上必要です"),
 });
 
+/** 文字列を整数に変換する。無効な場合は null を返す */
+function parseIntParam(value: string): number | null {
+  const parsed = Number(value);
+  return Number.isNaN(parsed) ? null : parsed;
+}
+
+/** JSON 文字列を ConversationMessage[] に変換する */
+function parseConversation(json: string): ConversationMessage[] {
+  return JSON.parse(json) as ConversationMessage[];
+}
+
 export function createRunsRouter(db: DB) {
   const router = new Hono();
 
   // GET /api/projects/:projectId/runs - Run一覧取得（prompt_version_id / test_case_id でフィルタ可能）
   router.get("/", async (c) => {
-    const projectId = Number(c.req.param("projectId"));
+    const projectId = parseIntParam(c.req.param("projectId"));
 
-    if (Number.isNaN(projectId)) {
+    if (projectId === null) {
       return c.json({ error: "Invalid projectId" }, 400);
     }
 
@@ -37,16 +48,16 @@ export function createRunsRouter(db: DB) {
     const conditions = [eq(runs.project_id, projectId)];
 
     if (promptVersionIdParam !== undefined) {
-      const promptVersionId = Number(promptVersionIdParam);
-      if (Number.isNaN(promptVersionId)) {
+      const promptVersionId = parseIntParam(promptVersionIdParam);
+      if (promptVersionId === null) {
         return c.json({ error: "Invalid prompt_version_id" }, 400);
       }
       conditions.push(eq(runs.prompt_version_id, promptVersionId));
     }
 
     if (testCaseIdParam !== undefined) {
-      const testCaseId = Number(testCaseIdParam);
-      if (Number.isNaN(testCaseId)) {
+      const testCaseId = parseIntParam(testCaseIdParam);
+      if (testCaseId === null) {
         return c.json({ error: "Invalid test_case_id" }, 400);
       }
       conditions.push(eq(runs.test_case_id, testCaseId));
@@ -60,16 +71,16 @@ export function createRunsRouter(db: DB) {
     return c.json(
       result.map((run) => ({
         ...run,
-        conversation: JSON.parse(run.conversation) as ConversationMessage[],
+        conversation: parseConversation(run.conversation),
       })),
     );
   });
 
   // POST /api/projects/:projectId/runs - 新規Run作成
   router.post("/", zValidator("json", createRunSchema), async (c) => {
-    const projectId = Number(c.req.param("projectId"));
+    const projectId = parseIntParam(c.req.param("projectId"));
 
-    if (Number.isNaN(projectId)) {
+    if (projectId === null) {
       return c.json({ error: "Invalid projectId" }, 400);
     }
 
@@ -98,7 +109,7 @@ export function createRunsRouter(db: DB) {
     return c.json(
       {
         ...created,
-        conversation: JSON.parse(created.conversation) as ConversationMessage[],
+        conversation: parseConversation(created.conversation),
       },
       201,
     );
@@ -106,10 +117,10 @@ export function createRunsRouter(db: DB) {
 
   // GET /api/projects/:projectId/runs/:id - 特定Run取得
   router.get("/:id", async (c) => {
-    const projectId = Number(c.req.param("projectId"));
-    const id = Number(c.req.param("id"));
+    const projectId = parseIntParam(c.req.param("projectId"));
+    const id = parseIntParam(c.req.param("id"));
 
-    if (Number.isNaN(projectId) || Number.isNaN(id)) {
+    if (projectId === null || id === null) {
       return c.json({ error: "Invalid ID" }, 400);
     }
 
@@ -124,17 +135,17 @@ export function createRunsRouter(db: DB) {
 
     return c.json({
       ...run,
-      conversation: JSON.parse(run.conversation) as ConversationMessage[],
+      conversation: parseConversation(run.conversation),
     });
   });
 
   // PATCH /api/projects/:projectId/runs/:id/best - ベスト回答フラグ更新
   // バージョン×テストケースごとに1件のみ設定できる（既存フラグは自動解除）
   router.patch("/:id/best", async (c) => {
-    const projectId = Number(c.req.param("projectId"));
-    const id = Number(c.req.param("id"));
+    const projectId = parseIntParam(c.req.param("projectId"));
+    const id = parseIntParam(c.req.param("id"));
 
-    if (Number.isNaN(projectId) || Number.isNaN(id)) {
+    if (projectId === null || id === null) {
       return c.json({ error: "Invalid ID" }, 400);
     }
 
@@ -173,7 +184,7 @@ export function createRunsRouter(db: DB) {
 
     return c.json({
       ...updated,
-      conversation: JSON.parse(updated.conversation) as ConversationMessage[],
+      conversation: parseConversation(updated.conversation),
     });
   });
 
