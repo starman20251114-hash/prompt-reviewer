@@ -20,8 +20,9 @@ const createRunSchema = z.object({
   api_provider: z.string().min(1, "api_providerは1文字以上必要です"),
 });
 
-/** 文字列を整数に変換する。無効な場合は null を返す */
-function parseIntParam(value: string): number | null {
+/** 文字列または undefined を整数に変換する。無効・undefined の場合は null を返す */
+function parseIntParam(value: string | undefined): number | null {
+  if (value === undefined) return null;
   const parsed = Number(value);
   return Number.isNaN(parsed) ? null : parsed;
 }
