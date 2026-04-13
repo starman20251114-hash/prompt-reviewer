@@ -3,7 +3,7 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "dev": "concurrently -n server,ui -c blue,green \"pnpm --filter @prompt-reviewer/server dev\" \"pnpm --filter @prompt-reviewer/ui dev\"",
+    "dev": "concurrently -n core,server,ui -c yellow,blue,green \"pnpm --filter @prompt-reviewer/core build:watch\" \"pnpm --filter @prompt-reviewer/server dev\" \"pnpm --filter @prompt-reviewer/ui dev\"",
     "check": "biome check .",
     "check:fix": "biome check --write .",
     "typecheck": "tsc --noEmit",
