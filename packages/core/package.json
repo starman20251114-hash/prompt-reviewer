@@ -13,7 +13,7 @@
   },
   "scripts": {
     "build": "tsc",
-    "build:watch": "tsc --watch",
+    "build:watch": "tsc --watch --preserveWatchOutput",
     "generate": "drizzle-kit generate",
     "migrate": "drizzle-kit migrate",
     "seed": "tsx src/seed.ts"
