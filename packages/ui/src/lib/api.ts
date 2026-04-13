@@ -61,3 +61,30 @@ export type HealthResponse = {
 export function getHealth(): Promise<HealthResponse> {
   return api.get<HealthResponse>("/health");
 }
+
+export type Project = {
+  id: number;
+  name: string;
+  description: string | null;
+  created_at: number;
+  updated_at: number;
+};
+
+export function getProjects(): Promise<Project[]> {
+  return api.get<Project[]>("/projects");
+}
+
+export function getProject(id: number): Promise<Project> {
+  return api.get<Project>(`/projects/${id}`);
+}
+
+export function createProject(data: {
+  name: string;
+  description?: string;
+}): Promise<Project> {
+  return api.post<Project>("/projects", data);
+}
+
+export function deleteProject(id: number): Promise<void> {
+  return api.delete<void>(`/projects/${id}`);
+}
