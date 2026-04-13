@@ -17,7 +17,7 @@ describe("runs スキーマ型定義", () => {
         prompt_version_id: number;
         test_case_id: number;
         conversation: string;
-        is_best: number;
+        is_best: boolean;
         created_at: number;
         model: string;
         temperature: number;
@@ -44,8 +44,8 @@ describe("runs スキーマ型定義", () => {
       expectTypeOf<Run["conversation"]>().toEqualTypeOf<string>();
     });
 
-    it("Run の is_best は number 型（0=通常, 1=ベスト回答）", () => {
-      expectTypeOf<Run["is_best"]>().toEqualTypeOf<number>();
+    it("Run の is_best は boolean 型", () => {
+      expectTypeOf<Run["is_best"]>().toEqualTypeOf<boolean>();
     });
 
     it("Run の project_id は number 型", () => {
@@ -92,7 +92,7 @@ describe("runs スキーマ型定義", () => {
     });
 
     it("NewRun の is_best はデフォルト値があるためオプショナル", () => {
-      expectTypeOf<NewRun["is_best"]>().toEqualTypeOf<number | undefined>();
+      expectTypeOf<NewRun["is_best"]>().toEqualTypeOf<boolean | undefined>();
     });
 
     it("ベスト回答フラグを立てた NewRun を作成できる", () => {
@@ -104,7 +104,7 @@ describe("runs スキーマ型定義", () => {
           { role: "user", content: "質問です" },
           { role: "assistant", content: "詳細な回答です" },
         ]),
-        is_best: 1,
+        is_best: true,
         created_at: Date.now(),
         model: "claude-opus-4-5",
         temperature: 0.7,

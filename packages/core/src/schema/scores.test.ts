@@ -14,7 +14,7 @@ describe("scores スキーマ型定義", () => {
       type RequiredFields = {
         id: number;
         run_id: number;
-        is_discarded: number;
+        is_discarded: boolean;
         created_at: number;
         updated_at: number;
       };
@@ -39,8 +39,8 @@ describe("scores スキーマ型定義", () => {
       expectTypeOf<Score["judge_reason"]>().toEqualTypeOf<string | null>();
     });
 
-    it("Score の is_discarded は number 型（0=有効, 1=廃棄）", () => {
-      expectTypeOf<Score["is_discarded"]>().toEqualTypeOf<number>();
+    it("Score の is_discarded は boolean 型", () => {
+      expectTypeOf<Score["is_discarded"]>().toEqualTypeOf<boolean>();
     });
 
     it("Score の run_id は number 型", () => {
@@ -68,7 +68,7 @@ describe("scores スキーマ型定義", () => {
     });
 
     it("NewScore の is_discarded はデフォルト値があるためオプショナル", () => {
-      expectTypeOf<NewScore["is_discarded"]>().toEqualTypeOf<number | undefined>();
+      expectTypeOf<NewScore["is_discarded"]>().toEqualTypeOf<boolean | undefined>();
     });
 
     it("NewScore の human_score はオプショナル（null許容）", () => {
@@ -118,7 +118,7 @@ describe("scores スキーマ型定義", () => {
       const discardedScore: NewScore = {
         run_id: 3,
         human_score: 2,
-        is_discarded: 1,
+        is_discarded: true,
         created_at: now,
         updated_at: now,
       };

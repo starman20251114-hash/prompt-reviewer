@@ -31,7 +31,7 @@ type MockRun = {
   prompt_version_id: number;
   test_case_id: number;
   conversation: string;
-  is_best: number;
+  is_best: boolean;
   created_at: number;
   model: string;
   temperature: number;
@@ -59,7 +59,7 @@ const sampleRun: MockRun = {
   prompt_version_id: 1,
   test_case_id: 1,
   conversation: JSON.stringify(sampleConversation),
-  is_best: 0,
+  is_best: false,
   created_at: 1000000,
   model: "claude-sonnet-4-6",
   temperature: 0.7,
@@ -217,14 +217,14 @@ describe("POST /api/projects/:projectId/runs", () => {
     expect(body.conversation).toEqual(sampleConversation);
   });
 
-  it("is_bestが0で初期化される", async () => {
-    const created = { ...sampleRun, is_best: 0 };
+  it("is_bestがfalseで初期化される", async () => {
+    const created = { ...sampleRun, is_best: false };
 
     const db = {
       insert: () => ({
-        values: (values: { is_best: number }) => ({
+        values: (values: { is_best: boolean }) => ({
           returning: () => {
-            expect(values.is_best).toBe(0);
+            expect(values.is_best).toBe(false);
             return Promise.resolve([created]);
           },
         }),
@@ -247,7 +247,7 @@ describe("POST /api/projects/:projectId/runs", () => {
 
     expect(res.status).toBe(201);
     const body = (await res.json()) as MockRun;
-    expect(body.is_best).toBe(0);
+    expect(body.is_best).toBe(false);
   });
 
   it("conversationが空配列のとき400を返す", async () => {
@@ -333,8 +333,8 @@ describe("GET /api/projects/:projectId/runs/:id", () => {
 });
 
 describe("PATCH /api/projects/:projectId/runs/:id/best", () => {
-  it("存在するIDに対して200でis_best=1のRunを返す", async () => {
-    const updated = { ...sampleRun, is_best: 1 };
+  it("存在するIDに対して200でis_best=trueのRunを返す", async () => {
+    const updated = { ...sampleRun, is_best: true };
 
     const db = {
       select: () => ({
@@ -358,14 +358,14 @@ describe("PATCH /api/projects/:projectId/runs/:id/best", () => {
 
     expect(res.status).toBe(200);
     const body = (await res.json()) as MockRun & { conversation: MockConversationMessage[] };
-    expect(body.is_best).toBe(1);
+    expect(body.is_best).toBe(true);
   });
 
   it("同一バージョン×テストケースの既存フラグが解除される", async () => {
-    const updated = { ...sampleRun, is_best: 1 };
+    const updated = { ...sampleRun, is_best: true };
 
     let updateCallCount = 0;
-    const capturedSets: Array<{ is_best: number }> = [];
+    const capturedSets: Array<{ is_best: boolean }> = [];
 
     const db = {
       select: () => ({
@@ -374,7 +374,7 @@ describe("PATCH /api/projects/:projectId/runs/:id/best", () => {
         }),
       }),
       update: () => ({
-        set: (values: { is_best: number }) => {
+        set: (values: { is_best: boolean }) => {
           capturedSets.push(values);
           updateCallCount++;
           return {
@@ -392,10 +392,10 @@ describe("PATCH /api/projects/:projectId/runs/:id/best", () => {
     });
 
     expect(res.status).toBe(200);
-    // updateが2回呼ばれる: 1回目は既存フラグ解除(is_best=0), 2回目はフラグ設定(is_best=1)
+    // updateが2回呼ばれる: 1回目は既存フラグ解除(is_best=false), 2回目はフラグ設定(is_best=true)
     expect(updateCallCount).toBe(2);
-    expect(capturedSets[0]?.is_best).toBe(0);
-    expect(capturedSets[1]?.is_best).toBe(1);
+    expect(capturedSets[0]?.is_best).toBe(false);
+    expect(capturedSets[1]?.is_best).toBe(true);
   });
 
   it("存在しないIDに対して404を返す", async () => {
