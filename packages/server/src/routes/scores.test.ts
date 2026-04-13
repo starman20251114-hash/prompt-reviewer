@@ -193,14 +193,14 @@ describe("POST /api/runs/:runId/score", () => {
     expect(body.error).toBe("Invalid runId");
   });
 
-  it("human_score が範囲外（1〜5以外）の場合は 400 を返す", async () => {
+  it("human_score が範囲外（1〜100以外）の場合は 400 を返す", async () => {
     const db = {};
 
     const app = buildScoresApp(db);
     const res = await app.request("/api/runs/1/score", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ human_score: 6 }),
+      body: JSON.stringify({ human_score: 101 }),
     });
 
     expect(res.status).toBe(400);

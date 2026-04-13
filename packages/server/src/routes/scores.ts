@@ -5,17 +5,20 @@ import { and, eq } from "drizzle-orm";
 import { Hono } from "hono";
 import { z } from "zod";
 
+const MIN_SCORE = 1;
+const MAX_SCORE = 100;
+
 const createScoreSchema = z.object({
-  human_score: z.number().int().min(1).max(5).optional(),
+  human_score: z.number().int().min(MIN_SCORE).max(MAX_SCORE).optional(),
   human_comment: z.string().optional(),
-  judge_score: z.number().int().min(1).max(5).optional(),
+  judge_score: z.number().int().min(MIN_SCORE).max(MAX_SCORE).optional(),
   judge_reason: z.string().optional(),
 });
 
 const updateScoreSchema = z.object({
-  human_score: z.number().int().min(1).max(5).nullable().optional(),
+  human_score: z.number().int().min(MIN_SCORE).max(MAX_SCORE).nullable().optional(),
   human_comment: z.string().nullable().optional(),
-  judge_score: z.number().int().min(1).max(5).nullable().optional(),
+  judge_score: z.number().int().min(MIN_SCORE).max(MAX_SCORE).nullable().optional(),
   judge_reason: z.string().nullable().optional(),
   is_discarded: z.number().int().min(0).max(1).optional(),
 });
