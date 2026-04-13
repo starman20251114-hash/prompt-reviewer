@@ -52,7 +52,6 @@ function TurnEditor({ turns, onChange }: TurnEditorProps) {
   }
 
   function handleRemoveTurn(index: number) {
-    if (turns.length <= 1) return;
     onChange(turns.filter((_, i) => i !== index));
   }
 
@@ -155,15 +154,14 @@ function TurnEditor({ turns, onChange }: TurnEditorProps) {
               <button
                 type="button"
                 onClick={() => handleRemoveTurn(index)}
-                disabled={turns.length <= 1}
                 style={{
                   padding: "2px 8px",
                   background: "transparent",
                   border: `1px solid ${colors.border}`,
                   borderRadius: "4px",
-                  color: turns.length <= 1 ? colors.muted : colors.danger,
+                  color: colors.danger,
                   fontSize: "12px",
-                  cursor: turns.length <= 1 ? "not-allowed" : "pointer",
+                  cursor: "pointer",
                 }}
               >
                 削除
@@ -215,23 +213,32 @@ function TurnEditor({ turns, onChange }: TurnEditorProps) {
 }
 
 // テストケースフォームの状態型
+type InputMode = "turns" | "context";
+
 type TestCaseFormData = {
   title: string;
+  inputMode: InputMode;
   turns: Turn[];
+  context_content: string;
   expected_description: string;
 };
 
 function getInitialFormData(testCase?: TestCase): TestCaseFormData {
   if (testCase) {
+    const inputMode: InputMode = testCase.turns.length === 0 ? "context" : "turns";
     return {
       title: testCase.title,
+      inputMode,
       turns: testCase.turns,
+      context_content: testCase.context_content ?? "",
       expected_description: testCase.expected_description ?? "",
     };
   }
   return {
     title: "",
+    inputMode: "turns",
     turns: [createEmptyTurn()],
+    context_content: "",
     expected_description: "",
   };
 }
@@ -254,13 +261,15 @@ function TestCaseModal({ testCase, onClose, onSubmit, isLoading }: TestCaseModal
     e.preventDefault();
     const trimmedTitle = formData.title.trim();
     if (!trimmedTitle) return;
-    const validTurns = formData.turns.filter((t) => t.content.trim());
-    if (validTurns.length === 0) return;
-    onSubmit({ ...formData, title: trimmedTitle, turns: validTurns });
+    if (formData.inputMode === "turns") {
+      const validTurns = formData.turns.filter((t) => t.content.trim());
+      onSubmit({ ...formData, title: trimmedTitle, turns: validTurns, context_content: "" });
+    } else {
+      onSubmit({ ...formData, title: trimmedTitle, turns: [] });
+    }
   }
 
-  const isSubmittable =
-    formData.title.trim() !== "" && formData.turns.some((t) => t.content.trim() !== "");
+  const isSubmittable = formData.title.trim() !== "";
 
   return (
     <div
@@ -336,25 +345,113 @@ function TestCaseModal({ testCase, onClose, onSubmit, isLoading }: TestCaseModal
             />
           </div>
 
-          {/* ターン */}
+          {/* 入力モード切替 */}
           <div style={{ marginBottom: "16px" }}>
             <p
               style={{
-                display: "block",
-                marginBottom: "8px",
                 fontSize: "14px",
                 color: colors.subtext,
                 margin: "0 0 8px",
               }}
             >
-              会話ターン
-              <span style={{ color: colors.danger, marginLeft: "4px" }}>*</span>
+              入力モード
             </p>
-            <TurnEditor
-              turns={formData.turns}
-              onChange={(turns) => setFormData((prev) => ({ ...prev, turns }))}
-            />
+            <div style={{ display: "flex", borderRadius: "8px", overflow: "hidden", border: `1px solid ${colors.border}` }}>
+              <button
+                type="button"
+                onClick={() => setFormData((prev) => ({ ...prev, inputMode: "turns" }))}
+                style={{
+                  flex: 1,
+                  padding: "7px 0",
+                  background: formData.inputMode === "turns" ? colors.accent : "transparent",
+                  border: "none",
+                  color: formData.inputMode === "turns" ? colors.overlay : colors.subtext,
+                  fontSize: "13px",
+                  fontWeight: formData.inputMode === "turns" ? 600 : 400,
+                  cursor: "pointer",
+                }}
+              >
+                ターン形式
+              </button>
+              <button
+                type="button"
+                onClick={() => setFormData((prev) => ({ ...prev, inputMode: "context" }))}
+                style={{
+                  flex: 1,
+                  padding: "7px 0",
+                  background: formData.inputMode === "context" ? colors.accent : "transparent",
+                  border: "none",
+                  borderLeft: `1px solid ${colors.border}`,
+                  color: formData.inputMode === "context" ? colors.overlay : colors.subtext,
+                  fontSize: "13px",
+                  fontWeight: formData.inputMode === "context" ? 600 : 400,
+                  cursor: "pointer",
+                }}
+              >
+                テキスト形式
+              </button>
+            </div>
+            <p style={{ margin: "6px 0 0", fontSize: "12px", color: colors.muted }}>
+              {formData.inputMode === "turns"
+                ? "会話をターンごとに分けて入力します（ターンは任意）。"
+                : "会話履歴をまとめてテキストとして入力します（context_content）。"}
+            </p>
           </div>
+
+          {/* 入力内容 */}
+          {formData.inputMode === "turns" ? (
+            <div style={{ marginBottom: "16px" }}>
+              <p
+                style={{
+                  fontSize: "14px",
+                  color: colors.subtext,
+                  margin: "0 0 8px",
+                }}
+              >
+                会話ターン（任意）
+              </p>
+              <TurnEditor
+                turns={formData.turns}
+                onChange={(turns) => setFormData((prev) => ({ ...prev, turns }))}
+              />
+            </div>
+          ) : (
+            <div style={{ marginBottom: "16px" }}>
+              <label
+                htmlFor="test-case-context"
+                style={{
+                  display: "block",
+                  marginBottom: "6px",
+                  fontSize: "14px",
+                  color: colors.subtext,
+                }}
+              >
+                コンテキスト（任意）
+              </label>
+              <textarea
+                id="test-case-context"
+                value={formData.context_content}
+                onChange={(e) =>
+                  setFormData((prev) => ({ ...prev, context_content: e.target.value }))
+                }
+                placeholder="会話履歴や参照テキストをまとめて入力..."
+                rows={6}
+                style={{
+                  width: "100%",
+                  padding: "10px 12px",
+                  background: colors.card,
+                  border: `1px solid ${colors.border}`,
+                  borderRadius: "8px",
+                  color: colors.text,
+                  fontSize: "13px",
+                  outline: "none",
+                  resize: "vertical",
+                  boxSizing: "border-box",
+                  fontFamily: "monospace",
+                }}
+              />
+            </div>
+          )}
 
           {/* 期待記述 */}
           <div style={{ marginBottom: "24px" }}>
@@ -546,6 +643,7 @@ type TestCaseCardProps = {
 };
 
 function TestCaseCard({ testCase, onEdit, onDelete }: TestCaseCardProps) {
+  const isContextMode = testCase.turns.length === 0;
   const userTurns = testCase.turns.filter((t) => t.role === "user").length;
   const assistantTurns = testCase.turns.filter((t) => t.role === "assistant").length;
 
@@ -617,19 +715,7 @@ function TestCaseCard({ testCase, onEdit, onDelete }: TestCaseCardProps) {
 
       {/* ターン情報バッジ */}
       <div style={{ display: "flex", gap: "8px", flexWrap: "wrap" }}>
-        <span
-          style={{
-            padding: "2px 8px",
-            background: colors.overlay,
-            borderRadius: "4px",
-            fontSize: "12px",
-            color: colors.subtext,
-            border: `1px solid ${colors.border}`,
-          }}
-        >
-          計 {testCase.turns.length} ターン
-        </span>
-        {userTurns > 0 && (
+        {isContextMode ? (
           <span
             style={{
               padding: "2px 8px",
@@ -640,22 +726,51 @@ function TestCaseCard({ testCase, onEdit, onDelete }: TestCaseCardProps) {
               border: `1px solid ${colors.border}`,
             }}
           >
-            user × {userTurns}
+            テキスト形式
           </span>
-        )}
-        {assistantTurns > 0 && (
-          <span
-            style={{
-              padding: "2px 8px",
-              background: colors.overlay,
-              borderRadius: "4px",
-              fontSize: "12px",
-              color: colors.green,
-              border: `1px solid ${colors.border}`,
-            }}
-          >
-            assistant × {assistantTurns}
-          </span>
+        ) : (
+          <>
+            <span
+              style={{
+                padding: "2px 8px",
+                background: colors.overlay,
+                borderRadius: "4px",
+                fontSize: "12px",
+                color: colors.subtext,
+                border: `1px solid ${colors.border}`,
+              }}
+            >
+              計 {testCase.turns.length} ターン
+            </span>
+            {userTurns > 0 && (
+              <span
+                style={{
+                  padding: "2px 8px",
+                  background: colors.overlay,
+                  borderRadius: "4px",
+                  fontSize: "12px",
+                  color: colors.accent,
+                  border: `1px solid ${colors.border}`,
+                }}
+              >
+                user × {userTurns}
+              </span>
+            )}
+            {assistantTurns > 0 && (
+              <span
+                style={{
+                  padding: "2px 8px",
+                  background: colors.overlay,
+                  borderRadius: "4px",
+                  fontSize: "12px",
+                  color: colors.green,
+                  border: `1px solid ${colors.border}`,
+                }}
+              >
+                assistant × {assistantTurns}
+              </span>
+            )}
+          </>
         )}
         {testCase.expected_description && (
           <span
@@ -673,23 +788,41 @@ function TestCaseCard({ testCase, onEdit, onDelete }: TestCaseCardProps) {
         )}
       </div>
 
-      {/* 最初のターンのプレビュー */}
-      {testCase.turns[0] && (
-        <p
-          style={{
-            margin: 0,
-            fontSize: "13px",
-            color: colors.muted,
-            lineHeight: 1.5,
-            overflow: "hidden",
-            display: "-webkit-box",
-            WebkitLineClamp: 2,
-            WebkitBoxOrient: "vertical",
-          }}
-        >
-          {testCase.turns[0].content}
-        </p>
-      )}
+      {/* プレビュー */}
+      {isContextMode
+        ? testCase.context_content && (
+            <p
+              style={{
+                margin: 0,
+                fontSize: "13px",
+                color: colors.muted,
+                lineHeight: 1.5,
+                overflow: "hidden",
+                display: "-webkit-box",
+                WebkitLineClamp: 2,
+                WebkitBoxOrient: "vertical",
+                fontFamily: "monospace",
+              }}
+            >
+              {testCase.context_content}
+            </p>
+          )
+        : testCase.turns[0] && (
+            <p
+              style={{
+                margin: 0,
+                fontSize: "13px",
+                color: colors.muted,
+                lineHeight: 1.5,
+                overflow: "hidden",
+                display: "-webkit-box",
+                WebkitLineClamp: 2,
+                WebkitBoxOrient: "vertical",
+              }}
+            >
+              {testCase.turns[0].content}
+            </p>
+          )}
     </div>
   );
 }
@@ -720,6 +853,7 @@ export function TestCasesPage() {
       createTestCase(projectId, {
         title: data.title,
         turns: data.turns,
+        context_content: data.context_content || undefined,
         expected_description: data.expected_description || undefined,
       }),
     onSuccess: () => {
@@ -733,6 +867,7 @@ export function TestCasesPage() {
       updateTestCase(projectId, tcId, {
         title: data.title,
         turns: data.turns,
+        context_content: data.context_content,
         expected_description: data.expected_description || null,
       }),
     onSuccess: () => {

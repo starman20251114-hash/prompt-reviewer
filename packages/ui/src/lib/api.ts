@@ -127,7 +127,7 @@ export function createTestCase(
   projectId: number,
   data: {
     title: string;
-    turns: Turn[];
+    turns?: Turn[];
     context_content?: string;
     expected_description?: string;
     display_order?: number;
