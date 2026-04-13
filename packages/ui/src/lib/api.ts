@@ -23,6 +23,10 @@ async function fetchJson<T>(path: string, init?: RequestInit): Promise<T> {
     throw new ApiError(response.status, `API error: ${response.status} ${response.statusText}`);
   }
 
+  if (response.status === 204 || response.headers.get("Content-Length") === "0") {
+    return undefined as T;
+  }
+
   return response.json() as Promise<T>;
 }
 
