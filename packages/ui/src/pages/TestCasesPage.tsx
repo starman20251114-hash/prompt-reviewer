@@ -914,7 +914,7 @@ export function TestCasesPage() {
       </div>
 
       <p style={{ color: colors.subtext, marginBottom: "24px", margin: "0 0 24px" }}>
-        プロジェクトのテストケース一覧です。マルチターンの会話と期待記述を管理します。
+        プロジェクトのテストケース一覧です。参照情報と期待記述を管理します。
       </p>
 
       {isLoading && (
