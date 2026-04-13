@@ -1,14 +1,3 @@
-CREATE TABLE `project_settings` (
-	`id` integer PRIMARY KEY AUTOINCREMENT NOT NULL,
-	`project_id` integer NOT NULL,
-	`model` text DEFAULT 'claude-opus-4-5' NOT NULL,
-	`temperature` real DEFAULT 0.7 NOT NULL,
-	`api_provider` text DEFAULT 'anthropic' NOT NULL,
-	`created_at` integer NOT NULL,
-	`updated_at` integer NOT NULL,
-	FOREIGN KEY (`project_id`) REFERENCES `projects`(`id`) ON UPDATE no action ON DELETE no action
-);
---> statement-breakpoint
 CREATE TABLE `projects` (
 	`id` integer PRIMARY KEY AUTOINCREMENT NOT NULL,
 	`name` text NOT NULL,
