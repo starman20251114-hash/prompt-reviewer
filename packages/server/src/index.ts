@@ -2,6 +2,7 @@ import { serve } from "@hono/node-server";
 import { db } from "@prompt-reviewer/core";
 import { Hono } from "hono";
 import { cors } from "hono/cors";
+import { createProjectSettingsRouter } from "./routes/project-settings.js";
 import { createProjectsRouter } from "./routes/projects.js";
 import { createPromptVersionsRouter } from "./routes/prompt-versions.js";
 import { createRunsRouter } from "./routes/runs.js";
@@ -29,6 +30,7 @@ app.route("/api/projects/:projectId/prompt-versions", createPromptVersionsRouter
 app.route("/api/projects/:projectId/prompt-versions", createVersionSummaryRouter(db));
 app.route("/api/projects/:projectId/runs", createRunsRouter(db));
 app.route("/api/runs", createScoresRouter(db));
+app.route("/api/projects/:projectId/settings", createProjectSettingsRouter(db));
 
 const port = Number(process.env.PORT ?? 3001);
 
