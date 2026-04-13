@@ -15,6 +15,9 @@
 # 依存パッケージのインストール
 pnpm install
 
+# コアパッケージのビルド（初回・core 変更時に必要）
+pnpm --filter @prompt-reviewer/core build
+
 # 環境変数の設定
 cp .env.example .env
 ```

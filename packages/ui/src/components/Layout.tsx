@@ -1,10 +1,68 @@
-import { NavLink, Outlet } from "react-router";
+import { NavLink, Outlet, useParams } from "react-router";
+import { ErrorBoundary } from "./ErrorBoundary";
 
-const navItems = [
-  { to: "/", label: "ダッシュボード" },
-  { to: "/projects", label: "プロジェクト" },
-  { to: "/health", label: "ヘルスチェック" },
-];
+const navLinkStyle = ({ isActive }: { isActive: boolean }) => ({
+  display: "block",
+  padding: "8px 16px",
+  textDecoration: "none",
+  color: isActive ? "#cba6f7" : "#cdd6f4",
+  backgroundColor: isActive ? "#313244" : "transparent",
+  borderRadius: "4px",
+  margin: "2px 8px",
+  fontSize: "14px",
+});
+
+function ProjectSubNav({ projectId }: { projectId: string }) {
+  const subNavItems = [
+    { to: `/projects/${projectId}`, label: "概要", end: true },
+    { to: `/projects/${projectId}/test-cases`, label: "テストケース" },
+    { to: `/projects/${projectId}/prompts`, label: "プロンプト" },
+    { to: `/projects/${projectId}/runs`, label: "Run 一覧" },
+    { to: `/projects/${projectId}/settings`, label: "設定" },
+  ];
+
+  return (
+    <div style={{ marginTop: "8px" }}>
+      <div
+        style={{
+          padding: "4px 16px",
+          fontSize: "11px",
+          color: "#6c7086",
+          textTransform: "uppercase",
+          letterSpacing: "0.08em",
+          marginBottom: "4px",
+        }}
+      >
+        プロジェクト
+      </div>
+      {subNavItems.map(({ to, label, end }) => (
+        <NavLink key={to} to={to} end={end} style={navLinkStyle}>
+          {label}
+        </NavLink>
+      ))}
+    </div>
+  );
+}
+
+function SidebarNav() {
+  const { id } = useParams<{ id?: string }>();
+
+  const topNavItems = [
+    { to: "/", label: "プロジェクト一覧", end: true },
+    { to: "/health", label: "ヘルスチェック", end: false },
+  ];
+
+  return (
+    <nav style={{ marginTop: "8px" }}>
+      {topNavItems.map(({ to, label, end }) => (
+        <NavLink key={to} to={to} end={end} style={navLinkStyle}>
+          {label}
+        </NavLink>
+      ))}
+      {id && <ProjectSubNav projectId={id} />}
+    </nav>
+  );
+}
 
 export function Layout() {
   return (
@@ -12,10 +70,12 @@ export function Layout() {
       <aside
         style={{
           width: "240px",
-          backgroundColor: "#1e1e2e",
+          backgroundColor: "#181825",
           color: "#cdd6f4",
           padding: "16px 0",
           flexShrink: 0,
+          borderRight: "1px solid #313244",
+          overflowY: "auto",
         }}
       >
         <div style={{ padding: "0 16px 16px", borderBottom: "1px solid #313244" }}>
@@ -23,26 +83,7 @@ export function Layout() {
             Prompt Reviewer
           </h1>
         </div>
-        <nav style={{ marginTop: "8px" }}>
-          {navItems.map(({ to, label }) => (
-            <NavLink
-              key={to}
-              to={to}
-              end={to === "/"}
-              style={({ isActive }) => ({
-                display: "block",
-                padding: "8px 16px",
-                textDecoration: "none",
-                color: isActive ? "#cba6f7" : "#cdd6f4",
-                backgroundColor: isActive ? "#313244" : "transparent",
-                borderRadius: "4px",
-                margin: "2px 8px",
-              })}
-            >
-              {label}
-            </NavLink>
-          ))}
-        </nav>
+        <SidebarNav />
       </aside>
       <main
         style={{
@@ -53,7 +94,9 @@ export function Layout() {
           overflow: "auto",
         }}
       >
-        <Outlet />
+        <ErrorBoundary>
+          <Outlet />
+        </ErrorBoundary>
       </main>
     </div>
   );
