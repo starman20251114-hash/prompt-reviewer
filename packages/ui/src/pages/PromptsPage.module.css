@@ -323,6 +323,12 @@
   flex-direction: column;
 }
 
+.panelHeaderRight {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
 .btnEdit {
   padding: 5px 14px;
   background: transparent;
@@ -331,6 +337,38 @@
   color: var(--c-subtext);
   font-size: 13px;
   cursor: pointer;
+}
+
+/* ==================== Selected badge & button ==================== */
+.badgeSelected {
+  padding: 2px 8px;
+  background: rgba(137, 220, 235, 0.2);
+  border: 1px solid rgba(137, 220, 235, 0.4);
+  border-radius: 4px;
+  font-size: 11px;
+  color: var(--c-blue);
+  font-weight: 600;
+}
+
+.btnSelected {
+  padding: 5px 12px;
+  border-radius: 6px;
+  font-size: 12px;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.btnSelectedInactive {
+  background: transparent;
+  color: var(--c-muted);
+  border: 1px solid var(--c-border);
+}
+
+.btnSelectedActive {
+  background: rgba(137, 220, 235, 0.13);
+  color: var(--c-blue);
+  border: 1px solid rgba(137, 220, 235, 0.4);
+  cursor: not-allowed;
 }
 
 .memoBox {

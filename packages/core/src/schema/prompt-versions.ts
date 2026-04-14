@@ -18,6 +18,7 @@ export const prompt_versions = sqliteTable("prompt_versions", {
     (): AnySQLiteColumn => prompt_versions.id,
   ),
   created_at: integer("created_at").notNull(),
+  is_selected: integer("is_selected", { mode: "boolean" }).notNull().default(false),
 });
 
 // Drizzle推論型のエクスポート

@@ -7,6 +7,7 @@ import {
   createPromptVersion,
   getProject,
   getPromptVersions,
+  setSelectedVersion,
   updatePromptVersion,
 } from "../lib/api";
 import styles from "./PromptsPage.module.css";
@@ -645,8 +646,9 @@ type PanelMode =
 export function PromptsPage() {
   const { id } = useParams<{ id: string }>();
   const projectId = Number(id);
+  const queryClient = useQueryClient();
 
-  const [selectedVersion, setSelectedVersion] = useState<PromptVersion | null>(null);
+  const [selectedVersion, setSelectedVersionState] = useState<PromptVersion | null>(null);
   const [compareVersion, setCompareVersion] = useState<PromptVersion | null>(null);
   const [panelMode, setPanelMode] = useState<PanelMode>(null);
   const [branchTarget, setBranchTarget] = useState<PromptVersion | null>(null);
@@ -668,12 +670,19 @@ export function PromptsPage() {
     enabled: !Number.isNaN(projectId),
   });
 
+  const setSelectedMutation = useMutation({
+    mutationFn: (versionId: number) => setSelectedVersion(projectId, versionId),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: ["promptVersions", projectId] });
+    },
+  });
+
   const tree = versions ? buildVersionTree(versions) : [];
   const flatNodes = flattenTree(tree);
   const verticalLinesPerNode = computeVerticalLines(flatNodes);
 
   function handleSelectVersion(v: PromptVersion) {
-    setSelectedVersion(v);
+    setSelectedVersionState(v);
     setPanelMode({ type: "view", version: v });
   }
 
@@ -701,7 +710,7 @@ export function PromptsPage() {
 
   function handleBranchCreated(newVersion: PromptVersion) {
     setBranchTarget(null);
-    setSelectedVersion(newVersion);
+    setSelectedVersionState(newVersion);
     setPanelMode({ type: "edit", version: newVersion });
   }
 
@@ -726,7 +735,7 @@ export function PromptsPage() {
           <button
             type="button"
             onClick={() => {
-              setSelectedVersion(null);
+              setSelectedVersionState(null);
               setPanelMode({ type: "new" });
             }}
             className={styles.btnPrimary}
@@ -833,13 +842,26 @@ export function PromptsPage() {
                     {panelMode.version.name ?? `バージョン ${panelMode.version.version}`}
                   </span>
                 </div>
-                <button
-                  type="button"
-                  onClick={() => setPanelMode({ type: "edit", version: panelMode.version })}
-                  className={styles.btnEdit}
-                >
-                  編集
-                </button>
+                <div className={styles.panelHeaderRight}>
+                  {panelMode.version.is_selected && (
+                    <span className={styles.badgeSelected}>Selected</span>
+                  )}
+                  <button
+                    type="button"
+                    onClick={() => setSelectedMutation.mutate(panelMode.version.id)}
+                    disabled={setSelectedMutation.isPending || panelMode.version.is_selected}
+                    className={`${styles.btnSelected} ${panelMode.version.is_selected ? styles.btnSelectedActive : styles.btnSelectedInactive}`}
+                  >
+                    {panelMode.version.is_selected ? "Selected 済み" : "Selected に設定"}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setPanelMode({ type: "edit", version: panelMode.version })}
+                    className={styles.btnEdit}
+                  >
+                    編集
+                  </button>
+                </div>
               </div>
               <div className={styles.panelBody}>
                 {panelMode.version.memo && (
@@ -877,7 +899,7 @@ export function PromptsPage() {
                   onSave={() => {
                     // 編集完了後に最新データで表示モードに戻す
                     setPanelMode(null);
-                    setSelectedVersion(null);
+                    setSelectedVersionState(null);
                   }}
                   onCancel={() => setPanelMode({ type: "view", version: panelMode.version })}
                 />

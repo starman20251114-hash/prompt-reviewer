@@ -193,5 +193,45 @@ export function createPromptVersionsRouter(db: DB) {
     return c.json(created, 201);
   });
 
+  // PATCH /api/projects/:projectId/prompt-versions/:id/selected - Selected フラグ設定
+  // プロジェクト内の既存フラグを解除してから対象バージョンに設定（1プロジェクト1件制約）
+  router.patch("/:id/selected", async (c) => {
+    const projectId = Number(c.req.param("projectId"));
+    const id = Number(c.req.param("id"));
+
+    if (Number.isNaN(projectId) || Number.isNaN(id)) {
+      return c.json({ error: "Invalid ID" }, 400);
+    }
+
+    const [existing] = await db
+      .select()
+      .from(prompt_versions)
+      .where(and(eq(prompt_versions.id, id), eq(prompt_versions.project_id, projectId)));
+
+    if (!existing) {
+      return c.json({ error: "PromptVersion not found" }, 404);
+    }
+
+    // プロジェクト内の既存 selected フラグを解除
+    await db
+      .update(prompt_versions)
+      .set({ is_selected: false })
+      .where(eq(prompt_versions.project_id, projectId));
+
+    // 対象バージョンに selected フラグを設定
+    const updateResult = await db
+      .update(prompt_versions)
+      .set({ is_selected: true })
+      .where(and(eq(prompt_versions.id, id), eq(prompt_versions.project_id, projectId)))
+      .returning();
+
+    const updated = updateResult[0];
+    if (!updated) {
+      return c.json({ error: "Failed to update PromptVersion" }, 500);
+    }
+
+    return c.json(updated);
+  });
+
   return router;
 }

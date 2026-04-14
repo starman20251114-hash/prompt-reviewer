@@ -106,6 +106,7 @@ export type PromptVersion = {
   content: string;
   parent_version_id: number | null;
   created_at: number;
+  is_selected: boolean;
 };
 
 export function getPromptVersions(projectId: number): Promise<PromptVersion[]> {
@@ -253,4 +254,8 @@ export function createRun(
 
 export function setBestRun(projectId: number, id: number): Promise<Run> {
   return api.patch<Run>(`/projects/${projectId}/runs/${id}/best`, {});
+}
+
+export function setSelectedVersion(projectId: number, id: number): Promise<PromptVersion> {
+  return api.patch<PromptVersion>(`/projects/${projectId}/prompt-versions/${id}/selected`, {});
 }
