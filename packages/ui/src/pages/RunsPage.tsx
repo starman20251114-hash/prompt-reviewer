@@ -1,15 +1,401 @@
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useState } from "react";
 import { useParams } from "react-router";
+import {
+  type ConversationMessage,
+  type Run,
+  createRun,
+  getProject,
+  getPromptVersions,
+  getRuns,
+  getTestCases,
+  setBestRun,
+} from "../lib/api";
+import styles from "./RunsPage.module.css";
+
+function formatDate(timestamp: number): string {
+  return new Date(timestamp).toLocaleDateString("ja-JP", {
+    year: "numeric",
+    month: "short",
+    day: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+}
+
+type Step = "select" | "input" | "saved";
 
 export function RunsPage() {
   const { id } = useParams<{ id: string }>();
+  const projectId = Number(id);
+  const queryClient = useQueryClient();
+
+  const [step, setStep] = useState<Step>("select");
+  const [selectedVersionId, setSelectedVersionId] = useState<number | "">("");
+  const [selectedTestCaseId, setSelectedTestCaseId] = useState<number | "">("");
+  const [llmResponse, setLlmResponse] = useState("");
+  const [savedRun, setSavedRun] = useState<Run | null>(null);
+
+  const { data: project } = useQuery({
+    queryKey: ["projects", projectId],
+    queryFn: () => getProject(projectId),
+    enabled: !Number.isNaN(projectId),
+  });
+
+  const { data: promptVersions = [] } = useQuery({
+    queryKey: ["prompt-versions", projectId],
+    queryFn: () => getPromptVersions(projectId),
+    enabled: !Number.isNaN(projectId),
+  });
+
+  const { data: testCases = [] } = useQuery({
+    queryKey: ["test-cases", projectId],
+    queryFn: () => getTestCases(projectId),
+    enabled: !Number.isNaN(projectId),
+  });
+
+  const { data: existingRuns = [] } = useQuery({
+    queryKey: [
+      "runs",
+      projectId,
+      { prompt_version_id: selectedVersionId, test_case_id: selectedTestCaseId },
+    ],
+    queryFn: () =>
+      getRuns(projectId, {
+        prompt_version_id: selectedVersionId !== "" ? selectedVersionId : undefined,
+        test_case_id: selectedTestCaseId !== "" ? selectedTestCaseId : undefined,
+      }),
+    enabled: step === "saved" && selectedVersionId !== "" && selectedTestCaseId !== "",
+  });
+
+  const createRunMutation = useMutation({
+    mutationFn: (data: {
+      prompt_version_id: number;
+      test_case_id: number;
+      conversation: ConversationMessage[];
+    }) =>
+      createRun(projectId, {
+        ...data,
+        model: "manual",
+        temperature: 0,
+        api_provider: "manual",
+      }),
+    onSuccess: (run) => {
+      setSavedRun(run);
+      setStep("saved");
+      void queryClient.invalidateQueries({ queryKey: ["runs", projectId] });
+    },
+  });
+
+  const setBestMutation = useMutation({
+    mutationFn: (runId: number) => setBestRun(projectId, runId),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: ["runs", projectId] });
+    },
+  });
+
+  const selectedVersion =
+    selectedVersionId !== "" ? promptVersions.find((v) => v.id === selectedVersionId) : undefined;
+  const selectedTestCase =
+    selectedTestCaseId !== "" ? testCases.find((tc) => tc.id === selectedTestCaseId) : undefined;
+
+  function handleStartRun() {
+    if (selectedVersionId === "" || selectedTestCaseId === "") return;
+    setLlmResponse("");
+    setStep("input");
+  }
+
+  function handleSaveRun() {
+    if (!selectedTestCase || selectedVersionId === "" || selectedTestCaseId === "") return;
+    if (!llmResponse.trim()) return;
+
+    const conversation: ConversationMessage[] = [
+      ...selectedTestCase.turns,
+      { role: "assistant", content: llmResponse.trim() },
+    ];
+
+    createRunMutation.mutate({
+      prompt_version_id: selectedVersionId,
+      test_case_id: selectedTestCaseId,
+      conversation,
+    });
+  }
+
+  function handleNewRun() {
+    setSavedRun(null);
+    setStep("select");
+  }
+
+  function getLastAssistantMessage(conversation: ConversationMessage[]): string {
+    const assistantMessages = conversation.filter((m) => m.role === "assistant");
+    return assistantMessages[assistantMessages.length - 1]?.content ?? "";
+  }
+
+  const isStartDisabled = selectedVersionId === "" || selectedTestCaseId === "";
+  const isSaveDisabled = !llmResponse.trim() || createRunMutation.isPending;
 
   return (
-    <div>
-      <h2 style={{ margin: "0 0 16px", fontSize: "20px" }}>Run 一覧・採点</h2>
-      <p style={{ color: "#a6adc8" }}>
-        プロジェクト <code style={{ color: "#cba6f7" }}>{id}</code> の実行結果と採点。
-      </p>
-      <p style={{ color: "#6c7086", marginTop: "24px" }}>（実装予定）</p>
+    <div className={`${styles.root} ${styles.page}`}>
+      {/* ヘッダー */}
+      <div className={styles.pageHeader}>
+        <div>
+          <h2 className={styles.pageTitle}>Run 実行・管理</h2>
+          {project && <p className={styles.projectName}>{project.name}</p>}
+        </div>
+      </div>
+
+      {/* Step 1: 選択フォーム */}
+      {step === "select" && (
+        <div className={styles.selectCard}>
+          <h3 className={styles.selectCardTitle}>Run を開始する</h3>
+
+          <div className={styles.fieldGroup}>
+            <label htmlFor="select-version" className={styles.fieldLabel}>
+              プロンプトバージョン
+            </label>
+            <select
+              id="select-version"
+              value={selectedVersionId}
+              onChange={(e) =>
+                setSelectedVersionId(e.target.value === "" ? "" : Number(e.target.value))
+              }
+              className={styles.fieldSelect}
+            >
+              <option value="">-- 選択してください --</option>
+              {promptVersions.map((v) => (
+                <option key={v.id} value={v.id}>
+                  v{v.version}
+                  {v.name ? ` - ${v.name}` : ""}
+                </option>
+              ))}
+            </select>
+            {promptVersions.length === 0 && (
+              <p className={styles.fieldHint}>
+                プロンプトバージョンがありません。先にバージョンを作成してください。
+              </p>
+            )}
+          </div>
+
+          <div className={styles.fieldGroupLg}>
+            <label htmlFor="select-test-case" className={styles.fieldLabel}>
+              テストケース
+            </label>
+            <select
+              id="select-test-case"
+              value={selectedTestCaseId}
+              onChange={(e) =>
+                setSelectedTestCaseId(e.target.value === "" ? "" : Number(e.target.value))
+              }
+              className={styles.fieldSelect}
+            >
+              <option value="">-- 選択してください --</option>
+              {testCases.map((tc) => (
+                <option key={tc.id} value={tc.id}>
+                  {tc.title}
+                </option>
+              ))}
+            </select>
+            {testCases.length === 0 && (
+              <p className={styles.fieldHint}>
+                テストケースがありません。先にテストケースを作成してください。
+              </p>
+            )}
+          </div>
+
+          <button
+            type="button"
+            onClick={handleStartRun}
+            disabled={isStartDisabled}
+            className={`${styles.btnStart} ${isStartDisabled ? styles.btnStartDisabled : ""}`}
+          >
+            Run を開始
+          </button>
+        </div>
+      )}
+
+      {/* Step 2: Run 実行UI */}
+      {step === "input" && selectedVersion && selectedTestCase && (
+        <div>
+          <div className={styles.stepHeader}>
+            <button
+              type="button"
+              onClick={() => setStep("select")}
+              className={styles.btnSecondary}
+            >
+              ← 戻る
+            </button>
+            <span className={styles.stepLabel}>
+              v{selectedVersion.version}
+              {selectedVersion.name ? ` - ${selectedVersion.name}` : ""} × {selectedTestCase.title}
+            </span>
+          </div>
+
+          <div className={styles.twoColumns}>
+            {/* 左カラム: テストケース表示 */}
+            <div className={styles.panel}>
+              <h3 className={styles.panelTitle}>
+                テストケース: {selectedTestCase.title}
+              </h3>
+
+              {/* 会話ターン表示 */}
+              <div className={styles.chatList}>
+                {selectedTestCase.turns.map((turn, index) => (
+                  <div
+                    key={`turn-${
+                      // biome-ignore lint/suspicious/noArrayIndexKey: ターン配列は順序で管理するため index をキーとして使用
+                      index
+                    }`}
+                    className={`${styles.bubbleWrapper} ${turn.role === "user" ? styles.bubbleWrapperUser : styles.bubbleWrapperAssistant}`}
+                  >
+                    <span className={styles.bubbleRole}>
+                      {turn.role === "user" ? "User" : "Assistant"}
+                    </span>
+                    <div
+                      className={`${styles.bubble} ${turn.role === "user" ? styles.bubbleUser : styles.bubbleAssistant}`}
+                    >
+                      {turn.content}
+                    </div>
+                  </div>
+                ))}
+              </div>
+
+              {/* 期待される説明 */}
+              {selectedTestCase.expected_description && (
+                <div className={styles.expectedBox}>
+                  <p className={styles.expectedLabel}>期待される応答の説明</p>
+                  <p className={styles.expectedText}>
+                    {selectedTestCase.expected_description}
+                  </p>
+                </div>
+              )}
+            </div>
+
+            {/* 右カラム: 手動入力エリア */}
+            <div className={`${styles.panel} ${styles.panelFlex}`}>
+              <h3 className={styles.panelSubtitle}>LLM 応答の入力</h3>
+              <p className={styles.inputDescription}>LLM 応答を手動で入力してください</p>
+
+              <textarea
+                value={llmResponse}
+                onChange={(e) => setLlmResponse(e.target.value)}
+                placeholder="LLM の応答をここにペーストまたは入力してください..."
+                className={styles.responseTextarea}
+              />
+
+              <div className={styles.inputActions}>
+                <button
+                  type="button"
+                  onClick={handleSaveRun}
+                  disabled={isSaveDisabled}
+                  className={`${styles.btnSave} ${isSaveDisabled ? styles.btnSaveDisabled : ""}`}
+                >
+                  {createRunMutation.isPending ? "保存中..." : "Run を保存"}
+                </button>
+
+                {/* TODO: Phase 2 - LLM実行ボタン */}
+                <button
+                  type="button"
+                  disabled
+                  title="Phase 2 で実装予定"
+                  className={styles.btnLlmRun}
+                >
+                  LLM 実行（Phase 2）
+                </button>
+              </div>
+
+              {createRunMutation.isError && (
+                <p className={styles.errorMsg}>保存に失敗しました。もう一度お試しください。</p>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Step 3: 保存後の表示 */}
+      {step === "saved" && savedRun && selectedVersion && selectedTestCase && (
+        <div>
+          <div className={styles.successBanner}>
+            Run を保存しました（ID: {savedRun.id}）
+          </div>
+
+          <div className={styles.savedActions}>
+            <button type="button" onClick={handleNewRun} className={styles.btnPrimary}>
+              新しい Run を作成
+            </button>
+          </div>
+
+          {/* 保存したRunの内容 */}
+          <div className={styles.savedPanel}>
+            <h3 className={styles.panelTitle}>保存した Run の内容</h3>
+            <p className={styles.savedMeta}>
+              v{selectedVersion.version}
+              {selectedVersion.name ? ` - ${selectedVersion.name}` : ""} × {selectedTestCase.title}{" "}
+              · {formatDate(savedRun.created_at)}
+            </p>
+            <div className={styles.chatList}>
+              {savedRun.conversation.map((msg, index) => (
+                <div
+                  key={`msg-${
+                    // biome-ignore lint/suspicious/noArrayIndexKey: 会話配列は順序で管理するため index をキーとして使用
+                    index
+                  }`}
+                  className={`${styles.bubbleWrapper} ${msg.role === "user" ? styles.bubbleWrapperUser : styles.bubbleWrapperAssistant}`}
+                >
+                  <span className={styles.bubbleRole}>
+                    {msg.role === "user" ? "User" : "Assistant"}
+                  </span>
+                  <div
+                    className={`${styles.bubble} ${msg.role === "user" ? styles.bubbleUser : styles.bubbleAssistant}`}
+                  >
+                    {msg.content}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* 既存のRun一覧 */}
+          <div className={styles.savedPanel}>
+            <h3 className={styles.panelTitle}>過去の Run 一覧</h3>
+            {existingRuns.length === 0 ? (
+              <p className={styles.emptyRuns}>まだ Run がありません。</p>
+            ) : (
+              <div className={styles.runList}>
+                {existingRuns.map((run) => {
+                  const lastResponse = getLastAssistantMessage(run.conversation);
+                  return (
+                    <div
+                      key={run.id}
+                      className={`${styles.runCard} ${run.is_best ? styles.runCardBest : ""}`}
+                    >
+                      <div className={styles.runCardBody}>
+                        <div className={styles.runCardHeader}>
+                          <span className={styles.runId}>Run #{run.id}</span>
+                          {run.is_best && (
+                            <span className={styles.badgeBest}>ベスト回答</span>
+                          )}
+                          <span className={styles.runDate}>{formatDate(run.created_at)}</span>
+                        </div>
+                        {lastResponse && (
+                          <p className={styles.runPreview}>{lastResponse}</p>
+                        )}
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => setBestMutation.mutate(run.id)}
+                        disabled={setBestMutation.isPending || run.is_best}
+                        className={`${styles.btnBest} ${run.is_best ? styles.btnBestActive : styles.btnBestInactive}`}
+                      >
+                        {run.is_best ? "ベスト済み" : "ベストに設定"}
+                      </button>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+        </div>
+      )}
     </div>
   );
 }
