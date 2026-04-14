@@ -3,7 +3,9 @@ import { useState } from "react";
 import { useParams } from "react-router";
 import {
   type ConversationMessage,
+  type PromptVersion,
   type Run,
+  type TestCase,
   createRun,
   getProject,
   getPromptVersions,
@@ -12,6 +14,67 @@ import {
   setBestRun,
 } from "../lib/api";
 import styles from "./RunsPage.module.css";
+
+function buildFullPrompt(version: PromptVersion, testCase: TestCase): string {
+  const systemPrompt = testCase.context_content
+    ? version.content.includes("{{context}}")
+      ? version.content.replace("{{context}}", testCase.context_content)
+      : `${version.content}\n\n${testCase.context_content}`
+    : version.content;
+
+  const turnsText = testCase.turns
+    .map((t) => `${t.role === "user" ? "User" : "Assistant"}: ${t.content}`)
+    .join("\n\n");
+
+  return turnsText
+    ? `[System Prompt]\n${systemPrompt}\n\n[Conversation]\n${turnsText}`
+    : `[System Prompt]\n${systemPrompt}`;
+}
+
+function CopyPromptPanel({
+  version,
+  testCase,
+}: {
+  version: PromptVersion;
+  testCase: TestCase;
+}) {
+  const [open, setOpen] = useState(false);
+  const [copied, setCopied] = useState(false);
+  const fullPrompt = buildFullPrompt(version, testCase);
+
+  function handleCopy() {
+    navigator.clipboard.writeText(fullPrompt).then(() => {
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    });
+  }
+
+  return (
+    <div className={styles.copyPromptPanel}>
+      <div className={styles.copyPromptHeader}>
+        <button
+          type="button"
+          onClick={() => setOpen((prev) => !prev)}
+          className={styles.btnCopyPromptToggle}
+          aria-expanded={open}
+        >
+          {open ? "▲ プロンプト全文を閉じる" : "▼ プロンプト全文を表示"}
+        </button>
+        <button type="button" onClick={handleCopy} className={styles.btnCopy}>
+          {copied ? "✓ コピー済み" : "コピー"}
+        </button>
+      </div>
+      {open && (
+        <textarea
+          readOnly
+          value={fullPrompt}
+          className={styles.copyPromptTextarea}
+          rows={12}
+        />
+      )}
+    </div>
+  );
+}
 
 function formatDate(timestamp: number): string {
   return new Date(timestamp).toLocaleDateString("ja-JP", {
@@ -362,6 +425,8 @@ export function RunsPage() {
                   {selectedTestCase.title}
                 </span>
               </div>
+
+              <CopyPromptPanel version={selectedVersion} testCase={selectedTestCase} />
 
               <div className={styles.twoColumns}>
                 {/* 左カラム: テストケース表示 */}
