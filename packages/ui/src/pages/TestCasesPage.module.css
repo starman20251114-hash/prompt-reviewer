@@ -1,30 +1,11 @@
-/* ==================== Color tokens ==================== */
-.root {
-  --c-bg: #1e1e2e;
-  --c-card: #313244;
-  --c-border: #45475a;
-  --c-text: #cdd6f4;
-  --c-subtext: #a6adc8;
-  --c-accent: #cba6f7;
-  --c-danger: #f38ba8;
-  --c-overlay: #181825;
-  --c-muted: #6c7086;
-  --c-green: #a6e3a1;
-  --c-yellow: #f9e2af;
-}
-
 /* ==================== Page layout ==================== */
 .pageHeader {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
+  composes: pageHeader from '../styles/shared.module.css';
   margin-bottom: 8px;
 }
 
 .pageTitle {
-  margin: 0;
-  font-size: 20px;
-  color: var(--c-text);
+  composes: pageTitle from '../styles/shared.module.css';
 }
 
 .pageDescription {
@@ -69,24 +50,15 @@
 
 /* ==================== Shared buttons ==================== */
 .btnPrimary {
+  composes: btnPrimary from '../styles/shared.module.css';
   padding: 8px 18px;
-  background: var(--c-accent);
-  border: none;
-  border-radius: 8px;
-  color: var(--c-overlay);
   font-size: 14px;
-  font-weight: 600;
-  cursor: pointer;
 }
 
 .btnSecondary {
+  composes: btnSecondary from '../styles/shared.module.css';
   padding: 8px 20px;
-  background: transparent;
-  border: 1px solid var(--c-border);
-  border-radius: 8px;
-  color: var(--c-subtext);
   font-size: 14px;
-  cursor: pointer;
 }
 
 .btnDanger {
@@ -101,8 +73,7 @@
 }
 
 .btnDisabled {
-  cursor: not-allowed;
-  opacity: 0.6;
+  composes: btnDisabled from '../styles/shared.module.css';
 }
 
 /* ==================== Modal ==================== */
@@ -119,44 +90,26 @@
 }
 
 .modalOverlayCentered {
-  position: fixed;
-  inset: 0;
-  background: rgba(0, 0, 0, 0.6);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  z-index: 100;
+  composes: modalOverlay from '../styles/shared.module.css';
 }
 
 .modalContent {
-  background: var(--c-overlay);
-  border: 1px solid var(--c-border);
-  border-radius: 12px;
-  padding: 28px;
+  composes: modalContent from '../styles/shared.module.css';
   width: 600px;
-  max-width: 90vw;
 }
 
 .modalContentSm {
-  background: var(--c-overlay);
-  border: 1px solid var(--c-border);
-  border-radius: 12px;
-  padding: 28px;
+  composes: modalContent from '../styles/shared.module.css';
   width: 420px;
-  max-width: 90vw;
 }
 
 .modalTitle {
-  margin: 0 0 20px;
-  font-size: 18px;
-  color: var(--c-text);
+  composes: modalTitle from '../styles/shared.module.css';
 }
 
 /* ==================== Form ==================== */
 .formActions {
-  display: flex;
-  gap: 12px;
-  justify-content: flex-end;
+  composes: formActions from '../styles/shared.module.css';
 }
 
 .fieldGroup {
@@ -168,41 +121,19 @@
 }
 
 .fieldLabel {
-  display: block;
-  margin-bottom: 6px;
-  font-size: 14px;
-  color: var(--c-subtext);
+  composes: fieldLabel from '../styles/shared.module.css';
 }
 
 .requiredMark {
-  color: var(--c-danger);
-  margin-left: 4px;
+  composes: requiredMark from '../styles/shared.module.css';
 }
 
 .fieldInput {
-  width: 100%;
-  padding: 10px 12px;
-  background: var(--c-card);
-  border: 1px solid var(--c-border);
-  border-radius: 8px;
-  color: var(--c-text);
-  font-size: 14px;
-  outline: none;
-  box-sizing: border-box;
+  composes: fieldInput from '../styles/shared.module.css';
 }
 
 .fieldTextarea {
-  width: 100%;
-  padding: 10px 12px;
-  background: var(--c-card);
-  border: 1px solid var(--c-border);
-  border-radius: 8px;
-  color: var(--c-text);
-  font-size: 14px;
-  outline: none;
-  resize: vertical;
-  box-sizing: border-box;
-  font-family: inherit;
+  composes: fieldTextarea from '../styles/shared.module.css';
 }
 
 .fieldTextareaContext {
@@ -417,11 +348,7 @@
 }
 
 .badge {
-  padding: 2px 8px;
-  background: var(--c-overlay);
-  border-radius: 4px;
-  font-size: 12px;
-  border: 1px solid var(--c-border);
+  composes: badge from '../styles/shared.module.css';
 }
 
 .badgeTextMode {

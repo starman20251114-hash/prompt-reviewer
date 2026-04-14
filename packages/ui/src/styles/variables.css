@@ -1,0 +1,17 @@
+/* ==================== Global color tokens ==================== */
+/* Catppuccin Mocha palette */
+:root {
+  --c-bg: #1e1e2e;
+  --c-card: #313244;
+  --c-border: #45475a;
+  --c-text: #cdd6f4;
+  --c-subtext: #a6adc8;
+  --c-accent: #cba6f7;
+  --c-danger: #f38ba8;
+  --c-overlay: #181825;
+  --c-surface: #45475a;
+  --c-muted: #6c7086;
+  --c-green: #a6e3a1;
+  --c-yellow: #f9e2af;
+  --c-blue: #89b4fa;
+}
