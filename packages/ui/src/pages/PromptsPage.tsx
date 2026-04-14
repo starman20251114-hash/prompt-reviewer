@@ -672,8 +672,9 @@ export function PromptsPage() {
 
   const setSelectedMutation = useMutation({
     mutationFn: (versionId: number) => setSelectedVersion(projectId, versionId),
-    onSuccess: () => {
+    onSuccess: (updatedVersion) => {
       void queryClient.invalidateQueries({ queryKey: ["promptVersions", projectId] });
+      setPanelMode({ type: "view", version: updatedVersion });
     },
   });
 
