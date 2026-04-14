@@ -9,22 +9,7 @@ import {
   getPromptVersions,
   updatePromptVersion,
 } from "../lib/api";
-
-const colors = {
-  bg: "#1e1e2e",
-  card: "#313244",
-  border: "#45475a",
-  text: "#cdd6f4",
-  subtext: "#a6adc8",
-  accent: "#cba6f7",
-  danger: "#f38ba8",
-  overlay: "#181825",
-  surface: "#45475a",
-  muted: "#6c7086",
-  green: "#a6e3a1",
-  yellow: "#f9e2af",
-  blue: "#89b4fa",
-};
+import styles from "./PromptsPage.module.css";
 
 function formatDate(timestamp: number): string {
   return new Date(timestamp).toLocaleDateString("ja-JP", {
@@ -205,42 +190,14 @@ function VersionTreeItem({
 
   return (
     <div
-      style={{
-        display: "flex",
-        alignItems: "stretch",
-        marginBottom: "2px",
-        paddingLeft: `${depth * 20}px`,
-      }}
+      className={styles.treeItem}
+      style={{ paddingLeft: `${depth * 20}px` }}
     >
       {/* 接続線（分岐ノードのみ） */}
       {depth > 0 && (
-        <div
-          style={{
-            width: "20px",
-            flexShrink: 0,
-            position: "relative",
-          }}
-        >
-          <div
-            style={{
-              position: "absolute",
-              left: "0",
-              top: "50%",
-              width: "16px",
-              height: "1px",
-              background: colors.border,
-            }}
-          />
-          <div
-            style={{
-              position: "absolute",
-              left: "0",
-              top: 0,
-              bottom: "50%",
-              width: "1px",
-              background: colors.border,
-            }}
-          />
+        <div className={styles.treeConnector}>
+          <div className={styles.treeConnectorH} />
+          <div className={styles.treeConnectorV} />
         </div>
       )}
 
@@ -248,68 +205,21 @@ function VersionTreeItem({
       <button
         type="button"
         onClick={() => onSelect(version)}
-        style={{
-          flex: 1,
-          padding: "8px 12px",
-          background: isSelected
-            ? "rgba(203,166,247,0.15)"
-            : isComparing
-              ? "rgba(137,180,250,0.1)"
-              : colors.card,
-          border: `1px solid ${
-            isSelected ? colors.accent : isComparing ? colors.blue : colors.border
-          }`,
-          borderRadius: "6px",
-          color: colors.text,
-          cursor: "pointer",
-          textAlign: "left",
-          fontFamily: "inherit",
-          display: "flex",
-          alignItems: "center",
-          gap: "8px",
-          minWidth: 0,
-        }}
+        className={`${styles.treeCard} ${isSelected ? styles.treeCardSelected : ""} ${isComparing ? styles.treeCardComparing : ""}`}
       >
         <span
-          style={{
-            fontSize: "11px",
-            fontWeight: 700,
-            color: isSelected ? colors.accent : colors.muted,
-            flexShrink: 0,
-            minWidth: "28px",
-          }}
+          className={`${styles.treeVersionNum} ${isSelected ? styles.treeVersionNumSelected : ""}`}
         >
           v{version.version}
         </span>
-        <span
-          style={{
-            fontSize: "13px",
-            color: colors.subtext,
-            overflow: "hidden",
-            textOverflow: "ellipsis",
-            whiteSpace: "nowrap",
-            flex: 1,
-          }}
-        >
+        <span className={styles.treeVersionName}>
           {version.name ?? `バージョン ${version.version}`}
         </span>
         {version.parent_version_id !== null && (
-          <span
-            style={{
-              fontSize: "10px",
-              color: colors.yellow,
-              background: "rgba(249,226,175,0.1)",
-              border: "1px solid rgba(249,226,175,0.3)",
-              borderRadius: "4px",
-              padding: "1px 5px",
-              flexShrink: 0,
-            }}
-          >
-            分岐
-          </span>
+          <span className={styles.badgeBranch}>分岐</span>
         )}
         <div
-          style={{ display: "flex", gap: "4px", marginLeft: "auto", flexShrink: 0 }}
+          className={styles.treeCardActions}
           onClick={(e) => e.stopPropagation()}
           onKeyDown={(e) => e.stopPropagation()}
         >
@@ -317,15 +227,7 @@ function VersionTreeItem({
             type="button"
             onClick={() => onCompare(version)}
             title="比較"
-            style={{
-              padding: "2px 7px",
-              fontSize: "11px",
-              background: "transparent",
-              border: `1px solid ${colors.border}`,
-              borderRadius: "4px",
-              color: isComparing ? colors.blue : colors.muted,
-              cursor: "pointer",
-            }}
+            className={`${styles.btnTreeAction} ${isComparing ? styles.btnTreeCompareActive : ""}`}
           >
             比較
           </button>
@@ -333,15 +235,7 @@ function VersionTreeItem({
             type="button"
             onClick={() => onBranch(version)}
             title="分岐"
-            style={{
-              padding: "2px 7px",
-              fontSize: "11px",
-              background: "transparent",
-              border: `1px solid ${colors.border}`,
-              borderRadius: "4px",
-              color: colors.yellow,
-              cursor: "pointer",
-            }}
+            className={`${styles.btnTreeAction} ${styles.btnTreeBranch}`}
           >
             分岐
           </button>
@@ -386,6 +280,7 @@ function PromptEditor({ version, projectId, isNew = false, onSave, onCancel }: P
   });
 
   const isPending = createMutation.isPending || updateMutation.isPending;
+  const isDisabled = !content.trim() || isPending;
 
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -406,30 +301,10 @@ function PromptEditor({ version, projectId, isNew = false, onSave, onCancel }: P
     }
   }
 
-  const inputStyle: React.CSSProperties = {
-    width: "100%",
-    padding: "8px 12px",
-    background: colors.card,
-    border: `1px solid ${colors.border}`,
-    borderRadius: "6px",
-    color: colors.text,
-    fontSize: "14px",
-    outline: "none",
-    boxSizing: "border-box",
-    fontFamily: "inherit",
-  };
-
-  const labelStyle: React.CSSProperties = {
-    display: "block",
-    marginBottom: "6px",
-    fontSize: "13px",
-    color: colors.subtext,
-  };
-
   return (
-    <form onSubmit={handleSubmit} style={{ display: "flex", flexDirection: "column", gap: "14px", flex: 1, minHeight: 0, overflow: "hidden" }}>
+    <form onSubmit={handleSubmit} className={styles.editorForm}>
       <div>
-        <label htmlFor="editor-name" style={labelStyle}>
+        <label htmlFor="editor-name" className={styles.fieldLabel}>
           バージョン名（任意）
         </label>
         <input
@@ -438,11 +313,11 @@ function PromptEditor({ version, projectId, isNew = false, onSave, onCancel }: P
           value={name}
           onChange={(e) => setName(e.target.value)}
           placeholder="例: 丁寧語対応版"
-          style={inputStyle}
+          className={styles.fieldInput}
         />
       </div>
       <div>
-        <label htmlFor="editor-memo" style={labelStyle}>
+        <label htmlFor="editor-memo" className={styles.fieldLabel}>
           メモ（任意）
         </label>
         <input
@@ -451,68 +326,40 @@ function PromptEditor({ version, projectId, isNew = false, onSave, onCancel }: P
           value={memo}
           onChange={(e) => setMemo(e.target.value)}
           placeholder="変更内容や目的を記入..."
-          style={inputStyle}
+          className={styles.fieldInput}
         />
       </div>
-      <div style={{ flex: 1, display: "flex", flexDirection: "column", minHeight: 0 }}>
-        <label htmlFor="editor-content" style={labelStyle}>
+      <div className={styles.fieldTextareaWrapper}>
+        <label htmlFor="editor-content" className={styles.fieldLabel}>
           プロンプト本文
-          <span style={{ color: colors.danger, marginLeft: "4px" }}>*</span>
+          <span className={styles.requiredMark}>*</span>
         </label>
         <textarea
           id="editor-content"
           value={content}
           onChange={(e) => setContent(e.target.value)}
           placeholder="システムプロンプトを入力..."
-          style={{
-            ...inputStyle,
-            flex: 1,
-            minHeight: 0,
-            overflow: "auto",
-            resize: "none",
-            lineHeight: 1.6,
-            fontFamily: "monospace",
-          }}
+          className={styles.fieldTextarea}
         />
       </div>
-      <div style={{ display: "flex", gap: "8px", justifyContent: "flex-end", flexShrink: 0 }}>
+      <div className={styles.formActions}>
         <button
           type="button"
           onClick={onCancel}
-          style={{
-            padding: "7px 18px",
-            background: "transparent",
-            border: `1px solid ${colors.border}`,
-            borderRadius: "6px",
-            color: colors.subtext,
-            fontSize: "13px",
-            cursor: "pointer",
-          }}
+          className={styles.btnCancel}
         >
           キャンセル
         </button>
         <button
           type="submit"
-          disabled={!content.trim() || isPending}
-          style={{
-            padding: "7px 18px",
-            background: colors.accent,
-            border: "none",
-            borderRadius: "6px",
-            color: colors.overlay,
-            fontSize: "13px",
-            fontWeight: 600,
-            cursor: !content.trim() || isPending ? "not-allowed" : "pointer",
-            opacity: !content.trim() || isPending ? 0.6 : 1,
-          }}
+          disabled={isDisabled}
+          className={`${styles.btnSave} ${isDisabled ? styles.btnDisabled : ""}`}
         >
           {isPending ? "保存中..." : isNew ? "作成" : "保存"}
         </button>
       </div>
       {(createMutation.isError || updateMutation.isError) && (
-        <p style={{ color: colors.danger, fontSize: "13px", margin: 0 }}>
-          保存に失敗しました。再度お試しください。
-        </p>
+        <p className={styles.errorMsg}>保存に失敗しました。再度お試しください。</p>
       )}
     </form>
   );
@@ -549,15 +396,7 @@ function BranchModal({ parentVersion, projectId, onClose, onCreated }: BranchMod
 
   return (
     <div
-      style={{
-        position: "fixed",
-        inset: 0,
-        background: "rgba(0,0,0,0.6)",
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "center",
-        zIndex: 100,
-      }}
+      className={styles.modalOverlay}
       onClick={(e) => {
         if (e.target === e.currentTarget) onClose();
       }}
@@ -565,37 +404,15 @@ function BranchModal({ parentVersion, projectId, onClose, onCreated }: BranchMod
         if (e.key === "Escape") onClose();
       }}
     >
-      <div
-        style={{
-          background: colors.overlay,
-          border: `1px solid ${colors.border}`,
-          borderRadius: "12px",
-          padding: "28px",
-          width: "480px",
-          maxWidth: "90vw",
-        }}
-      >
-        <h3 style={{ margin: "0 0 8px", fontSize: "17px", color: colors.text }}>
-          バージョンを分岐
-        </h3>
-        <p style={{ margin: "0 0 20px", color: colors.muted, fontSize: "13px" }}>
+      <div className={styles.modalContent}>
+        <h3 className={styles.modalTitle}>バージョンを分岐</h3>
+        <p className={styles.modalSubtext}>
           v{parentVersion.version}「{parentVersion.name ?? `バージョン ${parentVersion.version}`}
           」から分岐します
         </p>
-        <form
-          onSubmit={handleSubmit}
-          style={{ display: "flex", flexDirection: "column", gap: "14px" }}
-        >
+        <form onSubmit={handleSubmit} className={styles.modalForm}>
           <div>
-            <label
-              htmlFor="branch-name"
-              style={{
-                display: "block",
-                marginBottom: "6px",
-                fontSize: "13px",
-                color: colors.subtext,
-              }}
-            >
+            <label htmlFor="branch-name" className={styles.fieldLabel}>
               新しいバージョン名（任意）
             </label>
             <input
@@ -604,30 +421,11 @@ function BranchModal({ parentVersion, projectId, onClose, onCreated }: BranchMod
               value={name}
               onChange={(e) => setName(e.target.value)}
               placeholder="例: 別アプローチ版"
-              style={{
-                width: "100%",
-                padding: "8px 12px",
-                background: colors.card,
-                border: `1px solid ${colors.border}`,
-                borderRadius: "6px",
-                color: colors.text,
-                fontSize: "14px",
-                outline: "none",
-                boxSizing: "border-box",
-                fontFamily: "inherit",
-              }}
+              className={styles.fieldInput}
             />
           </div>
           <div>
-            <label
-              htmlFor="branch-memo"
-              style={{
-                display: "block",
-                marginBottom: "6px",
-                fontSize: "13px",
-                color: colors.subtext,
-              }}
-            >
+            <label htmlFor="branch-memo" className={styles.fieldLabel}>
               メモ（任意）
             </label>
             <input
@@ -636,55 +434,24 @@ function BranchModal({ parentVersion, projectId, onClose, onCreated }: BranchMod
               value={memo}
               onChange={(e) => setMemo(e.target.value)}
               placeholder="分岐の目的や変更予定..."
-              style={{
-                width: "100%",
-                padding: "8px 12px",
-                background: colors.card,
-                border: `1px solid ${colors.border}`,
-                borderRadius: "6px",
-                color: colors.text,
-                fontSize: "14px",
-                outline: "none",
-                boxSizing: "border-box",
-                fontFamily: "inherit",
-              }}
+              className={styles.fieldInput}
             />
           </div>
           {branchMutation.isError && (
-            <p style={{ color: colors.danger, fontSize: "13px", margin: 0 }}>
-              分岐の作成に失敗しました。
-            </p>
+            <p className={styles.errorMsg}>分岐の作成に失敗しました。</p>
           )}
-          <div style={{ display: "flex", gap: "10px", justifyContent: "flex-end" }}>
+          <div className={styles.modalActions}>
             <button
               type="button"
               onClick={onClose}
-              style={{
-                padding: "7px 18px",
-                background: "transparent",
-                border: `1px solid ${colors.border}`,
-                borderRadius: "6px",
-                color: colors.subtext,
-                fontSize: "13px",
-                cursor: "pointer",
-              }}
+              className={styles.btnCancel}
             >
               キャンセル
             </button>
             <button
               type="submit"
               disabled={branchMutation.isPending}
-              style={{
-                padding: "7px 18px",
-                background: colors.yellow,
-                border: "none",
-                borderRadius: "6px",
-                color: colors.overlay,
-                fontSize: "13px",
-                fontWeight: 600,
-                cursor: branchMutation.isPending ? "not-allowed" : "pointer",
-                opacity: branchMutation.isPending ? 0.6 : 1,
-              }}
+              className={`${styles.btnBranchSubmit} ${branchMutation.isPending ? styles.btnDisabled : ""}`}
             >
               {branchMutation.isPending ? "作成中..." : "分岐を作成"}
             </button>
@@ -769,29 +536,9 @@ function CompareView({ versionA, versionB, onClose }: CompareViewProps) {
   const [mode, setMode] = useState<"side-by-side" | "unified">("side-by-side");
   const diff = diffLines(versionA.content, versionB.content);
 
-  const headerStyle = (accent: string): React.CSSProperties => ({
-    padding: "10px 14px",
-    background: colors.card,
-    borderBottom: `1px solid ${accent}`,
-    fontSize: "13px",
-    color: colors.subtext,
-    display: "flex",
-    justifyContent: "space-between",
-    alignItems: "center",
-  });
-
   return (
     <div
-      style={{
-        position: "fixed",
-        inset: 0,
-        background: "rgba(0,0,0,0.7)",
-        display: "flex",
-        alignItems: "stretch",
-        justifyContent: "center",
-        zIndex: 100,
-        padding: "20px",
-      }}
+      className={styles.compareOverlay}
       onClick={(e) => {
         if (e.target === e.currentTarget) onClose();
       }}
@@ -799,52 +546,18 @@ function CompareView({ versionA, versionB, onClose }: CompareViewProps) {
         if (e.key === "Escape") onClose();
       }}
     >
-      <div
-        style={{
-          background: colors.overlay,
-          border: `1px solid ${colors.border}`,
-          borderRadius: "12px",
-          width: "100%",
-          maxWidth: "1200px",
-          display: "flex",
-          flexDirection: "column",
-          overflow: "hidden",
-        }}
-      >
+      <div className={styles.compareBox}>
         {/* ヘッダー */}
-        <div
-          style={{
-            padding: "16px 20px",
-            borderBottom: `1px solid ${colors.border}`,
-            display: "flex",
-            justifyContent: "space-between",
-            alignItems: "center",
-            flexShrink: 0,
-          }}
-        >
-          <h3 style={{ margin: 0, fontSize: "16px", color: colors.text }}>バージョン比較</h3>
-          <div style={{ display: "flex", gap: "8px", alignItems: "center" }}>
-            <div
-              style={{
-                display: "flex",
-                border: `1px solid ${colors.border}`,
-                borderRadius: "6px",
-                overflow: "hidden",
-              }}
-            >
+        <div className={styles.compareHeader}>
+          <h3 className={styles.compareHeaderTitle}>バージョン比較</h3>
+          <div className={styles.compareHeaderActions}>
+            <div className={styles.compareModeToggle}>
               {(["side-by-side", "unified"] as const).map((m) => (
                 <button
                   key={m}
                   type="button"
                   onClick={() => setMode(m)}
-                  style={{
-                    padding: "5px 12px",
-                    background: mode === m ? colors.card : "transparent",
-                    border: "none",
-                    color: mode === m ? colors.text : colors.muted,
-                    fontSize: "12px",
-                    cursor: "pointer",
-                  }}
+                  className={`${styles.btnMode} ${mode === m ? styles.btnModeActive : styles.btnModeInactive}`}
                 >
                   {m === "side-by-side" ? "並列" : "統合"}
                 </button>
@@ -853,15 +566,7 @@ function CompareView({ versionA, versionB, onClose }: CompareViewProps) {
             <button
               type="button"
               onClick={onClose}
-              style={{
-                padding: "5px 12px",
-                background: "transparent",
-                border: `1px solid ${colors.border}`,
-                borderRadius: "6px",
-                color: colors.subtext,
-                fontSize: "13px",
-                cursor: "pointer",
-              }}
+              className={styles.btnCloseCompare}
             >
               閉じる
             </button>
@@ -869,128 +574,57 @@ function CompareView({ versionA, versionB, onClose }: CompareViewProps) {
         </div>
 
         {/* コンテンツ */}
-        <div style={{ flex: 1, overflow: "hidden", display: "flex" }}>
+        <div className={styles.compareContent}>
           {mode === "side-by-side" ? (
-            <div style={{ display: "flex", flex: 1, overflow: "hidden" }}>
+            <div className={styles.sideBySide}>
               {/* 左: versionA */}
-              <div
-                style={{
-                  flex: 1,
-                  display: "flex",
-                  flexDirection: "column",
-                  overflow: "hidden",
-                  borderRight: `1px solid ${colors.border}`,
-                }}
-              >
-                <div style={headerStyle(colors.danger)}>
+              <div className={`${styles.comparePanel} ${styles.comparePanelLeft}`}>
+                <div className={`${styles.comparePanelHeader} ${styles.comparePanelHeaderA}`}>
                   <span>
                     v{versionA.version} {versionA.name && `— ${versionA.name}`}
                   </span>
-                  <span style={{ color: colors.muted, fontSize: "11px" }}>
+                  <span className={styles.comparePanelDate}>
                     {formatDate(versionA.created_at)}
                   </span>
                 </div>
-                <pre
-                  style={{
-                    flex: 1,
-                    margin: 0,
-                    padding: "14px",
-                    overflow: "auto",
-                    fontSize: "13px",
-                    lineHeight: 1.7,
-                    color: colors.text,
-                    fontFamily: "monospace",
-                    whiteSpace: "pre-wrap",
-                    wordBreak: "break-word",
-                  }}
-                >
-                  {versionA.content}
-                </pre>
+                <pre className={styles.comparePre}>{versionA.content}</pre>
               </div>
               {/* 右: versionB */}
-              <div
-                style={{ flex: 1, display: "flex", flexDirection: "column", overflow: "hidden" }}
-              >
-                <div style={headerStyle(colors.green)}>
+              <div className={styles.comparePanel}>
+                <div className={`${styles.comparePanelHeader} ${styles.comparePanelHeaderB}`}>
                   <span>
                     v{versionB.version} {versionB.name && `— ${versionB.name}`}
                   </span>
-                  <span style={{ color: colors.muted, fontSize: "11px" }}>
+                  <span className={styles.comparePanelDate}>
                     {formatDate(versionB.created_at)}
                   </span>
                 </div>
-                <pre
-                  style={{
-                    flex: 1,
-                    margin: 0,
-                    padding: "14px",
-                    overflow: "auto",
-                    fontSize: "13px",
-                    lineHeight: 1.7,
-                    color: colors.text,
-                    fontFamily: "monospace",
-                    whiteSpace: "pre-wrap",
-                    wordBreak: "break-word",
-                  }}
-                >
-                  {versionB.content}
-                </pre>
+                <pre className={styles.comparePre}>{versionB.content}</pre>
               </div>
             </div>
           ) : (
             // 統合表示（差分ハイライト）
-            <div style={{ flex: 1, display: "flex", flexDirection: "column", overflow: "hidden" }}>
-              <div
-                style={{
-                  padding: "10px 14px",
-                  background: colors.card,
-                  borderBottom: `1px solid ${colors.border}`,
-                  fontSize: "13px",
-                  color: colors.subtext,
-                  display: "flex",
-                  gap: "16px",
-                }}
-              >
-                <span style={{ color: colors.danger }}>ー v{versionA.version}</span>
-                <span style={{ color: colors.green }}>+ v{versionB.version}</span>
+            <div className={styles.unifiedView}>
+              <div className={styles.unifiedHeader}>
+                <span className={styles.unifiedLabelA}>ー v{versionA.version}</span>
+                <span className={styles.unifiedLabelB}>+ v{versionB.version}</span>
               </div>
-              <div
-                style={{
-                  flex: 1,
-                  overflow: "auto",
-                  padding: "0",
-                  fontFamily: "monospace",
-                  fontSize: "13px",
-                  lineHeight: 1.7,
-                }}
-              >
+              <div className={styles.diffScroll}>
                 {diff.map((line, i) => (
                   <div
                     key={`diff-${line.type}-${i}`}
-                    style={{
-                      padding: "0 14px",
-                      background:
-                        line.type === "removed"
-                          ? "rgba(243,139,168,0.12)"
-                          : line.type === "added"
-                            ? "rgba(166,227,161,0.12)"
-                            : "transparent",
-                      color:
-                        line.type === "removed"
-                          ? colors.danger
-                          : line.type === "added"
-                            ? colors.green
-                            : colors.text,
-                      display: "flex",
-                      gap: "8px",
-                    }}
+                    className={`${styles.diffLine} ${
+                      line.type === "removed"
+                        ? styles.diffLineRemoved
+                        : line.type === "added"
+                          ? styles.diffLineAdded
+                          : ""
+                    }`}
                   >
-                    <span style={{ width: "14px", flexShrink: 0, userSelect: "none" }}>
+                    <span className={styles.diffGutter}>
                       {line.type === "removed" ? "-" : line.type === "added" ? "+" : " "}
                     </span>
-                    <span style={{ whiteSpace: "pre-wrap", wordBreak: "break-word", flex: 1 }}>
-                      {line.text || "\u00a0"}
-                    </span>
+                    <span className={styles.diffText}>{line.text || "\u00a0"}</span>
                   </div>
                 ))}
               </div>
@@ -1072,38 +706,19 @@ export function PromptsPage() {
   }
 
   return (
-    <div style={{ display: "flex", flexDirection: "column", height: "100%" }}>
+    <div className={`${styles.root} ${styles.page}`}>
       {/* ページヘッダー */}
-      <div
-        style={{
-          display: "flex",
-          justifyContent: "space-between",
-          alignItems: "center",
-          marginBottom: "16px",
-        }}
-      >
+      <div className={styles.pageHeader}>
         <div>
-          <h2 style={{ margin: "0 0 4px", fontSize: "20px", color: colors.text }}>
-            プロンプト管理
-          </h2>
-          {project && (
-            <p style={{ margin: 0, fontSize: "13px", color: colors.muted }}>{project.name}</p>
-          )}
+          <h2 className={styles.pageTitle}>プロンプト管理</h2>
+          {project && <p className={styles.projectName}>{project.name}</p>}
         </div>
-        <div style={{ display: "flex", gap: "8px" }}>
+        <div className={styles.pageActions}>
           {selectedVersion && compareVersion && (
             <button
               type="button"
               onClick={handleOpenCompare}
-              style={{
-                padding: "7px 16px",
-                background: "transparent",
-                border: `1px solid ${colors.blue}`,
-                borderRadius: "6px",
-                color: colors.blue,
-                fontSize: "13px",
-                cursor: "pointer",
-              }}
+              className={styles.btnBlue}
             >
               比較を表示
             </button>
@@ -1114,16 +729,7 @@ export function PromptsPage() {
               setSelectedVersion(null);
               setPanelMode({ type: "new" });
             }}
-            style={{
-              padding: "7px 16px",
-              background: colors.accent,
-              border: "none",
-              borderRadius: "6px",
-              color: colors.overlay,
-              fontSize: "13px",
-              fontWeight: 600,
-              cursor: "pointer",
-            }}
+            className={styles.btnPrimary}
           >
             + 新規作成
           </button>
@@ -1132,51 +738,30 @@ export function PromptsPage() {
 
       {/* 比較バー */}
       {(selectedVersion || compareVersion) && (
-        <div
-          style={{
-            padding: "8px 12px",
-            background: colors.card,
-            border: `1px solid ${colors.border}`,
-            borderRadius: "6px",
-            marginBottom: "12px",
-            display: "flex",
-            gap: "12px",
-            alignItems: "center",
-            fontSize: "13px",
-          }}
-        >
-          <span style={{ color: colors.muted }}>選択中:</span>
+        <div className={styles.compareBar}>
+          <span className={styles.compareBarLabel}>選択中:</span>
           {selectedVersion && (
-            <span style={{ color: colors.accent }}>
+            <span className={styles.compareBarSelected}>
               v{selectedVersion.version} {selectedVersion.name && `— ${selectedVersion.name}`}
             </span>
           )}
           {compareVersion && (
             <>
-              <span style={{ color: colors.muted }}>vs</span>
-              <span style={{ color: colors.blue }}>
+              <span className={styles.compareBarVs}>vs</span>
+              <span className={styles.compareBarComparing}>
                 v{compareVersion.version} {compareVersion.name && `— ${compareVersion.name}`}
               </span>
               <button
                 type="button"
                 onClick={() => setCompareVersion(null)}
-                style={{
-                  marginLeft: "auto",
-                  padding: "2px 8px",
-                  background: "transparent",
-                  border: `1px solid ${colors.border}`,
-                  borderRadius: "4px",
-                  color: colors.muted,
-                  fontSize: "12px",
-                  cursor: "pointer",
-                }}
+                className={styles.btnClear}
               >
                 クリア
               </button>
             </>
           )}
           {!compareVersion && (
-            <span style={{ color: colors.muted, fontSize: "12px" }}>
+            <span className={styles.compareBarHint}>
               別のバージョンで「比較」をクリックすると比較できます
             </span>
           )}
@@ -1184,53 +769,23 @@ export function PromptsPage() {
       )}
 
       {/* メインコンテンツ */}
-      <div style={{ display: "flex", gap: "16px", flex: 1, minHeight: 0 }}>
+      <div className={styles.mainContent}>
         {/* バージョンツリー */}
-        <div
-          style={{
-            width: "300px",
-            flexShrink: 0,
-            display: "flex",
-            flexDirection: "column",
-            overflow: "hidden",
-          }}
-        >
-          <div
-            style={{
-              fontSize: "12px",
-              color: colors.muted,
-              textTransform: "uppercase",
-              letterSpacing: "0.08em",
-              marginBottom: "8px",
-            }}
-          >
-            バージョン履歴
-          </div>
+        <div className={styles.treePanel}>
+          <div className={styles.treePanelLabel}>バージョン履歴</div>
 
-          {isLoading && <p style={{ color: colors.muted, fontSize: "13px" }}>読み込み中...</p>}
-          {isError && (
-            <p style={{ color: colors.danger, fontSize: "13px" }}>読み込みに失敗しました</p>
-          )}
+          {isLoading && <p className={styles.treeStatus}>読み込み中...</p>}
+          {isError && <p className={styles.treeError}>読み込みに失敗しました</p>}
 
           {!isLoading && !isError && flatNodes.length === 0 && (
-            <div
-              style={{
-                padding: "20px",
-                textAlign: "center",
-                color: colors.muted,
-                fontSize: "13px",
-                background: colors.card,
-                borderRadius: "8px",
-                border: `1px solid ${colors.border}`,
-              }}
-            >
+            <div className={styles.treeEmpty}>
               バージョンがありません
               <br />
               <span style={{ fontSize: "12px" }}>「新規作成」から始めましょう</span>
             </div>
           )}
 
-          <div style={{ overflowY: "auto", flex: 1 }}>
+          <div className={styles.treeScroll}>
             {flatNodes.map((node, i) => (
               <VersionTreeItem
                 key={node.version.id}
@@ -1247,46 +802,17 @@ export function PromptsPage() {
         </div>
 
         {/* 右パネル */}
-        <div
-          style={{
-            flex: 1,
-            background: colors.card,
-            border: `1px solid ${colors.border}`,
-            borderRadius: "8px",
-            display: "flex",
-            flexDirection: "column",
-            overflow: "hidden",
-          }}
-        >
+        <div className={styles.rightPanel}>
           {panelMode === null && (
-            <div
-              style={{
-                flex: 1,
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-                color: colors.muted,
-                fontSize: "14px",
-              }}
-            >
+            <div className={styles.panelEmpty}>
               バージョンを選択するか、新規作成してください
             </div>
           )}
 
           {panelMode?.type === "new" && (
             <>
-              <div
-                style={{
-                  padding: "14px 16px",
-                  borderBottom: `1px solid ${colors.border}`,
-                  fontSize: "14px",
-                  fontWeight: 600,
-                  color: colors.accent,
-                }}
-              >
-                新規プロンプト作成
-              </div>
-              <div style={{ flex: 1, padding: "16px", overflow: "hidden", display: "flex", flexDirection: "column" }}>
+              <div className={styles.panelHeaderTitle}>新規プロンプト作成</div>
+              <div className={styles.panelEditorBody}>
                 <PromptEditor
                   version={null}
                   projectId={projectId}
@@ -1300,82 +826,32 @@ export function PromptsPage() {
 
           {panelMode?.type === "view" && (
             <>
-              <div
-                style={{
-                  padding: "14px 16px",
-                  borderBottom: `1px solid ${colors.border}`,
-                  display: "flex",
-                  justifyContent: "space-between",
-                  alignItems: "center",
-                }}
-              >
+              <div className={styles.panelHeader}>
                 <div>
-                  <span
-                    style={{
-                      fontSize: "12px",
-                      color: colors.muted,
-                      marginRight: "8px",
-                    }}
-                  >
-                    v{panelMode.version.version}
-                  </span>
-                  <span style={{ fontSize: "15px", fontWeight: 600, color: colors.text }}>
+                  <span className={styles.panelVersionNum}>v{panelMode.version.version}</span>
+                  <span className={styles.panelVersionName}>
                     {panelMode.version.name ?? `バージョン ${panelMode.version.version}`}
                   </span>
                 </div>
                 <button
                   type="button"
                   onClick={() => setPanelMode({ type: "edit", version: panelMode.version })}
-                  style={{
-                    padding: "5px 14px",
-                    background: "transparent",
-                    border: `1px solid ${colors.border}`,
-                    borderRadius: "6px",
-                    color: colors.subtext,
-                    fontSize: "13px",
-                    cursor: "pointer",
-                  }}
+                  className={styles.btnEdit}
                 >
                   編集
                 </button>
               </div>
-              <div style={{ flex: 1, overflow: "auto", padding: "16px" }}>
+              <div className={styles.panelBody}>
                 {panelMode.version.memo && (
-                  <div
-                    style={{
-                      padding: "8px 12px",
-                      background: colors.overlay,
-                      border: `1px solid ${colors.border}`,
-                      borderRadius: "6px",
-                      marginBottom: "14px",
-                      fontSize: "13px",
-                      color: colors.subtext,
-                    }}
-                  >
-                    <span style={{ color: colors.muted, marginRight: "6px" }}>メモ:</span>
+                  <div className={styles.memoBox}>
+                    <span className={styles.memoLabel}>メモ:</span>
                     {panelMode.version.memo}
                   </div>
                 )}
-                <div
-                  style={{
-                    fontSize: "12px",
-                    color: colors.muted,
-                    marginBottom: "6px",
-                  }}
-                >
+                <div className={styles.versionMeta}>
                   作成日時: {formatDate(panelMode.version.created_at)}
                   {panelMode.version.parent_version_id !== null && (
-                    <span
-                      style={{
-                        marginLeft: "10px",
-                        color: colors.yellow,
-                        background: "rgba(249,226,175,0.1)",
-                        border: "1px solid rgba(249,226,175,0.3)",
-                        borderRadius: "4px",
-                        padding: "1px 6px",
-                        fontSize: "11px",
-                      }}
-                    >
+                    <span className={styles.badgeParentVersion}>
                       v
                       {versions?.find((v) => v.id === panelMode.version.parent_version_id)
                         ?.version ?? "?"}
@@ -1383,42 +859,17 @@ export function PromptsPage() {
                     </span>
                   )}
                 </div>
-                <pre
-                  style={{
-                    margin: 0,
-                    padding: "14px",
-                    background: colors.overlay,
-                    border: `1px solid ${colors.border}`,
-                    borderRadius: "6px",
-                    fontSize: "13px",
-                    lineHeight: 1.7,
-                    color: colors.text,
-                    fontFamily: "monospace",
-                    whiteSpace: "pre-wrap",
-                    wordBreak: "break-word",
-                    overflowWrap: "break-word",
-                  }}
-                >
-                  {panelMode.version.content}
-                </pre>
+                <pre className={styles.promptPre}>{panelMode.version.content}</pre>
               </div>
             </>
           )}
 
           {panelMode?.type === "edit" && (
             <>
-              <div
-                style={{
-                  padding: "14px 16px",
-                  borderBottom: `1px solid ${colors.border}`,
-                  fontSize: "14px",
-                  fontWeight: 600,
-                  color: colors.accent,
-                }}
-              >
+              <div className={styles.panelHeaderTitle}>
                 v{panelMode.version.version} を編集
               </div>
-              <div style={{ flex: 1, padding: "16px", overflow: "hidden", display: "flex", flexDirection: "column" }}>
+              <div className={styles.panelEditorBody}>
                 <PromptEditor
                   version={panelMode.version}
                   projectId={projectId}

@@ -43,6 +43,12 @@
 
 - **Python**: `uv` でインストール済み。`better-sqlite3` などネイティブモジュールのビルドに使用可能。代替パッケージ（`@libsql/client` 等）に切り替える必要はない。
 
+## UIスタイリング規則
+
+- ページコンポーネントのスタイルはインラインスタイルを使わず、`PageName.module.css` に分離すること
+- カラーパレットは `.root` クラス内のCSSカスタムプロパティ（`--c-bg`、`--c-accent` 等）として定義する
+- `packages/ui/src/vite-env.d.ts`（`/// <reference types="vite/client" />`）がないとCSSモジュールの型が解決されないため、必ず作成すること
+
 ## ハマりやすいポイント
 
 ### drizzle-kit のスキーマ指定はグロブ不可
