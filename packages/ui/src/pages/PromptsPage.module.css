@@ -1,0 +1,758 @@
+/* ==================== Color tokens ==================== */
+.root {
+  --c-bg: #1e1e2e;
+  --c-card: #313244;
+  --c-border: #45475a;
+  --c-text: #cdd6f4;
+  --c-subtext: #a6adc8;
+  --c-accent: #cba6f7;
+  --c-danger: #f38ba8;
+  --c-overlay: #181825;
+  --c-muted: #6c7086;
+  --c-green: #a6e3a1;
+  --c-yellow: #f9e2af;
+  --c-blue: #89b4fa;
+}
+
+/* ==================== Page layout ==================== */
+.page {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+}
+
+.pageHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 16px;
+}
+
+.pageTitle {
+  margin: 0 0 4px;
+  font-size: 20px;
+  color: var(--c-text);
+}
+
+.projectName {
+  margin: 0;
+  font-size: 13px;
+  color: var(--c-muted);
+}
+
+.pageActions {
+  display: flex;
+  gap: 8px;
+}
+
+/* ==================== Shared buttons ==================== */
+.btnPrimary {
+  padding: 7px 16px;
+  background: var(--c-accent);
+  border: none;
+  border-radius: 6px;
+  color: var(--c-overlay);
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.btnSecondary {
+  padding: 7px 16px;
+  background: transparent;
+  border: 1px solid var(--c-border);
+  border-radius: 6px;
+  color: var(--c-subtext);
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.btnBlue {
+  padding: 7px 16px;
+  background: transparent;
+  border: 1px solid var(--c-blue);
+  border-radius: 6px;
+  color: var(--c-blue);
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.btnDisabled {
+  cursor: not-allowed;
+  opacity: 0.6;
+}
+
+/* ==================== Compare bar ==================== */
+.compareBar {
+  padding: 8px 12px;
+  background: var(--c-card);
+  border: 1px solid var(--c-border);
+  border-radius: 6px;
+  margin-bottom: 12px;
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  font-size: 13px;
+}
+
+.compareBarLabel {
+  color: var(--c-muted);
+}
+
+.compareBarSelected {
+  color: var(--c-accent);
+}
+
+.compareBarVs {
+  color: var(--c-muted);
+}
+
+.compareBarComparing {
+  color: var(--c-blue);
+}
+
+.compareBarHint {
+  color: var(--c-muted);
+  font-size: 12px;
+}
+
+.btnClear {
+  margin-left: auto;
+  padding: 2px 8px;
+  background: transparent;
+  border: 1px solid var(--c-border);
+  border-radius: 4px;
+  color: var(--c-muted);
+  font-size: 12px;
+  cursor: pointer;
+}
+
+/* ==================== Main content ==================== */
+.mainContent {
+  display: flex;
+  gap: 16px;
+  flex: 1;
+  min-height: 0;
+}
+
+/* ==================== Tree panel ==================== */
+.treePanel {
+  width: 300px;
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.treePanelLabel {
+  font-size: 12px;
+  color: var(--c-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  margin-bottom: 8px;
+}
+
+.treeStatus {
+  color: var(--c-muted);
+  font-size: 13px;
+}
+
+.treeError {
+  color: var(--c-danger);
+  font-size: 13px;
+}
+
+.treeEmpty {
+  padding: 20px;
+  text-align: center;
+  color: var(--c-muted);
+  font-size: 13px;
+  background: var(--c-card);
+  border-radius: 8px;
+  border: 1px solid var(--c-border);
+}
+
+.treeScroll {
+  overflow-y: auto;
+  flex: 1;
+}
+
+/* ==================== Tree item ==================== */
+.treeItem {
+  display: flex;
+  align-items: stretch;
+  margin-bottom: 2px;
+}
+
+.treeConnector {
+  width: 20px;
+  flex-shrink: 0;
+  position: relative;
+}
+
+.treeConnectorH {
+  position: absolute;
+  left: 0;
+  top: 50%;
+  width: 16px;
+  height: 1px;
+  background: var(--c-border);
+}
+
+.treeConnectorV {
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 50%;
+  width: 1px;
+  background: var(--c-border);
+}
+
+.treeCard {
+  flex: 1;
+  padding: 8px 12px;
+  background: var(--c-card);
+  border: 1px solid var(--c-border);
+  border-radius: 6px;
+  color: var(--c-text);
+  cursor: pointer;
+  text-align: left;
+  font-family: inherit;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.treeCardSelected {
+  background: rgba(203, 166, 247, 0.15);
+  border-color: var(--c-accent);
+}
+
+.treeCardComparing {
+  background: rgba(137, 180, 250, 0.1);
+  border-color: var(--c-blue);
+}
+
+.treeVersionNum {
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--c-muted);
+  flex-shrink: 0;
+  min-width: 28px;
+}
+
+.treeVersionNumSelected {
+  color: var(--c-accent);
+}
+
+.treeVersionName {
+  font-size: 13px;
+  color: var(--c-subtext);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  flex: 1;
+}
+
+.badgeBranch {
+  font-size: 10px;
+  color: var(--c-yellow);
+  background: rgba(249, 226, 175, 0.1);
+  border: 1px solid rgba(249, 226, 175, 0.3);
+  border-radius: 4px;
+  padding: 1px 5px;
+  flex-shrink: 0;
+}
+
+.treeCardActions {
+  display: flex;
+  gap: 4px;
+  margin-left: auto;
+  flex-shrink: 0;
+}
+
+.btnTreeAction {
+  padding: 2px 7px;
+  font-size: 11px;
+  background: transparent;
+  border: 1px solid var(--c-border);
+  border-radius: 4px;
+  cursor: pointer;
+  color: var(--c-muted);
+}
+
+.btnTreeCompareActive {
+  color: var(--c-blue);
+}
+
+.btnTreeBranch {
+  color: var(--c-yellow);
+}
+
+/* ==================== Right panel ==================== */
+.rightPanel {
+  flex: 1;
+  background: var(--c-card);
+  border: 1px solid var(--c-border);
+  border-radius: 8px;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.panelEmpty {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--c-muted);
+  font-size: 14px;
+}
+
+.panelHeader {
+  padding: 14px 16px;
+  border-bottom: 1px solid var(--c-border);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.panelHeaderTitle {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--c-accent);
+  padding: 14px 16px;
+  border-bottom: 1px solid var(--c-border);
+}
+
+.panelVersionNum {
+  font-size: 12px;
+  color: var(--c-muted);
+  margin-right: 8px;
+}
+
+.panelVersionName {
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--c-text);
+}
+
+.panelBody {
+  flex: 1;
+  overflow: auto;
+  padding: 16px;
+}
+
+.panelEditorBody {
+  flex: 1;
+  padding: 16px;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
+.btnEdit {
+  padding: 5px 14px;
+  background: transparent;
+  border: 1px solid var(--c-border);
+  border-radius: 6px;
+  color: var(--c-subtext);
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.memoBox {
+  padding: 8px 12px;
+  background: var(--c-overlay);
+  border: 1px solid var(--c-border);
+  border-radius: 6px;
+  margin-bottom: 14px;
+  font-size: 13px;
+  color: var(--c-subtext);
+}
+
+.memoLabel {
+  color: var(--c-muted);
+  margin-right: 6px;
+}
+
+.versionMeta {
+  font-size: 12px;
+  color: var(--c-muted);
+  margin-bottom: 6px;
+}
+
+.badgeParentVersion {
+  margin-left: 10px;
+  color: var(--c-yellow);
+  background: rgba(249, 226, 175, 0.1);
+  border: 1px solid rgba(249, 226, 175, 0.3);
+  border-radius: 4px;
+  padding: 1px 6px;
+  font-size: 11px;
+}
+
+.promptPre {
+  margin: 0;
+  padding: 14px;
+  background: var(--c-overlay);
+  border: 1px solid var(--c-border);
+  border-radius: 6px;
+  font-size: 13px;
+  line-height: 1.7;
+  color: var(--c-text);
+  font-family: monospace;
+  white-space: pre-wrap;
+  word-break: break-word;
+  overflow-wrap: break-word;
+}
+
+/* ==================== Editor form ==================== */
+.editorForm {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.fieldLabel {
+  display: block;
+  margin-bottom: 6px;
+  font-size: 13px;
+  color: var(--c-subtext);
+}
+
+.requiredMark {
+  color: var(--c-danger);
+  margin-left: 4px;
+}
+
+.fieldInput {
+  width: 100%;
+  padding: 8px 12px;
+  background: var(--c-card);
+  border: 1px solid var(--c-border);
+  border-radius: 6px;
+  color: var(--c-text);
+  font-size: 14px;
+  outline: none;
+  box-sizing: border-box;
+  font-family: inherit;
+}
+
+.fieldTextareaWrapper {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+
+.fieldTextarea {
+  width: 100%;
+  padding: 8px 12px;
+  background: var(--c-card);
+  border: 1px solid var(--c-border);
+  border-radius: 6px;
+  color: var(--c-text);
+  font-size: 14px;
+  outline: none;
+  box-sizing: border-box;
+  resize: none;
+  line-height: 1.6;
+  font-family: monospace;
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+}
+
+.formActions {
+  display: flex;
+  gap: 8px;
+  justify-content: flex-end;
+  flex-shrink: 0;
+}
+
+.btnSave {
+  padding: 7px 18px;
+  background: var(--c-accent);
+  border: none;
+  border-radius: 6px;
+  color: var(--c-overlay);
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.btnCancel {
+  padding: 7px 18px;
+  background: transparent;
+  border: 1px solid var(--c-border);
+  border-radius: 6px;
+  color: var(--c-subtext);
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.errorMsg {
+  color: var(--c-danger);
+  font-size: 13px;
+  margin: 0;
+}
+
+/* ==================== Branch modal ==================== */
+.modalOverlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.6);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 100;
+}
+
+.modalContent {
+  background: var(--c-overlay);
+  border: 1px solid var(--c-border);
+  border-radius: 12px;
+  padding: 28px;
+  width: 480px;
+  max-width: 90vw;
+}
+
+.modalTitle {
+  margin: 0 0 8px;
+  font-size: 17px;
+  color: var(--c-text);
+}
+
+.modalSubtext {
+  margin: 0 0 20px;
+  color: var(--c-muted);
+  font-size: 13px;
+}
+
+.modalForm {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.modalActions {
+  display: flex;
+  gap: 10px;
+  justify-content: flex-end;
+}
+
+.btnBranchSubmit {
+  padding: 7px 18px;
+  background: var(--c-yellow);
+  border: none;
+  border-radius: 6px;
+  color: var(--c-overlay);
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+/* ==================== Compare view ==================== */
+.compareOverlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.7);
+  display: flex;
+  align-items: stretch;
+  justify-content: center;
+  z-index: 100;
+  padding: 20px;
+}
+
+.compareBox {
+  background: var(--c-overlay);
+  border: 1px solid var(--c-border);
+  border-radius: 12px;
+  width: 100%;
+  max-width: 1200px;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.compareHeader {
+  padding: 16px 20px;
+  border-bottom: 1px solid var(--c-border);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-shrink: 0;
+}
+
+.compareHeaderTitle {
+  margin: 0;
+  font-size: 16px;
+  color: var(--c-text);
+}
+
+.compareHeaderActions {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+.compareModeToggle {
+  display: flex;
+  border: 1px solid var(--c-border);
+  border-radius: 6px;
+  overflow: hidden;
+}
+
+.btnMode {
+  padding: 5px 12px;
+  border: none;
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.btnModeActive {
+  background: var(--c-card);
+  color: var(--c-text);
+}
+
+.btnModeInactive {
+  background: transparent;
+  color: var(--c-muted);
+}
+
+.btnCloseCompare {
+  padding: 5px 12px;
+  background: transparent;
+  border: 1px solid var(--c-border);
+  border-radius: 6px;
+  color: var(--c-subtext);
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.compareContent {
+  flex: 1;
+  overflow: hidden;
+  display: flex;
+}
+
+/* Side-by-side */
+.sideBySide {
+  display: flex;
+  flex: 1;
+  overflow: hidden;
+}
+
+.comparePanel {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.comparePanelLeft {
+  border-right: 1px solid var(--c-border);
+}
+
+.comparePanelHeader {
+  padding: 10px 14px;
+  background: var(--c-card);
+  font-size: 13px;
+  color: var(--c-subtext);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.comparePanelHeaderA {
+  border-bottom: 1px solid var(--c-danger);
+}
+
+.comparePanelHeaderB {
+  border-bottom: 1px solid var(--c-green);
+}
+
+.comparePanelDate {
+  color: var(--c-muted);
+  font-size: 11px;
+}
+
+.comparePre {
+  flex: 1;
+  margin: 0;
+  padding: 14px;
+  overflow: auto;
+  font-size: 13px;
+  line-height: 1.7;
+  color: var(--c-text);
+  font-family: monospace;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+/* Unified diff */
+.unifiedView {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.unifiedHeader {
+  padding: 10px 14px;
+  background: var(--c-card);
+  border-bottom: 1px solid var(--c-border);
+  font-size: 13px;
+  display: flex;
+  gap: 16px;
+}
+
+.unifiedLabelA {
+  color: var(--c-danger);
+}
+
+.unifiedLabelB {
+  color: var(--c-green);
+}
+
+.diffScroll {
+  flex: 1;
+  overflow: auto;
+  font-family: monospace;
+  font-size: 13px;
+  line-height: 1.7;
+}
+
+.diffLine {
+  padding: 0 14px;
+  display: flex;
+  gap: 8px;
+  color: var(--c-text);
+}
+
+.diffLineRemoved {
+  background: rgba(243, 139, 168, 0.12);
+  color: var(--c-danger);
+}
+
+.diffLineAdded {
+  background: rgba(166, 227, 161, 0.12);
+  color: var(--c-green);
+}
+
+.diffGutter {
+  width: 14px;
+  flex-shrink: 0;
+  user-select: none;
+}
+
+.diffText {
+  white-space: pre-wrap;
+  word-break: break-word;
+  flex: 1;
+}
