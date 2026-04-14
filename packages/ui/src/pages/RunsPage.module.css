@@ -400,6 +400,24 @@
   cursor: not-allowed;
 }
 
+.btnScore {
+  padding: 6px 12px;
+  border-radius: 6px;
+  font-size: 12px;
+  white-space: nowrap;
+  flex-shrink: 0;
+  background: transparent;
+  color: var(--c-accent);
+  border: 1px solid var(--c-accent);
+  text-decoration: none;
+  display: inline-flex;
+  align-items: center;
+}
+
+.btnScore:hover {
+  background: rgba(203, 166, 247, 0.12);
+}
+
 .emptyRuns {
   color: var(--c-muted);
   font-size: 14px;

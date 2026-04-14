@@ -1,6 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
-import { useParams } from "react-router";
+import { Link, useParams } from "react-router";
 import {
   type ConversationMessage,
   type PromptVersion,
@@ -116,12 +116,14 @@ function RunConversation({ conversation }: { conversation: ConversationMessage[]
 // Run一覧カードコンポーネント
 function RunCard({
   run,
+  projectId,
   versionLabel,
   testCaseLabel,
   onSetBest,
   isBestPending,
 }: {
   run: Run;
+  projectId: number;
   versionLabel: string;
   testCaseLabel: string;
   onSetBest: () => void;
@@ -150,6 +152,12 @@ function RunCard({
           >
             {expanded ? "▲ 折りたたむ" : "▼ 会話を表示"}
           </button>
+          <Link
+            to={`/projects/${projectId}/score`}
+            className={styles.btnScore}
+          >
+            採点
+          </Link>
           <button
             type="button"
             onClick={onSetBest}
@@ -557,6 +565,7 @@ export function RunsPage() {
                       <RunCard
                         key={run.id}
                         run={run}
+                        projectId={projectId}
                         versionLabel={getVersionLabel(run.prompt_version_id)}
                         testCaseLabel={getTestCaseLabel(run.test_case_id)}
                         onSetBest={() => setBestMutation.mutate(run.id)}
@@ -646,6 +655,7 @@ export function RunsPage() {
                 <RunCard
                   key={run.id}
                   run={run}
+                  projectId={projectId}
                   versionLabel={getVersionLabel(run.prompt_version_id)}
                   testCaseLabel={getTestCaseLabel(run.test_case_id)}
                   onSetBest={() => setBestMutation.mutate(run.id)}
