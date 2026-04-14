@@ -1,3 +1,8 @@
+/* ==================== Color tokens ==================== */
+.root {
+  --c-bg: var(--c-bg, #1e1e2e);
+}
+
 /* ==================== Page layout ==================== */
 .page {
   color: var(--c-text);
@@ -319,8 +324,8 @@
   border-radius: 6px;
   border: 1px solid var(--c-border);
   display: flex;
-  gap: 12px;
-  align-items: flex-start;
+  flex-direction: column;
+  gap: 0;
 }
 
 .runCardBest {
@@ -337,6 +342,7 @@
   align-items: center;
   gap: 8px;
   margin-bottom: 6px;
+  flex-wrap: wrap;
 }
 
 .runId {
@@ -395,6 +401,118 @@
 }
 
 .emptyRuns {
+  color: var(--c-muted);
+  font-size: 14px;
+}
+
+/* ==================== Tab navigation ==================== */
+.tabBar {
+  display: flex;
+  gap: 4px;
+  margin-bottom: 20px;
+  border-bottom: 1px solid var(--c-border);
+  padding-bottom: 0;
+}
+
+.tabBtn {
+  padding: 8px 20px;
+  background: transparent;
+  color: var(--c-subtext);
+  border: none;
+  border-bottom: 2px solid transparent;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  margin-bottom: -1px;
+  transition: color 0.15s, border-color 0.15s;
+}
+
+.tabBtnActive {
+  color: var(--c-accent);
+  border-bottom-color: var(--c-accent);
+}
+
+/* ==================== Run list: filter bar ==================== */
+.filterBar {
+  display: flex;
+  align-items: flex-end;
+  gap: 12px;
+  margin-bottom: 16px;
+  flex-wrap: wrap;
+}
+
+.filterField {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 180px;
+}
+
+.filterLabel {
+  font-size: 12px;
+  color: var(--c-subtext);
+  font-weight: 600;
+}
+
+.filterSelect {
+  padding: 7px 10px;
+  background: var(--c-overlay);
+  border: 1px solid var(--c-border);
+  border-radius: 6px;
+  color: var(--c-text);
+  font-size: 13px;
+}
+
+.btnClearFilter {
+  padding: 7px 14px;
+  background: transparent;
+  color: var(--c-muted);
+  border: 1px solid var(--c-border);
+  border-radius: 6px;
+  font-size: 13px;
+  cursor: pointer;
+  align-self: flex-end;
+}
+
+/* ==================== Run card (accordion) ==================== */
+.runCardTop {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.runCardActions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.runMeta {
+  font-size: 12px;
+  color: var(--c-subtext);
+  flex: 1;
+}
+
+.btnToggle {
+  padding: 4px 10px;
+  background: transparent;
+  color: var(--c-blue);
+  border: 1px solid var(--c-blue);
+  border-radius: 5px;
+  font-size: 12px;
+  cursor: pointer;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.runConversation {
+  margin-top: 14px;
+  padding-top: 14px;
+  border-top: 1px solid var(--c-border);
+}
+
+/* ==================== Loading ==================== */
+.loadingMsg {
   color: var(--c-muted);
   font-size: 14px;
 }
