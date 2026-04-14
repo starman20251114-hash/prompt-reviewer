@@ -86,6 +86,22 @@ export function createScoresRouter(db: DB) {
     return c.json(created, 201);
   });
 
+  // GET /api/runs/:runId/score - スコア取得
+  runsRouter.get("/:runId/score", async (c) => {
+    const runId = parseIntParam(c.req.param("runId"));
+
+    if (runId === null) {
+      return c.json({ error: "Invalid runId" }, 400);
+    }
+
+    const [score] = await db.select().from(scores).where(eq(scores.run_id, runId));
+    if (!score) {
+      return c.json({ error: "Score not found" }, 404);
+    }
+
+    return c.json(score);
+  });
+
   // PATCH /api/runs/:runId/score - スコア更新
   runsRouter.patch("/:runId/score", zValidator("json", updateScoreSchema), async (c) => {
     const runId = parseIntParam(c.req.param("runId"));

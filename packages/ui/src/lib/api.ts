@@ -254,3 +254,57 @@ export function createRun(
 export function setBestRun(projectId: number, id: number): Promise<Run> {
   return api.patch<Run>(`/projects/${projectId}/runs/${id}/best`, {});
 }
+
+// Score API
+
+export type Score = {
+  id: number;
+  run_id: number;
+  human_score: number | null;
+  human_comment: string | null;
+  judge_score: number | null;
+  judge_reason: string | null;
+  is_discarded: boolean;
+  created_at: number;
+  updated_at: number;
+};
+
+export function getScore(runId: number): Promise<Score> {
+  return api.get<Score>(`/runs/${runId}/score`);
+}
+
+export function createScore(
+  runId: number,
+  data: { human_score?: number; human_comment?: string },
+): Promise<Score> {
+  return api.post<Score>(`/runs/${runId}/score`, data);
+}
+
+export function updateScore(
+  runId: number,
+  data: {
+    human_score?: number | null;
+    human_comment?: string | null;
+    is_discarded?: boolean;
+  },
+): Promise<Score> {
+  return api.patch<Score>(`/runs/${runId}/score`, data);
+}
+
+export function upsertScore(
+  runId: number,
+  data: {
+    human_score?: number | null;
+    human_comment?: string | null;
+    is_discarded?: boolean;
+  },
+  hasScore: boolean,
+): Promise<Score> {
+  if (hasScore) {
+    return updateScore(runId, data);
+  }
+  return createScore(runId, {
+    human_score: data.human_score ?? undefined,
+    human_comment: data.human_comment ?? undefined,
+  });
+}
