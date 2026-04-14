@@ -511,6 +511,61 @@
   border-top: 1px solid var(--c-border);
 }
 
+/* ==================== Copy prompt panel ==================== */
+.copyPromptPanel {
+  margin-bottom: 16px;
+  background: var(--c-card);
+  border: 1px solid var(--c-border);
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.copyPromptHeader {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 14px;
+}
+
+.btnCopyPromptToggle {
+  flex: 1;
+  text-align: left;
+  background: transparent;
+  border: none;
+  color: var(--c-blue);
+  font-size: 13px;
+  cursor: pointer;
+  padding: 0;
+}
+
+.btnCopy {
+  padding: 5px 14px;
+  background: var(--c-accent);
+  color: var(--c-overlay);
+  border: none;
+  border-radius: 5px;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.copyPromptTextarea {
+  display: block;
+  width: 100%;
+  box-sizing: border-box;
+  padding: 12px 14px;
+  background: var(--c-overlay);
+  border: none;
+  border-top: 1px solid var(--c-border);
+  color: var(--c-text);
+  font-size: 13px;
+  font-family: monospace;
+  line-height: 1.5;
+  resize: vertical;
+}
+
 /* ==================== Loading ==================== */
 .loadingMsg {
   color: var(--c-muted);
