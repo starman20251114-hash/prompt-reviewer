@@ -27,8 +27,8 @@ function buildFullPrompt(version: PromptVersion, testCase: TestCase): string {
     .join("\n\n");
 
   return turnsText
-    ? `[System Prompt]\n${systemPrompt}\n\n[Conversation]\n${turnsText}`
-    : `[System Prompt]\n${systemPrompt}`;
+    ? `${systemPrompt}\n\n[Conversation]\n${turnsText}`
+    : systemPrompt;
 }
 
 function CopyPromptPanel({
