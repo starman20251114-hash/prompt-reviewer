@@ -36,6 +36,13 @@
       "when": 1744509600000,
       "tag": "0004_project_settings",
       "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "6",
+      "when": 1744596000000,
+      "tag": "0005_prompt_version_selected",
+      "breakpoints": true
     }
   ]
 }
