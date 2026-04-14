@@ -11,22 +11,7 @@ import {
   getTestCases,
   setBestRun,
 } from "../lib/api";
-
-const colors = {
-  bg: "#1e1e2e",
-  card: "#313244",
-  border: "#45475a",
-  text: "#cdd6f4",
-  subtext: "#a6adc8",
-  accent: "#cba6f7",
-  danger: "#f38ba8",
-  overlay: "#181825",
-  surface: "#45475a",
-  muted: "#6c7086",
-  green: "#a6e3a1",
-  yellow: "#f9e2af",
-  blue: "#89b4fa",
-};
+import styles from "./RunsPage.module.css";
 
 function formatDate(timestamp: number): string {
   return new Date(timestamp).toLocaleDateString("ja-JP", {
@@ -146,51 +131,26 @@ export function RunsPage() {
     return assistantMessages[assistantMessages.length - 1]?.content ?? "";
   }
 
+  const isStartDisabled = selectedVersionId === "" || selectedTestCaseId === "";
+  const isSaveDisabled = !llmResponse.trim() || createRunMutation.isPending;
+
   return (
-    <div style={{ color: colors.text }}>
+    <div className={`${styles.root} ${styles.page}`}>
       {/* ヘッダー */}
-      <div
-        style={{
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "space-between",
-          marginBottom: "24px",
-        }}
-      >
+      <div className={styles.pageHeader}>
         <div>
-          <h2 style={{ margin: "0 0 4px", fontSize: "20px" }}>Run 実行・管理</h2>
-          {project && (
-            <p style={{ margin: 0, color: colors.subtext, fontSize: "14px" }}>{project.name}</p>
-          )}
+          <h2 className={styles.pageTitle}>Run 実行・管理</h2>
+          {project && <p className={styles.projectName}>{project.name}</p>}
         </div>
       </div>
 
       {/* Step 1: 選択フォーム */}
       {step === "select" && (
-        <div
-          style={{
-            backgroundColor: colors.card,
-            borderRadius: "8px",
-            border: `1px solid ${colors.border}`,
-            padding: "24px",
-            maxWidth: "600px",
-          }}
-        >
-          <h3 style={{ margin: "0 0 20px", fontSize: "16px", color: colors.accent }}>
-            Run を開始する
-          </h3>
+        <div className={styles.selectCard}>
+          <h3 className={styles.selectCardTitle}>Run を開始する</h3>
 
-          <div style={{ marginBottom: "16px" }}>
-            <label
-              htmlFor="select-version"
-              style={{
-                display: "block",
-                fontSize: "13px",
-                color: colors.subtext,
-                marginBottom: "6px",
-                fontWeight: 600,
-              }}
-            >
+          <div className={styles.fieldGroup}>
+            <label htmlFor="select-version" className={styles.fieldLabel}>
               プロンプトバージョン
             </label>
             <select
@@ -199,15 +159,7 @@ export function RunsPage() {
               onChange={(e) =>
                 setSelectedVersionId(e.target.value === "" ? "" : Number(e.target.value))
               }
-              style={{
-                width: "100%",
-                padding: "8px 12px",
-                backgroundColor: colors.overlay,
-                border: `1px solid ${colors.border}`,
-                borderRadius: "6px",
-                color: colors.text,
-                fontSize: "14px",
-              }}
+              className={styles.fieldSelect}
             >
               <option value="">-- 選択してください --</option>
               {promptVersions.map((v) => (
@@ -218,23 +170,14 @@ export function RunsPage() {
               ))}
             </select>
             {promptVersions.length === 0 && (
-              <p style={{ margin: "6px 0 0", fontSize: "12px", color: colors.muted }}>
+              <p className={styles.fieldHint}>
                 プロンプトバージョンがありません。先にバージョンを作成してください。
               </p>
             )}
           </div>
 
-          <div style={{ marginBottom: "24px" }}>
-            <label
-              htmlFor="select-test-case"
-              style={{
-                display: "block",
-                fontSize: "13px",
-                color: colors.subtext,
-                marginBottom: "6px",
-                fontWeight: 600,
-              }}
-            >
+          <div className={styles.fieldGroupLg}>
+            <label htmlFor="select-test-case" className={styles.fieldLabel}>
               テストケース
             </label>
             <select
@@ -243,15 +186,7 @@ export function RunsPage() {
               onChange={(e) =>
                 setSelectedTestCaseId(e.target.value === "" ? "" : Number(e.target.value))
               }
-              style={{
-                width: "100%",
-                padding: "8px 12px",
-                backgroundColor: colors.overlay,
-                border: `1px solid ${colors.border}`,
-                borderRadius: "6px",
-                color: colors.text,
-                fontSize: "14px",
-              }}
+              className={styles.fieldSelect}
             >
               <option value="">-- 選択してください --</option>
               {testCases.map((tc) => (
@@ -261,7 +196,7 @@ export function RunsPage() {
               ))}
             </select>
             {testCases.length === 0 && (
-              <p style={{ margin: "6px 0 0", fontSize: "12px", color: colors.muted }}>
+              <p className={styles.fieldHint}>
                 テストケースがありません。先にテストケースを作成してください。
               </p>
             )}
@@ -270,21 +205,8 @@ export function RunsPage() {
           <button
             type="button"
             onClick={handleStartRun}
-            disabled={selectedVersionId === "" || selectedTestCaseId === ""}
-            style={{
-              padding: "8px 20px",
-              backgroundColor:
-                selectedVersionId === "" || selectedTestCaseId === ""
-                  ? colors.muted
-                  : colors.accent,
-              color: colors.overlay,
-              border: "none",
-              borderRadius: "6px",
-              fontSize: "14px",
-              fontWeight: 600,
-              cursor:
-                selectedVersionId === "" || selectedTestCaseId === "" ? "not-allowed" : "pointer",
-            }}
+            disabled={isStartDisabled}
+            className={`${styles.btnStart} ${isStartDisabled ? styles.btnStartDisabled : ""}`}
           >
             Run を開始
           </button>
@@ -294,95 +216,42 @@ export function RunsPage() {
       {/* Step 2: Run 実行UI */}
       {step === "input" && selectedVersion && selectedTestCase && (
         <div>
-          <div style={{ marginBottom: "16px", display: "flex", alignItems: "center", gap: "12px" }}>
+          <div className={styles.stepHeader}>
             <button
               type="button"
               onClick={() => setStep("select")}
-              style={{
-                padding: "6px 12px",
-                backgroundColor: "transparent",
-                color: colors.subtext,
-                border: `1px solid ${colors.border}`,
-                borderRadius: "6px",
-                fontSize: "13px",
-                cursor: "pointer",
-              }}
+              className={styles.btnSecondary}
             >
               ← 戻る
             </button>
-            <span style={{ color: colors.subtext, fontSize: "14px" }}>
+            <span className={styles.stepLabel}>
               v{selectedVersion.version}
               {selectedVersion.name ? ` - ${selectedVersion.name}` : ""} × {selectedTestCase.title}
             </span>
           </div>
 
-          <div
-            style={{
-              display: "grid",
-              gridTemplateColumns: "1fr 1fr",
-              gap: "16px",
-            }}
-          >
+          <div className={styles.twoColumns}>
             {/* 左カラム: テストケース表示 */}
-            <div
-              style={{
-                backgroundColor: colors.card,
-                borderRadius: "8px",
-                border: `1px solid ${colors.border}`,
-                padding: "20px",
-              }}
-            >
-              <h3
-                style={{
-                  margin: "0 0 16px",
-                  fontSize: "15px",
-                  color: colors.accent,
-                }}
-              >
+            <div className={styles.panel}>
+              <h3 className={styles.panelTitle}>
                 テストケース: {selectedTestCase.title}
               </h3>
 
               {/* 会話ターン表示 */}
-              <div style={{ display: "flex", flexDirection: "column", gap: "10px" }}>
+              <div className={styles.chatList}>
                 {selectedTestCase.turns.map((turn, index) => (
                   <div
                     key={`turn-${
                       // biome-ignore lint/suspicious/noArrayIndexKey: ターン配列は順序で管理するため index をキーとして使用
                       index
                     }`}
-                    style={{
-                      display: "flex",
-                      flexDirection: "column",
-                      alignItems: turn.role === "user" ? "flex-end" : "flex-start",
-                    }}
+                    className={`${styles.bubbleWrapper} ${turn.role === "user" ? styles.bubbleWrapperUser : styles.bubbleWrapperAssistant}`}
                   >
-                    <span
-                      style={{
-                        fontSize: "11px",
-                        color: colors.muted,
-                        marginBottom: "4px",
-                        textTransform: "uppercase",
-                        letterSpacing: "0.05em",
-                      }}
-                    >
+                    <span className={styles.bubbleRole}>
                       {turn.role === "user" ? "User" : "Assistant"}
                     </span>
                     <div
-                      style={{
-                        maxWidth: "85%",
-                        padding: "10px 14px",
-                        borderRadius:
-                          turn.role === "user" ? "12px 12px 4px 12px" : "12px 12px 12px 4px",
-                        backgroundColor:
-                          turn.role === "user" ? `${colors.accent}33` : colors.surface,
-                        border: `1px solid ${
-                          turn.role === "user" ? `${colors.accent}55` : colors.border
-                        }`,
-                        fontSize: "14px",
-                        lineHeight: "1.5",
-                        whiteSpace: "pre-wrap",
-                        wordBreak: "break-word",
-                      }}
+                      className={`${styles.bubble} ${turn.role === "user" ? styles.bubbleUser : styles.bubbleAssistant}`}
                     >
                       {turn.content}
                     </div>
@@ -392,35 +261,9 @@ export function RunsPage() {
 
               {/* 期待される説明 */}
               {selectedTestCase.expected_description && (
-                <div
-                  style={{
-                    marginTop: "16px",
-                    padding: "12px",
-                    backgroundColor: `${colors.yellow}22`,
-                    border: `1px solid ${colors.yellow}44`,
-                    borderRadius: "6px",
-                  }}
-                >
-                  <p
-                    style={{
-                      margin: "0 0 4px",
-                      fontSize: "12px",
-                      color: colors.yellow,
-                      fontWeight: 600,
-                      textTransform: "uppercase",
-                      letterSpacing: "0.05em",
-                    }}
-                  >
-                    期待される応答の説明
-                  </p>
-                  <p
-                    style={{
-                      margin: 0,
-                      fontSize: "13px",
-                      color: colors.subtext,
-                      lineHeight: "1.5",
-                    }}
-                  >
+                <div className={styles.expectedBox}>
+                  <p className={styles.expectedLabel}>期待される応答の説明</p>
+                  <p className={styles.expectedText}>
                     {selectedTestCase.expected_description}
                   </p>
                 </div>
@@ -428,76 +271,23 @@ export function RunsPage() {
             </div>
 
             {/* 右カラム: 手動入力エリア */}
-            <div
-              style={{
-                backgroundColor: colors.card,
-                borderRadius: "8px",
-                border: `1px solid ${colors.border}`,
-                padding: "20px",
-                display: "flex",
-                flexDirection: "column",
-              }}
-            >
-              <h3
-                style={{
-                  margin: "0 0 8px",
-                  fontSize: "15px",
-                  color: colors.accent,
-                }}
-              >
-                LLM 応答の入力
-              </h3>
-              <p
-                style={{
-                  margin: "0 0 16px",
-                  fontSize: "13px",
-                  color: colors.subtext,
-                }}
-              >
-                LLM 応答を手動で入力してください
-              </p>
+            <div className={`${styles.panel} ${styles.panelFlex}`}>
+              <h3 className={styles.panelSubtitle}>LLM 応答の入力</h3>
+              <p className={styles.inputDescription}>LLM 応答を手動で入力してください</p>
 
               <textarea
                 value={llmResponse}
                 onChange={(e) => setLlmResponse(e.target.value)}
                 placeholder="LLM の応答をここにペーストまたは入力してください..."
-                style={{
-                  flex: 1,
-                  minHeight: "200px",
-                  padding: "12px",
-                  backgroundColor: colors.overlay,
-                  border: `1px solid ${colors.border}`,
-                  borderRadius: "6px",
-                  color: colors.text,
-                  fontSize: "14px",
-                  lineHeight: "1.5",
-                  resize: "vertical",
-                  fontFamily: "inherit",
-                  marginBottom: "16px",
-                }}
+                className={styles.responseTextarea}
               />
 
-              <div style={{ display: "flex", gap: "8px", flexDirection: "column" }}>
+              <div className={styles.inputActions}>
                 <button
                   type="button"
                   onClick={handleSaveRun}
-                  disabled={!llmResponse.trim() || createRunMutation.isPending}
-                  style={{
-                    padding: "10px 20px",
-                    backgroundColor:
-                      !llmResponse.trim() || createRunMutation.isPending
-                        ? colors.muted
-                        : colors.green,
-                    color: colors.overlay,
-                    border: "none",
-                    borderRadius: "6px",
-                    fontSize: "14px",
-                    fontWeight: 600,
-                    cursor:
-                      !llmResponse.trim() || createRunMutation.isPending
-                        ? "not-allowed"
-                        : "pointer",
-                  }}
+                  disabled={isSaveDisabled}
+                  className={`${styles.btnSave} ${isSaveDisabled ? styles.btnSaveDisabled : ""}`}
                 >
                   {createRunMutation.isPending ? "保存中..." : "Run を保存"}
                 </button>
@@ -507,32 +297,14 @@ export function RunsPage() {
                   type="button"
                   disabled
                   title="Phase 2 で実装予定"
-                  style={{
-                    padding: "10px 20px",
-                    backgroundColor: colors.muted,
-                    color: colors.overlay,
-                    border: "none",
-                    borderRadius: "6px",
-                    fontSize: "14px",
-                    fontWeight: 600,
-                    cursor: "not-allowed",
-                    opacity: 0.5,
-                  }}
+                  className={styles.btnLlmRun}
                 >
                   LLM 実行（Phase 2）
                 </button>
               </div>
 
               {createRunMutation.isError && (
-                <p
-                  style={{
-                    marginTop: "12px",
-                    color: colors.danger,
-                    fontSize: "13px",
-                  }}
-                >
-                  保存に失敗しました。もう一度お試しください。
-                </p>
+                <p className={styles.errorMsg}>保存に失敗しました。もう一度お試しください。</p>
               )}
             </div>
           </div>
@@ -542,102 +314,38 @@ export function RunsPage() {
       {/* Step 3: 保存後の表示 */}
       {step === "saved" && savedRun && selectedVersion && selectedTestCase && (
         <div>
-          <div
-            style={{
-              padding: "12px 16px",
-              backgroundColor: `${colors.green}22`,
-              border: `1px solid ${colors.green}44`,
-              borderRadius: "6px",
-              marginBottom: "20px",
-              color: colors.green,
-              fontSize: "14px",
-            }}
-          >
+          <div className={styles.successBanner}>
             Run を保存しました（ID: {savedRun.id}）
           </div>
 
-          <div style={{ marginBottom: "20px", display: "flex", gap: "8px" }}>
-            <button
-              type="button"
-              onClick={handleNewRun}
-              style={{
-                padding: "8px 20px",
-                backgroundColor: colors.accent,
-                color: colors.overlay,
-                border: "none",
-                borderRadius: "6px",
-                fontSize: "14px",
-                fontWeight: 600,
-                cursor: "pointer",
-              }}
-            >
+          <div className={styles.savedActions}>
+            <button type="button" onClick={handleNewRun} className={styles.btnPrimary}>
               新しい Run を作成
             </button>
           </div>
 
           {/* 保存したRunの内容 */}
-          <div
-            style={{
-              backgroundColor: colors.card,
-              borderRadius: "8px",
-              border: `1px solid ${colors.border}`,
-              padding: "20px",
-              marginBottom: "20px",
-            }}
-          >
-            <h3
-              style={{
-                margin: "0 0 16px",
-                fontSize: "15px",
-                color: colors.accent,
-              }}
-            >
-              保存した Run の内容
-            </h3>
-            <p style={{ margin: "0 0 12px", fontSize: "13px", color: colors.muted }}>
+          <div className={styles.savedPanel}>
+            <h3 className={styles.panelTitle}>保存した Run の内容</h3>
+            <p className={styles.savedMeta}>
               v{selectedVersion.version}
               {selectedVersion.name ? ` - ${selectedVersion.name}` : ""} × {selectedTestCase.title}{" "}
               · {formatDate(savedRun.created_at)}
             </p>
-            <div style={{ display: "flex", flexDirection: "column", gap: "10px" }}>
+            <div className={styles.chatList}>
               {savedRun.conversation.map((msg, index) => (
                 <div
                   key={`msg-${
                     // biome-ignore lint/suspicious/noArrayIndexKey: 会話配列は順序で管理するため index をキーとして使用
                     index
                   }`}
-                  style={{
-                    display: "flex",
-                    flexDirection: "column",
-                    alignItems: msg.role === "user" ? "flex-end" : "flex-start",
-                  }}
+                  className={`${styles.bubbleWrapper} ${msg.role === "user" ? styles.bubbleWrapperUser : styles.bubbleWrapperAssistant}`}
                 >
-                  <span
-                    style={{
-                      fontSize: "11px",
-                      color: colors.muted,
-                      marginBottom: "4px",
-                      textTransform: "uppercase",
-                      letterSpacing: "0.05em",
-                    }}
-                  >
+                  <span className={styles.bubbleRole}>
                     {msg.role === "user" ? "User" : "Assistant"}
                   </span>
                   <div
-                    style={{
-                      maxWidth: "85%",
-                      padding: "10px 14px",
-                      borderRadius:
-                        msg.role === "user" ? "12px 12px 4px 12px" : "12px 12px 12px 4px",
-                      backgroundColor: msg.role === "user" ? `${colors.accent}33` : colors.surface,
-                      border: `1px solid ${
-                        msg.role === "user" ? `${colors.accent}55` : colors.border
-                      }`,
-                      fontSize: "14px",
-                      lineHeight: "1.5",
-                      whiteSpace: "pre-wrap",
-                      wordBreak: "break-word",
-                    }}
+                    className={`${styles.bubble} ${msg.role === "user" ? styles.bubbleUser : styles.bubbleAssistant}`}
                   >
                     {msg.content}
                   </div>
@@ -647,113 +355,36 @@ export function RunsPage() {
           </div>
 
           {/* 既存のRun一覧 */}
-          <div
-            style={{
-              backgroundColor: colors.card,
-              borderRadius: "8px",
-              border: `1px solid ${colors.border}`,
-              padding: "20px",
-            }}
-          >
-            <h3
-              style={{
-                margin: "0 0 16px",
-                fontSize: "15px",
-                color: colors.accent,
-              }}
-            >
-              過去の Run 一覧
-            </h3>
+          <div className={styles.savedPanel}>
+            <h3 className={styles.panelTitle}>過去の Run 一覧</h3>
             {existingRuns.length === 0 ? (
-              <p style={{ color: colors.muted, fontSize: "14px" }}>まだ Run がありません。</p>
+              <p className={styles.emptyRuns}>まだ Run がありません。</p>
             ) : (
-              <div style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
+              <div className={styles.runList}>
                 {existingRuns.map((run) => {
                   const lastResponse = getLastAssistantMessage(run.conversation);
                   return (
                     <div
                       key={run.id}
-                      style={{
-                        padding: "14px",
-                        backgroundColor: colors.overlay,
-                        borderRadius: "6px",
-                        border: `1px solid ${run.is_best ? colors.yellow : colors.border}`,
-                        display: "flex",
-                        gap: "12px",
-                        alignItems: "flex-start",
-                      }}
+                      className={`${styles.runCard} ${run.is_best ? styles.runCardBest : ""}`}
                     >
-                      <div style={{ flex: 1, minWidth: 0 }}>
-                        <div
-                          style={{
-                            display: "flex",
-                            alignItems: "center",
-                            gap: "8px",
-                            marginBottom: "6px",
-                          }}
-                        >
-                          <span style={{ fontSize: "13px", color: colors.muted }}>
-                            Run #{run.id}
-                          </span>
+                      <div className={styles.runCardBody}>
+                        <div className={styles.runCardHeader}>
+                          <span className={styles.runId}>Run #{run.id}</span>
                           {run.is_best && (
-                            <span
-                              style={{
-                                padding: "2px 8px",
-                                backgroundColor: `${colors.yellow}33`,
-                                border: `1px solid ${colors.yellow}55`,
-                                borderRadius: "4px",
-                                fontSize: "11px",
-                                color: colors.yellow,
-                                fontWeight: 600,
-                              }}
-                            >
-                              ベスト回答
-                            </span>
+                            <span className={styles.badgeBest}>ベスト回答</span>
                           )}
-                          <span
-                            style={{
-                              fontSize: "12px",
-                              color: colors.muted,
-                              marginLeft: "auto",
-                            }}
-                          >
-                            {formatDate(run.created_at)}
-                          </span>
+                          <span className={styles.runDate}>{formatDate(run.created_at)}</span>
                         </div>
                         {lastResponse && (
-                          <p
-                            style={{
-                              margin: 0,
-                              fontSize: "13px",
-                              color: colors.subtext,
-                              lineHeight: "1.5",
-                              overflow: "hidden",
-                              display: "-webkit-box",
-                              WebkitLineClamp: 3,
-                              WebkitBoxOrient: "vertical",
-                              whiteSpace: "pre-wrap",
-                            }}
-                          >
-                            {lastResponse}
-                          </p>
+                          <p className={styles.runPreview}>{lastResponse}</p>
                         )}
                       </div>
                       <button
                         type="button"
                         onClick={() => setBestMutation.mutate(run.id)}
                         disabled={setBestMutation.isPending || run.is_best}
-                        style={{
-                          padding: "6px 12px",
-                          backgroundColor: run.is_best ? `${colors.yellow}22` : "transparent",
-                          color: run.is_best ? colors.yellow : colors.muted,
-                          border: `1px solid ${run.is_best ? `${colors.yellow}55` : colors.border}`,
-                          borderRadius: "6px",
-                          fontSize: "12px",
-                          cursor:
-                            run.is_best || setBestMutation.isPending ? "not-allowed" : "pointer",
-                          whiteSpace: "nowrap",
-                          flexShrink: 0,
-                        }}
+                        className={`${styles.btnBest} ${run.is_best ? styles.btnBestActive : styles.btnBestInactive}`}
                       >
                         {run.is_best ? "ベスト済み" : "ベストに設定"}
                       </button>
