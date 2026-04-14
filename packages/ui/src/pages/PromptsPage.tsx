@@ -427,7 +427,7 @@ function PromptEditor({ version, projectId, isNew = false, onSave, onCancel }: P
   };
 
   return (
-    <form onSubmit={handleSubmit} style={{ display: "flex", flexDirection: "column", gap: "14px" }}>
+    <form onSubmit={handleSubmit} style={{ display: "flex", flexDirection: "column", gap: "14px", flex: 1, minHeight: 0, overflow: "hidden" }}>
       <div>
         <label htmlFor="editor-name" style={labelStyle}>
           バージョン名（任意）
@@ -454,7 +454,7 @@ function PromptEditor({ version, projectId, isNew = false, onSave, onCancel }: P
           style={inputStyle}
         />
       </div>
-      <div style={{ flex: 1 }}>
+      <div style={{ flex: 1, display: "flex", flexDirection: "column", minHeight: 0 }}>
         <label htmlFor="editor-content" style={labelStyle}>
           プロンプト本文
           <span style={{ color: colors.danger, marginLeft: "4px" }}>*</span>
@@ -464,16 +464,18 @@ function PromptEditor({ version, projectId, isNew = false, onSave, onCancel }: P
           value={content}
           onChange={(e) => setContent(e.target.value)}
           placeholder="システムプロンプトを入力..."
-          rows={16}
           style={{
             ...inputStyle,
-            resize: "vertical",
+            flex: 1,
+            minHeight: 0,
+            overflow: "auto",
+            resize: "none",
             lineHeight: 1.6,
             fontFamily: "monospace",
           }}
         />
       </div>
-      <div style={{ display: "flex", gap: "8px", justifyContent: "flex-end" }}>
+      <div style={{ display: "flex", gap: "8px", justifyContent: "flex-end", flexShrink: 0 }}>
         <button
           type="button"
           onClick={onCancel}
@@ -1284,7 +1286,7 @@ export function PromptsPage() {
               >
                 新規プロンプト作成
               </div>
-              <div style={{ flex: 1, padding: "16px", overflow: "auto" }}>
+              <div style={{ flex: 1, padding: "16px", overflow: "hidden", display: "flex", flexDirection: "column" }}>
                 <PromptEditor
                   version={null}
                   projectId={projectId}
@@ -1416,7 +1418,7 @@ export function PromptsPage() {
               >
                 v{panelMode.version.version} を編集
               </div>
-              <div style={{ flex: 1, padding: "16px", overflow: "auto" }}>
+              <div style={{ flex: 1, padding: "16px", overflow: "hidden", display: "flex", flexDirection: "column" }}>
                 <PromptEditor
                   version={panelMode.version}
                   projectId={projectId}
