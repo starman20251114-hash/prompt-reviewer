@@ -253,7 +253,8 @@
 }
 
 .btnBulkSave:disabled {
-  composes: btnDisabled from '../styles/shared.module.css';
+  cursor: not-allowed;
+  opacity: 0.6;
 }
 
 .bulkSavedMsg {
