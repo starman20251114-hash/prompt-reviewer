@@ -18,6 +18,7 @@ function ProjectSubNav({ projectId }: { projectId: string }) {
     { to: `/projects/${projectId}/test-cases`, label: "テストケース" },
     { to: `/projects/${projectId}/prompts`, label: "プロンプト" },
     { to: `/projects/${projectId}/runs`, label: "Run 一覧" },
+    { to: `/projects/${projectId}/score`, label: "採点" },
     { to: `/projects/${projectId}/settings`, label: "設定" },
   ];
 
