@@ -13,7 +13,7 @@ const turnSchema = z.object({
 
 const createTestCaseSchema = z.object({
   title: z.string().min(1, "タイトルは1文字以上必要です"),
-  turns: z.array(turnSchema).min(1, "turnsは1件以上必要です"),
+  turns: z.array(turnSchema).default([]),
   context_content: z.string().optional(),
   expected_description: z.string().optional(),
   display_order: z.number().int().optional(),
@@ -21,7 +21,7 @@ const createTestCaseSchema = z.object({
 
 const updateTestCaseSchema = z.object({
   title: z.string().min(1, "タイトルは1文字以上必要です").optional(),
-  turns: z.array(turnSchema).min(1, "turnsは1件以上必要です").optional(),
+  turns: z.array(turnSchema).optional(),
   context_content: z.string().optional(),
   expected_description: z.string().nullable().optional(),
   display_order: z.number().int().optional(),
