@@ -16,11 +16,44 @@ const upsertSettingsSchema = z.object({
   }),
 });
 
+type UpsertBody = z.infer<typeof upsertSettingsSchema>;
+
 /** 文字列または undefined を整数に変換する。無効・undefined の場合は null を返す */
 function parseIntParam(value: string | undefined): number | null {
   if (value === undefined) return null;
   const parsed = Number(value);
   return Number.isNaN(parsed) ? null : parsed;
+}
+
+/** 既存設定を更新し、更新後のレコードを返す。失敗時は null */
+async function updateSettings(db: DB, projectId: number, body: UpsertBody, now: number) {
+  const [updated] = await db
+    .update(project_settings)
+    .set({
+      model: body.model,
+      temperature: body.temperature,
+      api_provider: body.api_provider,
+      updated_at: now,
+    })
+    .where(eq(project_settings.project_id, projectId))
+    .returning();
+  return updated ?? null;
+}
+
+/** 新規設定を作成し、作成後のレコードを返す。失敗時は null */
+async function createSettings(db: DB, projectId: number, body: UpsertBody, now: number) {
+  const [created] = await db
+    .insert(project_settings)
+    .values({
+      project_id: projectId,
+      model: body.model,
+      temperature: body.temperature,
+      api_provider: body.api_provider,
+      created_at: now,
+      updated_at: now,
+    })
+    .returning();
+  return created ?? null;
 }
 
 /**
@@ -64,50 +97,19 @@ export function createProjectSettingsRouter(db: DB) {
     const body = c.req.valid("json");
     const now = Date.now();
 
-    // 既存設定の確認
     const [existing] = await db
       .select()
       .from(project_settings)
       .where(eq(project_settings.project_id, projectId));
 
     if (existing) {
-      // 更新
-      const updateResult = await db
-        .update(project_settings)
-        .set({
-          model: body.model,
-          temperature: body.temperature,
-          api_provider: body.api_provider,
-          updated_at: now,
-        })
-        .where(eq(project_settings.project_id, projectId))
-        .returning();
-
-      const updated = updateResult[0];
-      if (!updated) {
-        return c.json({ error: "Failed to update Settings" }, 500);
-      }
-
+      const updated = await updateSettings(db, projectId, body, now);
+      if (!updated) return c.json({ error: "Failed to update Settings" }, 500);
       return c.json(updated);
     }
-    // 新規作成
-    const insertResult = await db
-      .insert(project_settings)
-      .values({
-        project_id: projectId,
-        model: body.model,
-        temperature: body.temperature,
-        api_provider: body.api_provider,
-        created_at: now,
-        updated_at: now,
-      })
-      .returning();
 
-    const created = insertResult[0];
-    if (!created) {
-      return c.json({ error: "Failed to create Settings" }, 500);
-    }
-
+    const created = await createSettings(db, projectId, body, now);
+    if (!created) return c.json({ error: "Failed to create Settings" }, 500);
     return c.json(created, 201);
   });
 
