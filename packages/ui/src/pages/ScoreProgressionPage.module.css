@@ -1,0 +1,263 @@
+/* ==================== Root ==================== */
+.root {
+  --c-bg: #1e1e2e;
+  --c-text: #cdd6f4;
+  --c-subtext: #a6adc8;
+  --c-accent: #cba6f7;
+  --c-border: #313244;
+  --c-card: #181825;
+  --c-overlay: #313244;
+  --c-surface: #45475a;
+  --c-green: #a6e3a1;
+  --c-yellow: #f9e2af;
+  --c-danger: #f38ba8;
+
+  color: var(--c-text);
+}
+
+/* ==================== Page header ==================== */
+.pageHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  margin-bottom: 32px;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+
+.pageTitle {
+  margin: 0 0 4px;
+  font-size: 20px;
+  color: var(--c-text);
+}
+
+.projectName {
+  margin: 0;
+  color: var(--c-subtext);
+  font-size: 14px;
+}
+
+/* ==================== Score type switcher ==================== */
+.scoreTypeSwitcher {
+  display: flex;
+  gap: 4px;
+  background: var(--c-card);
+  border: 1px solid var(--c-border);
+  border-radius: 8px;
+  padding: 4px;
+}
+
+.switcherBtn {
+  padding: 6px 16px;
+  font-size: 13px;
+  background: transparent;
+  border: none;
+  border-radius: 6px;
+  color: var(--c-subtext);
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s;
+}
+
+.switcherBtn:hover:not(.switcherBtnDisabled) {
+  background: var(--c-overlay);
+  color: var(--c-text);
+}
+
+.switcherBtnActive {
+  background: var(--c-accent);
+  color: #1e1e2e;
+  font-weight: 600;
+}
+
+.switcherBtnActive:hover {
+  background: var(--c-accent);
+  color: #1e1e2e;
+}
+
+.switcherBtnDisabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+/* ==================== Section ==================== */
+.section {
+  margin-bottom: 40px;
+}
+
+.sectionTitle {
+  margin: 0 0 4px;
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--c-text);
+}
+
+.sectionDesc {
+  margin: 0 0 16px;
+  font-size: 13px;
+  color: var(--c-subtext);
+}
+
+/* ==================== Chart ==================== */
+.chartWrapper {
+  background: var(--c-card);
+  border: 1px solid var(--c-border);
+  border-radius: 12px;
+  padding: 24px 16px 16px;
+}
+
+.chartEmpty {
+  background: var(--c-card);
+  border: 1px solid var(--c-border);
+  border-radius: 12px;
+  padding: 48px 24px;
+  text-align: center;
+  color: var(--c-subtext);
+  font-size: 14px;
+}
+
+/* ==================== Table ==================== */
+.tableWrapper {
+  overflow-x: auto;
+  border-radius: 12px;
+  border: 1px solid var(--c-border);
+}
+
+.table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+  background: var(--c-card);
+}
+
+.th {
+  padding: 10px 16px;
+  text-align: left;
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--c-subtext);
+  background: var(--c-overlay);
+  border-bottom: 1px solid var(--c-border);
+  white-space: nowrap;
+}
+
+.thNumber {
+  text-align: center;
+}
+
+.thVersionName {
+  display: block;
+  font-size: 10px;
+  font-weight: 400;
+  text-transform: none;
+  letter-spacing: 0;
+  color: var(--c-subtext);
+  margin-top: 2px;
+  max-width: 80px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.tr {
+  border-bottom: 1px solid var(--c-border);
+}
+
+.tr:last-child {
+  border-bottom: none;
+}
+
+.tr:hover {
+  background: color-mix(in srgb, var(--c-accent) 5%, transparent);
+}
+
+.td {
+  padding: 10px 16px;
+  color: var(--c-text);
+  vertical-align: middle;
+}
+
+.tdNumber {
+  text-align: center;
+}
+
+/* ==================== Version / TestCase labels ==================== */
+.versionNum {
+  font-weight: 600;
+  color: var(--c-accent);
+  font-size: 13px;
+}
+
+.versionName {
+  font-size: 13px;
+  color: var(--c-subtext);
+}
+
+.testCaseTitle {
+  font-size: 13px;
+  color: var(--c-text);
+}
+
+/* ==================== Score badge ==================== */
+.scoreBadge {
+  display: inline-block;
+  padding: 2px 10px;
+  border-radius: 12px;
+  font-size: 12px;
+  font-weight: 600;
+  min-width: 40px;
+  text-align: center;
+}
+
+.scoreBadgeEmpty {
+  display: inline-block;
+  padding: 2px 10px;
+  font-size: 12px;
+  color: var(--c-surface);
+  min-width: 40px;
+  text-align: center;
+}
+
+.scoreBadgeHigh {
+  background: color-mix(in srgb, var(--c-green) 20%, transparent);
+  color: var(--c-green);
+  border: 1px solid color-mix(in srgb, var(--c-green) 40%, transparent);
+}
+
+.scoreBadgeMid {
+  background: color-mix(in srgb, var(--c-yellow) 20%, transparent);
+  color: var(--c-yellow);
+  border: 1px solid color-mix(in srgb, var(--c-yellow) 40%, transparent);
+}
+
+.scoreBadgeLow {
+  background: color-mix(in srgb, var(--c-danger) 20%, transparent);
+  color: var(--c-danger);
+  border: 1px solid color-mix(in srgb, var(--c-danger) 40%, transparent);
+}
+
+/* ==================== Status messages ==================== */
+.loadingMsg {
+  color: var(--c-subtext);
+  font-size: 14px;
+  padding: 32px;
+  text-align: center;
+}
+
+.errorMsg {
+  color: var(--c-danger);
+  font-size: 14px;
+  padding: 32px;
+  text-align: center;
+}
+
+.emptyMsg {
+  color: var(--c-subtext);
+  font-size: 14px;
+  padding: 48px;
+  text-align: center;
+  background: var(--c-card);
+  border: 1px solid var(--c-border);
+  border-radius: 12px;
+}

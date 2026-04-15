@@ -95,71 +95,37 @@ function flattenTree(nodes: VersionTreeNode[]): VersionTreeNode[] {
   return result;
 }
 
-// ツリー接続線を構築するためのヘルパー
-function buildConnectorFlags(flatNodes: VersionTreeNode[]): boolean[][] {
-  // 各ノードのdepthごとに「まだ下に兄弟がいるか」を追跡
-  const flags: boolean[][] = flatNodes.map(() => []);
+// Determine whether to draw a vertical line at depth d for each node
 
-  for (let i = 0; i < flatNodes.length; i++) {
-    const node = flatNodes[i];
-    const depthFlags: boolean[] = [];
-
-    for (let d = 0; d < node.depth; d++) {
-      // depth d において、このノードより後ろに同じ深さ(または浅い深さで分岐が続く)ノードがあるか
-      let hasMore = false;
-      for (let j = i + 1; j < flatNodes.length; j++) {
-        if (flatNodes[j].depth <= d) {
-          break;
-        }
-        if (
-          flatNodes[j].depth === d + 1 &&
-          flatNodes[j].version.parent_version_id === flatNodes[i].version.parent_version_id
-        ) {
-          // 同じ親を持つ兄弟が後ろにいるか確認
-        }
-        if (flatNodes[j].depth === d) {
-          hasMore = true;
-          break;
-        }
-      }
-      depthFlags.push(hasMore);
-    }
-    flags[i] = depthFlags;
-  }
-  return flags;
-}
-
-// 各ノードについて、そのdepth位置に縦線を引くかどうかを判断
 function computeVerticalLines(flatNodes: VersionTreeNode[]): boolean[][] {
   const result: boolean[][] = flatNodes.map(() => []);
   const maxDepth = Math.max(...flatNodes.map((n) => n.depth), 0);
 
   for (let d = 0; d <= maxDepth; d++) {
-    // depth d のノードがどの位置にいるかを記録
     for (let i = 0; i < flatNodes.length; i++) {
       const node = flatNodes[i];
+      if (!node) continue;
       if (node.depth >= d) {
-        // このインデックスの位置でdepth dの縦線を引くか
         if (node.depth === d) {
-          result[i][d] = false; // このノード自身
+          // biome-ignore lint/style/noNonNullAssertion: result[i] is always initialized above
+          result[i]![d] = false;
         } else {
-          // このノードがdepth d のノードの後裔かどうか
-          // depth d の最後の兄弟より前に現れるか確認
           let showLine = false;
-          // depth d+1...node.depth の間に親をたどる
-          // 簡易的に: depth d のノードがiの前にあって、iより後にも depth d のノードが同じ親の下に続くか
           for (let j = i + 1; j < flatNodes.length; j++) {
-            if (flatNodes[j].depth < d) break;
-            if (flatNodes[j].depth === d) {
-              // iからjまでの間に、depth d のノードがあるということは縦線が必要
+            const jNode = flatNodes[j];
+            if (!jNode) break;
+            if (jNode.depth < d) break;
+            if (jNode.depth === d) {
               showLine = true;
               break;
             }
           }
-          result[i][d] = showLine;
+          // biome-ignore lint/style/noNonNullAssertion: result[i] is always initialized above
+          result[i]![d] = showLine;
         }
       } else {
-        result[i][d] = false;
+        // biome-ignore lint/style/noNonNullAssertion: result[i] is always initialized above
+        result[i]![d] = false;
       }
     }
   }
@@ -184,16 +150,13 @@ function VersionTreeItem({
   onSelect,
   onBranch,
   onCompare,
-  verticalLines,
+  verticalLines: _verticalLines,
 }: VersionTreeItemProps) {
   const { version } = node;
   const depth = node.depth;
 
   return (
-    <div
-      className={styles.treeItem}
-      style={{ paddingLeft: `${depth * 20}px` }}
-    >
+    <div className={styles.treeItem} style={{ paddingLeft: `${depth * 20}px` }}>
       {/* 接続線（分岐ノードのみ） */}
       {depth > 0 && (
         <div className={styles.treeConnector}>
@@ -216,9 +179,7 @@ function VersionTreeItem({
         <span className={styles.treeVersionName}>
           {version.name ?? `バージョン ${version.version}`}
         </span>
-        {version.parent_version_id !== null && (
-          <span className={styles.badgeBranch}>分岐</span>
-        )}
+        {version.parent_version_id !== null && <span className={styles.badgeBranch}>分岐</span>}
         <div
           className={styles.treeCardActions}
           onClick={(e) => e.stopPropagation()}
@@ -344,11 +305,7 @@ function PromptEditor({ version, projectId, isNew = false, onSave, onCancel }: P
         />
       </div>
       <div className={styles.formActions}>
-        <button
-          type="button"
-          onClick={onCancel}
-          className={styles.btnCancel}
-        >
+        <button type="button" onClick={onCancel} className={styles.btnCancel}>
           キャンセル
         </button>
         <button
@@ -438,15 +395,9 @@ function BranchModal({ parentVersion, projectId, onClose, onCreated }: BranchMod
               className={styles.fieldInput}
             />
           </div>
-          {branchMutation.isError && (
-            <p className={styles.errorMsg}>分岐の作成に失敗しました。</p>
-          )}
+          {branchMutation.isError && <p className={styles.errorMsg}>分岐の作成に失敗しました。</p>}
           <div className={styles.modalActions}>
-            <button
-              type="button"
-              onClick={onClose}
-              className={styles.btnCancel}
-            >
+            <button type="button" onClick={onClose} className={styles.btnCancel}>
               キャンセル
             </button>
             <button
@@ -481,49 +432,56 @@ function diffLines(a: string, b: string): { type: "same" | "removed" | "added"; 
 
   while (ai < aLines.length || bi < bLines.length) {
     if (ai < aLines.length && bi < bLines.length && aLines[ai] === bLines[bi]) {
-      result.push({ type: "same", text: aLines[ai] });
+      // biome-ignore lint/style/noNonNullAssertion: bounds checked above
+      result.push({ type: "same", text: aLines[ai]! });
       ai++;
       bi++;
     } else {
-      // 先読みして一致するものを探す
       const aRemainder = aLines.slice(ai);
       const bRemainder = bLines.slice(bi);
 
-      // bの行がaに出てくるか（削除の後に挿入）
       let foundInA = -1;
       let foundInB = -1;
       const lookAhead = Math.min(5, maxLen);
 
       for (let d = 0; d < lookAhead; d++) {
-        if (d < bRemainder.length && aRemainder.slice(0, lookAhead).includes(bRemainder[d])) {
+        // biome-ignore lint/style/noNonNullAssertion: d < bRemainder.length checked
+        if (d < bRemainder.length && aRemainder.slice(0, lookAhead).includes(bRemainder[d]!)) {
           foundInB = d;
-          foundInA = aRemainder.indexOf(bRemainder[d]);
+          // biome-ignore lint/style/noNonNullAssertion: d < bRemainder.length checked
+          foundInA = aRemainder.indexOf(bRemainder[d]!);
           break;
         }
-        if (d < aRemainder.length && bRemainder.slice(0, lookAhead).includes(aRemainder[d])) {
+        // biome-ignore lint/style/noNonNullAssertion: d < aRemainder.length checked
+        if (d < aRemainder.length && bRemainder.slice(0, lookAhead).includes(aRemainder[d]!)) {
           foundInA = d;
-          foundInB = bRemainder.indexOf(aRemainder[d]);
+          // biome-ignore lint/style/noNonNullAssertion: d < aRemainder.length checked
+          foundInB = bRemainder.indexOf(aRemainder[d]!);
           break;
         }
       }
 
       if (foundInA > 0) {
         for (let i = 0; i < foundInA; i++) {
-          result.push({ type: "removed", text: aRemainder[i] });
+          // biome-ignore lint/style/noNonNullAssertion: i < foundInA <= aRemainder.length
+          result.push({ type: "removed", text: aRemainder[i]! });
         }
         ai += foundInA;
       } else if (foundInB > 0) {
         for (let i = 0; i < foundInB; i++) {
-          result.push({ type: "added", text: bRemainder[i] });
+          // biome-ignore lint/style/noNonNullAssertion: i < foundInB <= bRemainder.length
+          result.push({ type: "added", text: bRemainder[i]! });
         }
         bi += foundInB;
       } else {
         if (ai < aLines.length) {
-          result.push({ type: "removed", text: aLines[ai] });
+          // biome-ignore lint/style/noNonNullAssertion: bounds checked above
+          result.push({ type: "removed", text: aLines[ai]! });
           ai++;
         }
         if (bi < bLines.length) {
-          result.push({ type: "added", text: bLines[bi] });
+          // biome-ignore lint/style/noNonNullAssertion: bounds checked above
+          result.push({ type: "added", text: bLines[bi]! });
           bi++;
         }
       }
@@ -564,11 +522,7 @@ function CompareView({ versionA, versionB, onClose }: CompareViewProps) {
                 </button>
               ))}
             </div>
-            <button
-              type="button"
-              onClick={onClose}
-              className={styles.btnCloseCompare}
-            >
+            <button type="button" onClick={onClose} className={styles.btnCloseCompare}>
               閉じる
             </button>
           </div>
@@ -584,9 +538,7 @@ function CompareView({ versionA, versionB, onClose }: CompareViewProps) {
                   <span>
                     v{versionA.version} {versionA.name && `— ${versionA.name}`}
                   </span>
-                  <span className={styles.comparePanelDate}>
-                    {formatDate(versionA.created_at)}
-                  </span>
+                  <span className={styles.comparePanelDate}>{formatDate(versionA.created_at)}</span>
                 </div>
                 <pre className={styles.comparePre}>{versionA.content}</pre>
               </div>
@@ -596,9 +548,7 @@ function CompareView({ versionA, versionB, onClose }: CompareViewProps) {
                   <span>
                     v{versionB.version} {versionB.name && `— ${versionB.name}`}
                   </span>
-                  <span className={styles.comparePanelDate}>
-                    {formatDate(versionB.created_at)}
-                  </span>
+                  <span className={styles.comparePanelDate}>{formatDate(versionB.created_at)}</span>
                 </div>
                 <pre className={styles.comparePre}>{versionB.content}</pre>
               </div>
@@ -725,11 +675,7 @@ export function PromptsPage() {
         </div>
         <div className={styles.pageActions}>
           {selectedVersion && compareVersion && (
-            <button
-              type="button"
-              onClick={handleOpenCompare}
-              className={styles.btnBlue}
-            >
+            <button type="button" onClick={handleOpenCompare} className={styles.btnBlue}>
               比較を表示
             </button>
           )}
@@ -814,9 +760,7 @@ export function PromptsPage() {
         {/* 右パネル */}
         <div className={styles.rightPanel}>
           {panelMode === null && (
-            <div className={styles.panelEmpty}>
-              バージョンを選択するか、新規作成してください
-            </div>
+            <div className={styles.panelEmpty}>バージョンを選択するか、新規作成してください</div>
           )}
 
           {panelMode?.type === "new" && (
@@ -889,9 +833,7 @@ export function PromptsPage() {
 
           {panelMode?.type === "edit" && (
             <>
-              <div className={styles.panelHeaderTitle}>
-                v{panelMode.version.version} を編集
-              </div>
+              <div className={styles.panelHeaderTitle}>v{panelMode.version.version} を編集</div>
               <div className={styles.panelEditorBody}>
                 <PromptEditor
                   version={panelMode.version}

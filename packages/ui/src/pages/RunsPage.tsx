@@ -16,6 +16,219 @@ import {
 } from "../lib/api";
 import styles from "./RunsPage.module.css";
 
+function diffLines(a: string, b: string): { type: "same" | "removed" | "added"; text: string }[] {
+  const aLines = a.split("\n");
+  const bLines = b.split("\n");
+  const result: { type: "same" | "removed" | "added"; text: string }[] = [];
+
+  const maxLen = Math.max(aLines.length, bLines.length);
+  let ai = 0;
+  let bi = 0;
+
+  while (ai < aLines.length || bi < bLines.length) {
+    if (ai < aLines.length && bi < bLines.length && aLines[ai] === bLines[bi]) {
+      // biome-ignore lint/style/noNonNullAssertion: bounds checked above
+      result.push({ type: "same", text: aLines[ai]! });
+      ai++;
+      bi++;
+    } else {
+      const aRemainder = aLines.slice(ai);
+      const bRemainder = bLines.slice(bi);
+
+      let foundInA = -1;
+      let foundInB = -1;
+      const lookAhead = Math.min(5, maxLen);
+
+      for (let d = 0; d < lookAhead; d++) {
+        // biome-ignore lint/style/noNonNullAssertion: d < bRemainder.length checked
+        if (d < bRemainder.length && aRemainder.slice(0, lookAhead).includes(bRemainder[d]!)) {
+          foundInB = d;
+          // biome-ignore lint/style/noNonNullAssertion: d < bRemainder.length checked
+          foundInA = aRemainder.indexOf(bRemainder[d]!);
+          break;
+        }
+        // biome-ignore lint/style/noNonNullAssertion: d < aRemainder.length checked
+        if (d < aRemainder.length && bRemainder.slice(0, lookAhead).includes(aRemainder[d]!)) {
+          foundInA = d;
+          // biome-ignore lint/style/noNonNullAssertion: d < aRemainder.length checked
+          foundInB = bRemainder.indexOf(aRemainder[d]!);
+          break;
+        }
+      }
+
+      if (foundInA > 0) {
+        for (let i = 0; i < foundInA; i++) {
+          // biome-ignore lint/style/noNonNullAssertion: i < foundInA <= aRemainder.length
+          result.push({ type: "removed", text: aRemainder[i]! });
+        }
+        ai += foundInA;
+      } else if (foundInB > 0) {
+        for (let i = 0; i < foundInB; i++) {
+          // biome-ignore lint/style/noNonNullAssertion: i < foundInB <= bRemainder.length
+          result.push({ type: "added", text: bRemainder[i]! });
+        }
+        bi += foundInB;
+      } else {
+        if (ai < aLines.length) {
+          // biome-ignore lint/style/noNonNullAssertion: bounds checked above
+          result.push({ type: "removed", text: aLines[ai]! });
+          ai++;
+        }
+        if (bi < bLines.length) {
+          // biome-ignore lint/style/noNonNullAssertion: bounds checked above
+          result.push({ type: "added", text: bLines[bi]! });
+          bi++;
+        }
+      }
+    }
+  }
+
+  return result;
+}
+
+type RunCompareViewProps = {
+  runA: Run;
+  runB: Run;
+  versionLabelA: string;
+  versionLabelB: string;
+  onClose: () => void;
+};
+
+function RunCompareView({
+  runA,
+  runB,
+  versionLabelA,
+  versionLabelB,
+  onClose,
+}: RunCompareViewProps) {
+  const [mode, setMode] = useState<"side-by-side" | "unified">("side-by-side");
+
+  const lastAssistantA =
+    [...runA.conversation].reverse().find((m) => m.role === "assistant")?.content ?? "";
+  const lastAssistantB =
+    [...runB.conversation].reverse().find((m) => m.role === "assistant")?.content ?? "";
+  const diff = diffLines(lastAssistantA, lastAssistantB);
+
+  return (
+    <div
+      className={styles.compareOverlay}
+      onClick={(e) => {
+        if (e.target === e.currentTarget) onClose();
+      }}
+      onKeyDown={(e) => {
+        if (e.key === "Escape") onClose();
+      }}
+    >
+      <div className={styles.compareBox}>
+        <div className={styles.compareHeader}>
+          <h3 className={styles.compareHeaderTitle}>Run 比較</h3>
+          <div className={styles.compareHeaderActions}>
+            <div className={styles.compareModeToggle}>
+              {(["side-by-side", "unified"] as const).map((m) => (
+                <button
+                  key={m}
+                  type="button"
+                  onClick={() => setMode(m)}
+                  className={`${styles.btnMode} ${mode === m ? styles.btnModeActive : styles.btnModeInactive}`}
+                >
+                  {m === "side-by-side" ? "並列" : "差分"}
+                </button>
+              ))}
+            </div>
+            <button type="button" onClick={onClose} className={styles.btnCloseCompare}>
+              閉じる
+            </button>
+          </div>
+        </div>
+
+        <div className={styles.compareContent}>
+          {mode === "side-by-side" ? (
+            <div className={styles.sideBySide}>
+              <div className={`${styles.comparePanel} ${styles.comparePanelLeft}`}>
+                <div className={`${styles.comparePanelHeader} ${styles.comparePanelHeaderA}`}>
+                  <span>Run #{runA.id}</span>
+                  <span className={styles.comparePanelMeta}>{versionLabelA}</span>
+                </div>
+                <div className={styles.compareChatList}>
+                  {runA.conversation.map((msg, i) => (
+                    <div
+                      key={`a-msg-${
+                        // biome-ignore lint/suspicious/noArrayIndexKey: 会話配列は順序で管理
+                        i
+                      }`}
+                      className={`${styles.bubbleWrapper} ${msg.role === "user" ? styles.bubbleWrapperUser : styles.bubbleWrapperAssistant}`}
+                    >
+                      <span className={styles.bubbleRole}>
+                        {msg.role === "user" ? "User" : "Assistant"}
+                      </span>
+                      <div
+                        className={`${styles.bubble} ${msg.role === "user" ? styles.bubbleUser : styles.bubbleAssistant}`}
+                      >
+                        {msg.content}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+              <div className={styles.comparePanel}>
+                <div className={`${styles.comparePanelHeader} ${styles.comparePanelHeaderB}`}>
+                  <span>Run #{runB.id}</span>
+                  <span className={styles.comparePanelMeta}>{versionLabelB}</span>
+                </div>
+                <div className={styles.compareChatList}>
+                  {runB.conversation.map((msg, i) => (
+                    <div
+                      key={`b-msg-${
+                        // biome-ignore lint/suspicious/noArrayIndexKey: 会話配列は順序で管理
+                        i
+                      }`}
+                      className={`${styles.bubbleWrapper} ${msg.role === "user" ? styles.bubbleWrapperUser : styles.bubbleWrapperAssistant}`}
+                    >
+                      <span className={styles.bubbleRole}>
+                        {msg.role === "user" ? "User" : "Assistant"}
+                      </span>
+                      <div
+                        className={`${styles.bubble} ${msg.role === "user" ? styles.bubbleUser : styles.bubbleAssistant}`}
+                      >
+                        {msg.content}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+          ) : (
+            <div className={styles.unifiedView}>
+              <div className={styles.unifiedHeader}>
+                <span className={styles.unifiedLabelA}>ー Run #{runA.id}</span>
+                <span className={styles.unifiedLabelB}>+ Run #{runB.id}</span>
+              </div>
+              <div className={styles.diffScroll}>
+                {diff.map((line, i) => (
+                  <div
+                    key={`diff-${line.type}-${i}`}
+                    className={`${styles.diffLine} ${
+                      line.type === "removed"
+                        ? styles.diffLineRemoved
+                        : line.type === "added"
+                          ? styles.diffLineAdded
+                          : ""
+                    }`}
+                  >
+                    <span className={styles.diffGutter}>
+                      {line.type === "removed" ? "-" : line.type === "added" ? "+" : " "}
+                    </span>
+                    <span className={styles.diffText}>{line.text || "\u00a0"}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
 
 function buildFullPrompt(version: PromptVersion, testCase: TestCase): string {
   const systemPrompt = testCase.context_content
@@ -133,7 +346,9 @@ function RunCard({
   const [expanded, setExpanded] = useState(false);
 
   return (
-    <div className={`${styles.runCard} ${run.is_best ? styles.runCardBest : ""} ${isCompareSelected ? styles.runCardCompareSelected : ""}`}>
+    <div
+      className={`${styles.runCard} ${run.is_best ? styles.runCardBest : ""} ${isCompareSelected ? styles.runCardCompareSelected : ""}`}
+    >
       <div className={styles.runCardTop}>
         <div className={styles.runCardHeader}>
           <span className={styles.runId}>Run #{run.id}</span>
@@ -287,8 +502,7 @@ export function RunsPage() {
   });
 
   const setBestMutation = useMutation({
-    mutationFn: ({ id, unset }: { id: number; unset: boolean }) =>
-      setBestRun(projectId, id, unset),
+    mutationFn: ({ id, unset }: { id: number; unset: boolean }) => setBestRun(projectId, id, unset),
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: ["runs", projectId] });
     },
@@ -657,7 +871,10 @@ export function RunsPage() {
                   </button>
                   <button
                     type="button"
-                    onClick={() => { setCompareRunA(null); setCompareRunB(null); }}
+                    onClick={() => {
+                      setCompareRunA(null);
+                      setCompareRunB(null);
+                    }}
                     className={styles.btnClearCompare}
                   >
                     クリア
