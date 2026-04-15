@@ -6,6 +6,7 @@ import { createProjectSettingsRouter } from "./routes/project-settings.js";
 import { createProjectsRouter } from "./routes/projects.js";
 import { createPromptVersionsRouter } from "./routes/prompt-versions.js";
 import { createRunsRouter } from "./routes/runs.js";
+import { createScoreProgressionRouter } from "./routes/score-progression.js";
 import { createScoresRouter, createVersionSummaryRouter } from "./routes/scores.js";
 import { createTestCasesRouter } from "./routes/test-cases.js";
 
@@ -30,6 +31,7 @@ app.route("/api/projects/:projectId/prompt-versions", createPromptVersionsRouter
 app.route("/api/projects/:projectId/prompt-versions", createVersionSummaryRouter(db));
 app.route("/api/projects/:projectId/runs", createRunsRouter(db));
 app.route("/api/runs", createScoresRouter(db));
+app.route("/api/projects/:projectId/score-progression", createScoreProgressionRouter(db));
 app.route("/api/projects/:projectId/settings", createProjectSettingsRouter(db));
 
 const port = Number(process.env.PORT ?? 3001);

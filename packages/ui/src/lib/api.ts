@@ -313,3 +313,37 @@ export function upsertScore(
     human_comment: data.human_comment ?? undefined,
   });
 }
+
+// Score Progression API
+
+export type VersionSummary = {
+  versionId: number;
+  versionNumber: number;
+  versionName: string | null;
+  avgHumanScore: number | null;
+  avgJudgeScore: number | null;
+  runCount: number;
+  scoredCount: number;
+};
+
+export type TestCaseScoreBreakdown = {
+  testCaseId: number;
+  testCaseTitle: string;
+  versions: {
+    versionId: number;
+    versionNumber: number;
+    versionName: string | null;
+    humanScore: number | null;
+    judgeScore: number | null;
+    runId: number | null;
+  }[];
+};
+
+export type ScoreProgressionResponse = {
+  versionSummaries: VersionSummary[];
+  testCaseBreakdown: TestCaseScoreBreakdown[];
+};
+
+export function getScoreProgression(projectId: number): Promise<ScoreProgressionResponse> {
+  return api.get<ScoreProgressionResponse>(`/projects/${projectId}/score-progression`);
+}

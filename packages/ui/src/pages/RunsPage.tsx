@@ -26,7 +26,8 @@ function diffLines(a: string, b: string): { type: "same" | "removed" | "added"; 
 
   while (ai < aLines.length || bi < bLines.length) {
     if (ai < aLines.length && bi < bLines.length && aLines[ai] === bLines[bi]) {
-      result.push({ type: "same", text: aLines[ai] });
+      // biome-ignore lint/style/noNonNullAssertion: bounds checked above
+      result.push({ type: "same", text: aLines[ai]! });
       ai++;
       bi++;
     } else {
@@ -38,35 +39,43 @@ function diffLines(a: string, b: string): { type: "same" | "removed" | "added"; 
       const lookAhead = Math.min(5, maxLen);
 
       for (let d = 0; d < lookAhead; d++) {
-        if (d < bRemainder.length && aRemainder.slice(0, lookAhead).includes(bRemainder[d])) {
+        // biome-ignore lint/style/noNonNullAssertion: d < bRemainder.length checked
+        if (d < bRemainder.length && aRemainder.slice(0, lookAhead).includes(bRemainder[d]!)) {
           foundInB = d;
-          foundInA = aRemainder.indexOf(bRemainder[d]);
+          // biome-ignore lint/style/noNonNullAssertion: d < bRemainder.length checked
+          foundInA = aRemainder.indexOf(bRemainder[d]!);
           break;
         }
-        if (d < aRemainder.length && bRemainder.slice(0, lookAhead).includes(aRemainder[d])) {
+        // biome-ignore lint/style/noNonNullAssertion: d < aRemainder.length checked
+        if (d < aRemainder.length && bRemainder.slice(0, lookAhead).includes(aRemainder[d]!)) {
           foundInA = d;
-          foundInB = bRemainder.indexOf(aRemainder[d]);
+          // biome-ignore lint/style/noNonNullAssertion: d < aRemainder.length checked
+          foundInB = bRemainder.indexOf(aRemainder[d]!);
           break;
         }
       }
 
       if (foundInA > 0) {
         for (let i = 0; i < foundInA; i++) {
-          result.push({ type: "removed", text: aRemainder[i] });
+          // biome-ignore lint/style/noNonNullAssertion: i < foundInA <= aRemainder.length
+          result.push({ type: "removed", text: aRemainder[i]! });
         }
         ai += foundInA;
       } else if (foundInB > 0) {
         for (let i = 0; i < foundInB; i++) {
-          result.push({ type: "added", text: bRemainder[i] });
+          // biome-ignore lint/style/noNonNullAssertion: i < foundInB <= bRemainder.length
+          result.push({ type: "added", text: bRemainder[i]! });
         }
         bi += foundInB;
       } else {
         if (ai < aLines.length) {
-          result.push({ type: "removed", text: aLines[ai] });
+          // biome-ignore lint/style/noNonNullAssertion: bounds checked above
+          result.push({ type: "removed", text: aLines[ai]! });
           ai++;
         }
         if (bi < bLines.length) {
-          result.push({ type: "added", text: bLines[bi] });
+          // biome-ignore lint/style/noNonNullAssertion: bounds checked above
+          result.push({ type: "added", text: bLines[bi]! });
           bi++;
         }
       }
@@ -84,7 +93,13 @@ type RunCompareViewProps = {
   onClose: () => void;
 };
 
-function RunCompareView({ runA, runB, versionLabelA, versionLabelB, onClose }: RunCompareViewProps) {
+function RunCompareView({
+  runA,
+  runB,
+  versionLabelA,
+  versionLabelB,
+  onClose,
+}: RunCompareViewProps) {
   const [mode, setMode] = useState<"side-by-side" | "unified">("side-by-side");
 
   const lastAssistantA =
@@ -142,8 +157,12 @@ function RunCompareView({ runA, runB, versionLabelA, versionLabelB, onClose }: R
                       }`}
                       className={`${styles.bubbleWrapper} ${msg.role === "user" ? styles.bubbleWrapperUser : styles.bubbleWrapperAssistant}`}
                     >
-                      <span className={styles.bubbleRole}>{msg.role === "user" ? "User" : "Assistant"}</span>
-                      <div className={`${styles.bubble} ${msg.role === "user" ? styles.bubbleUser : styles.bubbleAssistant}`}>
+                      <span className={styles.bubbleRole}>
+                        {msg.role === "user" ? "User" : "Assistant"}
+                      </span>
+                      <div
+                        className={`${styles.bubble} ${msg.role === "user" ? styles.bubbleUser : styles.bubbleAssistant}`}
+                      >
                         {msg.content}
                       </div>
                     </div>
@@ -164,8 +183,12 @@ function RunCompareView({ runA, runB, versionLabelA, versionLabelB, onClose }: R
                       }`}
                       className={`${styles.bubbleWrapper} ${msg.role === "user" ? styles.bubbleWrapperUser : styles.bubbleWrapperAssistant}`}
                     >
-                      <span className={styles.bubbleRole}>{msg.role === "user" ? "User" : "Assistant"}</span>
-                      <div className={`${styles.bubble} ${msg.role === "user" ? styles.bubbleUser : styles.bubbleAssistant}`}>
+                      <span className={styles.bubbleRole}>
+                        {msg.role === "user" ? "User" : "Assistant"}
+                      </span>
+                      <div
+                        className={`${styles.bubble} ${msg.role === "user" ? styles.bubbleUser : styles.bubbleAssistant}`}
+                      >
                         {msg.content}
                       </div>
                     </div>
@@ -322,7 +345,9 @@ function RunCard({
   const [expanded, setExpanded] = useState(false);
 
   return (
-    <div className={`${styles.runCard} ${run.is_best ? styles.runCardBest : ""} ${isCompareSelected ? styles.runCardCompareSelected : ""}`}>
+    <div
+      className={`${styles.runCard} ${run.is_best ? styles.runCardBest : ""} ${isCompareSelected ? styles.runCardCompareSelected : ""}`}
+    >
       <div className={styles.runCardTop}>
         <div className={styles.runCardHeader}>
           <span className={styles.runId}>Run #{run.id}</span>
@@ -355,10 +380,7 @@ function RunCard({
               {isCompareSelected ? "比較解除" : "比較"}
             </button>
           )}
-          <Link
-            to={`/projects/${projectId}/score`}
-            className={styles.btnScore}
-          >
+          <Link to={`/projects/${projectId}/score`} className={styles.btnScore}>
             採点
           </Link>
           <button
@@ -476,8 +498,7 @@ export function RunsPage() {
   });
 
   const setBestMutation = useMutation({
-    mutationFn: ({ id, unset }: { id: number; unset: boolean }) =>
-      setBestRun(projectId, id, unset),
+    mutationFn: ({ id, unset }: { id: number; unset: boolean }) => setBestRun(projectId, id, unset),
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: ["runs", projectId] });
     },
@@ -846,7 +867,10 @@ export function RunsPage() {
                   </button>
                   <button
                     type="button"
-                    onClick={() => { setCompareRunA(null); setCompareRunB(null); }}
+                    onClick={() => {
+                      setCompareRunA(null);
+                      setCompareRunB(null);
+                    }}
                     className={styles.btnClearCompare}
                   >
                     クリア
