@@ -151,7 +151,11 @@ function RunCard({
           </button>
           <button
             type="button"
-            onClick={() => onSetBest(run.is_best)}
+            onClick={() => {
+              // ベスト設定済みの場合は解除（unset=true）、未設定の場合は設定（unset=false）
+              const unset = run.is_best;
+              onSetBest(unset);
+            }}
             disabled={isBestPending}
             className={`${styles.btnBest} ${run.is_best ? styles.btnBestActive : styles.btnBestInactive}`}
           >
