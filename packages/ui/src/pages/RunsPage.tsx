@@ -357,7 +357,7 @@ function RunCard({
             </button>
           )}
           <Link
-            to={`/projects/${projectId}/score`}
+            to={`/projects/${projectId}/score?runId=${run.id}`}
             className={styles.btnScore}
           >
             採点

@@ -1,6 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { useState } from "react";
-import { useParams } from "react-router";
+import { useEffect, useRef, useState } from "react";
+import { useParams, useSearchParams } from "react-router";
 import {
   type Run,
   type Score,
@@ -103,13 +103,22 @@ function IndividualRunRow({
   run,
   versionName,
   testCaseTitle,
+  autoFocus,
 }: {
   run: Run;
   versionName: string;
   testCaseTitle: string;
+  autoFocus?: boolean;
 }) {
   const queryClient = useQueryClient();
-  const [expanded, setExpanded] = useState(false);
+  const [expanded, setExpanded] = useState(autoFocus ?? false);
+  const cardRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (autoFocus && cardRef.current) {
+      cardRef.current.scrollIntoView({ behavior: "smooth", block: "start" });
+    }
+  }, [autoFocus]);
   const [starValue, setStarValue] = useState<number | null>(null);
   const [comment, setComment] = useState("");
   const [saved, setSaved] = useState(false);
@@ -159,7 +168,10 @@ function IndividualRunRow({
   const isDiscarded = score?.is_discarded ?? false;
 
   return (
-    <div className={styles.runCard}>
+    <div
+      ref={cardRef}
+      className={`${styles.runCard} ${autoFocus ? styles.runCardFocused : ""}`}
+    >
       <button
         type="button"
         className={styles.runCardHeader}
@@ -333,6 +345,8 @@ export function ScorePage() {
   const { id } = useParams<{ id: string }>();
   const projectId = Number(id);
   const queryClient = useQueryClient();
+  const [searchParams] = useSearchParams();
+  const focusedRunId = searchParams.get("runId") ? Number(searchParams.get("runId")) : null;
 
   const [tab, setTab] = useState<"individual" | "bulk">("individual");
   const [filterVersionId, setFilterVersionId] = useState<number | "">("");
@@ -509,6 +523,7 @@ export function ScorePage() {
               run={run}
               versionName={getVersionName(run.prompt_version_id)}
               testCaseTitle={`テストケース #${run.test_case_id}`}
+              autoFocus={focusedRunId === run.id}
             />
           ))}
         </div>
