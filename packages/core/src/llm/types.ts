@@ -25,6 +25,13 @@ export type LLMResponse = {
   raw: unknown;
 };
 
+export type LLMModel = {
+  id: string;
+  displayName: string;
+  createdAt?: string;
+  raw: unknown;
+};
+
 export type LLMStreamEvent =
   | {
       type: "text-delta";
@@ -38,4 +45,8 @@ export type LLMStreamEvent =
 export interface LLMClient {
   sendMessage(request: LLMRequest): Promise<LLMResponse>;
   stream(request: LLMRequest): AsyncIterable<LLMStreamEvent>;
+}
+
+export interface LLMModelClient {
+  listModels(): Promise<LLMModel[]>;
 }

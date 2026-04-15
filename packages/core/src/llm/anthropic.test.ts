@@ -19,6 +19,9 @@ describe("AnthropicLLMClient", () => {
         messages: {
           create,
         },
+        models: {
+          list: vi.fn(),
+        },
       }),
     });
 
@@ -99,6 +102,9 @@ describe("AnthropicLLMClient", () => {
         messages: {
           create,
         },
+        models: {
+          list: vi.fn(),
+        },
       }),
     });
 
@@ -162,6 +168,49 @@ describe("AnthropicLLMClient", () => {
     ).rejects.toBeInstanceOf(LLMConfigurationError);
   });
 
+  it("listModels で Models API の候補を正規化する", async () => {
+    const list = vi.fn().mockResolvedValue({
+      data: [
+        {
+          id: "claude-sonnet-4-5-20250929",
+          display_name: "Claude Sonnet 4.5",
+          created_at: "2025-09-29T00:00:00Z",
+          type: "model",
+        },
+        {
+          display_name: "IDなしは無視",
+        },
+      ],
+    });
+
+    const client = new AnthropicLLMClient({
+      apiKey: "test-key",
+      clientFactory: async () => ({
+        messages: {
+          create: vi.fn(),
+        },
+        models: {
+          list,
+        },
+      }),
+    });
+
+    await expect(client.listModels()).resolves.toEqual([
+      {
+        id: "claude-sonnet-4-5-20250929",
+        displayName: "Claude Sonnet 4.5",
+        createdAt: "2025-09-29T00:00:00Z",
+        raw: {
+          id: "claude-sonnet-4-5-20250929",
+          display_name: "Claude Sonnet 4.5",
+          created_at: "2025-09-29T00:00:00Z",
+          type: "model",
+        },
+      },
+    ]);
+    expect(list).toHaveBeenCalledWith();
+  });
+
   it("401/403 を認証エラーに正規化する", async () => {
     const client = new AnthropicLLMClient({
       apiKey: "invalid-key",
@@ -170,6 +219,9 @@ describe("AnthropicLLMClient", () => {
           create: vi.fn().mockRejectedValue({
             status: 401,
           }),
+        },
+        models: {
+          list: vi.fn(),
         },
       }),
     });

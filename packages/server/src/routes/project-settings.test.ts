@@ -14,6 +14,7 @@ vi.mock("better-sqlite3", () => {
 });
 
 import type { DB } from "@prompt-reviewer/core";
+import { LLMAuthenticationError } from "@prompt-reviewer/core";
 import { Hono } from "hono";
 import { describe, expect, it, vi } from "vitest";
 import { createProjectSettingsRouter } from "./project-settings.js";
@@ -30,11 +31,23 @@ type MockSettings = {
   updated_at: number;
 };
 
+type ModelListClient = {
+  listModels(): Promise<unknown[]>;
+};
+
 // ---- ヘルパー ----
 
-function buildApp(db: unknown) {
+function buildApp(
+  db: unknown,
+  options?: {
+    modelClientFactory?: (body: {
+      api_provider: "anthropic" | "openai";
+      api_key: string;
+    }) => ModelListClient | null;
+  },
+) {
   const app = new Hono();
-  app.route("/api/projects/:projectId/settings", createProjectSettingsRouter(db as DB));
+  app.route("/api/projects/:projectId/settings", createProjectSettingsRouter(db as DB, options));
   return app;
 }
 
@@ -419,5 +432,105 @@ describe("PUT /api/projects/:projectId/settings", () => {
     expect(res.status).toBe(201);
     const body = (await res.json()) as MockSettings;
     expect(body.temperature).toBe(2);
+  });
+});
+
+// ---- POST /api/projects/:projectId/settings/models テスト ----
+
+describe("POST /api/projects/:projectId/settings/models", () => {
+  it("Anthropic APIキーで取得したモデル候補を返す", async () => {
+    const listModels = vi.fn().mockResolvedValue([
+      {
+        id: "claude-sonnet-4-5-20250929",
+        displayName: "Claude Sonnet 4.5",
+        createdAt: "2025-09-29T00:00:00Z",
+        raw: { id: "claude-sonnet-4-5-20250929" },
+      },
+    ]);
+    const modelClientFactory = vi.fn().mockReturnValue({ listModels });
+
+    const app = buildApp({}, { modelClientFactory });
+    const res = await app.request("/api/projects/1/settings/models", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        api_provider: "anthropic",
+        api_key: "sk-ant-test",
+      }),
+    });
+
+    expect(res.status).toBe(200);
+    expect(modelClientFactory).toHaveBeenCalledWith({
+      api_provider: "anthropic",
+      api_key: "sk-ant-test",
+    });
+    expect(listModels).toHaveBeenCalledWith();
+    await expect(res.json()).resolves.toEqual({
+      models: [
+        {
+          id: "claude-sonnet-4-5-20250929",
+          displayName: "Claude Sonnet 4.5",
+          createdAt: "2025-09-29T00:00:00Z",
+          raw: { id: "claude-sonnet-4-5-20250929" },
+        },
+      ],
+    });
+  });
+
+  it("APIキーが空の場合は 400 を返し、モデル取得を呼び出さない", async () => {
+    const modelClientFactory = vi.fn();
+
+    const app = buildApp({}, { modelClientFactory });
+    const res = await app.request("/api/projects/1/settings/models", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        api_provider: "anthropic",
+        api_key: "",
+      }),
+    });
+
+    expect(res.status).toBe(400);
+    expect(modelClientFactory).not.toHaveBeenCalled();
+  });
+
+  it("未対応プロバイダーの場合は 501 を返す", async () => {
+    const app = buildApp({}, { modelClientFactory: () => null });
+    const res = await app.request("/api/projects/1/settings/models", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        api_provider: "openai",
+        api_key: "sk-test",
+      }),
+    });
+
+    expect(res.status).toBe(501);
+    await expect(res.json()).resolves.toEqual({
+      error: "Provider model listing is not implemented",
+    });
+  });
+
+  it("認証エラーの場合は 401 を返す", async () => {
+    const app = buildApp(
+      {},
+      {
+        modelClientFactory: () => ({
+          listModels: vi.fn().mockRejectedValue(new LLMAuthenticationError("invalid api key")),
+        }),
+      },
+    );
+
+    const res = await app.request("/api/projects/1/settings/models", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        api_provider: "anthropic",
+        api_key: "invalid",
+      }),
+    });
+
+    expect(res.status).toBe(401);
+    await expect(res.json()).resolves.toEqual({ error: "invalid api key" });
   });
 });

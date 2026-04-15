@@ -1,5 +1,13 @@
 import { LLMAuthenticationError, LLMConfigurationError } from "./errors.js";
-import type { LLMClient, LLMRequest, LLMResponse, LLMStreamEvent, LLMUsage } from "./types.js";
+import type {
+  LLMClient,
+  LLMModel,
+  LLMModelClient,
+  LLMRequest,
+  LLMResponse,
+  LLMStreamEvent,
+  LLMUsage,
+} from "./types.js";
 
 type AnthropicTextBlock = {
   type: "text";
@@ -15,6 +23,16 @@ type AnthropicMessageResponse = {
   content?: Array<AnthropicTextBlock | { type: string }>;
   stop_reason?: string | null;
   usage?: AnthropicUsage;
+};
+
+type AnthropicModelInfo = {
+  id?: string;
+  display_name?: string;
+  created_at?: string;
+};
+
+type AnthropicModelListResponse = {
+  data?: AnthropicModelInfo[];
 };
 
 type AnthropicStreamEventShape = {
@@ -34,8 +52,13 @@ type AnthropicMessagesAPI = {
   create(params: Record<string, unknown>): Promise<unknown>;
 };
 
+type AnthropicModelsAPI = {
+  list(params?: Record<string, unknown>): Promise<unknown> | unknown;
+};
+
 type AnthropicSDKClient = {
   messages: AnthropicMessagesAPI;
+  models: AnthropicModelsAPI;
 };
 
 type AnthropicClientFactory = (apiKey: string) => Promise<AnthropicSDKClient> | AnthropicSDKClient;
@@ -50,7 +73,7 @@ export type AnthropicLLMClientOptions = {
 const DEFAULT_ANTHROPIC_API_KEY_ENV = "ANTHROPIC_API_KEY";
 const DEFAULT_MAX_TOKENS = 1024;
 
-export class AnthropicLLMClient implements LLMClient {
+export class AnthropicLLMClient implements LLMClient, LLMModelClient {
   private readonly apiKey: string | undefined;
   private readonly apiKeyEnvVar: string;
   private readonly defaultMaxTokens: number;
@@ -76,6 +99,30 @@ export class AnthropicLLMClient implements LLMClient {
         stopReason: response.stop_reason ?? null,
         usage: mapUsage(response.usage),
         raw: response,
+      });
+    } catch (error) {
+      throw normalizeAnthropicError(error, this.apiKeyEnvVar);
+    }
+  }
+
+  async listModels(): Promise<LLMModel[]> {
+    try {
+      const client = await this.getClient();
+      const response = (await client.models.list()) as AnthropicModelListResponse;
+
+      return (response.data ?? []).flatMap((model) => {
+        if (!model.id) {
+          return [];
+        }
+
+        return [
+          {
+            id: model.id,
+            displayName: model.display_name ?? model.id,
+            ...(model.created_at ? { createdAt: model.created_at } : {}),
+            raw: model,
+          },
+        ];
       });
     } catch (error) {
       throw normalizeAnthropicError(error, this.apiKeyEnvVar);

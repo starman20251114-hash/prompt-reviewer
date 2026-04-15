@@ -326,15 +326,30 @@ export type ProjectSettings = {
   updated_at: number;
 };
 
+export type ApiProvider = "anthropic" | "openai";
+
+export type LLMModelOption = {
+  id: string;
+  displayName: string;
+  createdAt?: string;
+};
+
 export function getProjectSettings(projectId: number): Promise<ProjectSettings> {
   return api.get<ProjectSettings>(`/projects/${projectId}/settings`);
 }
 
 export function upsertProjectSettings(
   projectId: number,
-  data: { model: string; temperature: number; api_provider: "anthropic" | "openai" },
+  data: { model: string; temperature: number; api_provider: ApiProvider },
 ): Promise<ProjectSettings> {
   return api.put<ProjectSettings>(`/projects/${projectId}/settings`, data);
+}
+
+export function listProjectSettingsModels(
+  projectId: number,
+  data: { api_provider: ApiProvider; api_key: string },
+): Promise<{ models: LLMModelOption[] }> {
+  return api.post<{ models: LLMModelOption[] }>(`/projects/${projectId}/settings/models`, data);
 }
 
 // Score Progression API

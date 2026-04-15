@@ -2,26 +2,14 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useState } from "react";
 import { useParams } from "react-router";
 import { useApiKey } from "../hooks/useApiKey";
-import { ApiError, getProjectSettings, upsertProjectSettings } from "../lib/api";
+import {
+  type ApiProvider,
+  ApiError,
+  getProjectSettings,
+  listProjectSettingsModels,
+  upsertProjectSettings,
+} from "../lib/api";
 import styles from "./ProjectSettingsPage.module.css";
-
-const ANTHROPIC_MODELS = [
-  { value: "claude-opus-4-6", label: "claude-opus-4-6" },
-  { value: "claude-sonnet-4-6", label: "claude-sonnet-4-6" },
-  { value: "claude-haiku-4-5-20251001", label: "claude-haiku-4-5-20251001" },
-] as const;
-
-const OPENAI_MODELS = [
-  { value: "gpt-4o", label: "gpt-4o" },
-  { value: "gpt-4o-mini", label: "gpt-4o-mini" },
-] as const;
-
-const ALL_MODELS = [...ANTHROPIC_MODELS.map((m) => m.value), ...OPENAI_MODELS.map((m) => m.value)];
-
-function inferProvider(model: string): "anthropic" | "openai" {
-  if (OPENAI_MODELS.some((m) => m.value === model)) return "openai";
-  return "anthropic";
-}
 
 export function ProjectSettingsPage() {
   const { id } = useParams<{ id: string }>();
@@ -31,9 +19,9 @@ export function ProjectSettingsPage() {
   const { apiKey, hasApiKey, setApiKey } = useApiKey(projectId);
   const [apiKeyInput, setApiKeyInput] = useState(apiKey);
 
-  const [model, setModel] = useState("claude-opus-4-6");
+  const [model, setModel] = useState("");
   const [temperature, setTemperature] = useState(0.7);
-  const [apiProvider, setApiProvider] = useState<"anthropic" | "openai">("anthropic");
+  const [apiProvider, setApiProvider] = useState<ApiProvider>("anthropic");
   const [initialized, setInitialized] = useState(false);
 
   const [saveFeedback, setSaveFeedback] = useState<"success" | "error" | null>(null);
@@ -54,6 +42,21 @@ export function ProjectSettingsPage() {
     },
   });
 
+  const {
+    data: modelOptionsData,
+    isFetching: isFetchingModels,
+    error: modelsError,
+  } = useQuery({
+    queryKey: ["project-settings-models", projectId, apiProvider, hasApiKey],
+    queryFn: () =>
+      listProjectSettingsModels(projectId, {
+        api_provider: apiProvider,
+        api_key: apiKey,
+      }),
+    enabled: !Number.isNaN(projectId) && hasApiKey,
+    retry: false,
+  });
+
   // DBから設定を取得したら初回のみフォームに反映する
   useEffect(() => {
     if (settingsData && !initialized) {
@@ -70,6 +73,12 @@ export function ProjectSettingsPage() {
       setInitialized(true);
     }
   }, [error, initialized]);
+
+  useEffect(() => {
+    if (initialized && model === "" && modelOptionsData?.models[0]) {
+      setModel(modelOptionsData.models[0].id);
+    }
+  }, [initialized, model, modelOptionsData]);
 
   const upsertMutation = useMutation({
     mutationFn: () =>
@@ -89,14 +98,10 @@ export function ProjectSettingsPage() {
     },
   });
 
-  function handleModelChange(newModel: string) {
-    setModel(newModel);
-    setApiProvider(inferProvider(newModel));
-  }
-
   function handleSaveApiKey() {
     setApiKey(apiKeyInput);
     setApiKeySaved(true);
+    void queryClient.invalidateQueries({ queryKey: ["project-settings-models", projectId] });
     setTimeout(() => setApiKeySaved(false), 2000);
   }
 
@@ -107,6 +112,13 @@ export function ProjectSettingsPage() {
       </div>
     );
   }
+
+  const modelOptions = modelOptionsData?.models ?? [];
+  const modelIds = modelOptions.map((option) => option.id);
+  const hasRemoteModelOptions = modelOptions.length > 0;
+  const shouldShowSavedModelOption = model !== "" && !modelIds.includes(model);
+  const isModelSelectDisabled = !hasApiKey || isFetchingModels || !hasRemoteModelOptions;
+  const canSaveSettings = model.trim().length > 0 && !upsertMutation.isPending;
 
   const isNetworkError = error instanceof ApiError ? error.status !== 404 : error != null;
   if (isNetworkError) {
@@ -136,26 +148,42 @@ export function ProjectSettingsPage() {
             <select
               id="settings-model"
               value={model}
-              onChange={(e) => handleModelChange(e.target.value)}
+              onChange={(e) => setModel(e.target.value)}
               className={styles.fieldSelect}
+              disabled={isModelSelectDisabled}
             >
-              <optgroup label="Anthropic">
-                {ANTHROPIC_MODELS.map((m) => (
-                  <option key={m.value} value={m.value}>
-                    {m.label}
-                  </option>
-                ))}
-              </optgroup>
-              <optgroup label="OpenAI">
-                {OPENAI_MODELS.map((m) => (
-                  <option key={m.value} value={m.value}>
-                    {m.label}
-                  </option>
-                ))}
-              </optgroup>
-              {/* DBに保存済みのモデルが上記リスト外の場合もオプションとして表示 */}
-              {!ALL_MODELS.includes(model) && <option value={model}>{model}</option>}
+              {!hasApiKey && <option value="">APIキーを保存すると候補を取得します</option>}
+              {hasApiKey && isFetchingModels && <option value={model}>候補を取得中...</option>}
+              {hasApiKey && !isFetchingModels && !hasRemoteModelOptions && (
+                <option value={model}>候補を取得できません</option>
+              )}
+              {modelOptions.map((option) => (
+                <option key={option.id} value={option.id}>
+                  {option.displayName === option.id
+                    ? option.id
+                    : `${option.displayName} (${option.id})`}
+                </option>
+              ))}
+              {shouldShowSavedModelOption && <option value={model}>{model}（保存済み）</option>}
             </select>
+            {hasApiKey && !isFetchingModels && hasRemoteModelOptions && model === "" && (
+              <p className={styles.fieldHint}>取得した候補からモデルを選択してください</p>
+            )}
+            {!hasApiKey && (
+              <p className={styles.fieldHint}>先に API キーを保存すると、利用可能なモデル候補を取得します</p>
+            )}
+            {modelsError instanceof ApiError && (
+              <p className={styles.fieldError}>
+                {modelsError.status === 501
+                  ? "このプロバイダーのモデル候補取得は未対応です。"
+                  : modelsError.status === 401
+                    ? "APIキーの認証に失敗しました。キーを確認してください。"
+                    : "モデル候補の取得に失敗しました。"}
+              </p>
+            )}
+            {shouldShowSavedModelOption && (
+              <p className={styles.fieldHint}>保存済みモデルは取得候補に含まれていません</p>
+            )}
           </div>
 
           {/* APIプロバイダー */}
@@ -166,13 +194,16 @@ export function ProjectSettingsPage() {
             <select
               id="settings-provider"
               value={apiProvider}
-              onChange={(e) => setApiProvider(e.target.value as "anthropic" | "openai")}
+              onChange={(e) => {
+                setApiProvider(e.target.value as ApiProvider);
+                setModel("");
+              }}
               className={styles.fieldSelect}
             >
               <option value="anthropic">Anthropic</option>
               <option value="openai">OpenAI</option>
             </select>
-            <p className={styles.fieldHint}>モデルを変更すると自動的に切り替わります</p>
+            <p className={styles.fieldHint}>プロバイダーを変更するとモデル候補を再取得します</p>
           </div>
 
           {/* Temperatureスライダー */}
@@ -201,7 +232,8 @@ export function ProjectSettingsPage() {
         <div className={styles.section}>
           <h3 className={styles.sectionTitle}>API キー</h3>
           <p className={styles.apiKeyNote}>
-            APIキーはブラウザの localStorage にのみ保存されます。サーバーには送信されません。
+            APIキーはブラウザの localStorage に保存され、モデル候補取得時にサーバーへ一時送信されます。
+            サーバー側では保存しません。
           </p>
 
           <div className={styles.fieldGroup}>
@@ -239,7 +271,7 @@ export function ProjectSettingsPage() {
           <button
             type="button"
             onClick={() => upsertMutation.mutate()}
-            disabled={upsertMutation.isPending}
+            disabled={!canSaveSettings}
             className={styles.btnSave}
           >
             {upsertMutation.isPending ? "保存中..." : "設定を保存"}
