@@ -1,6 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
-import { useParams } from "react-router";
+import { Link, useParams } from "react-router";
 import {
   type ConversationMessage,
   type PromptVersion,
@@ -14,6 +14,197 @@ import {
   setBestRun,
 } from "../lib/api";
 import styles from "./RunsPage.module.css";
+
+function diffLines(a: string, b: string): { type: "same" | "removed" | "added"; text: string }[] {
+  const aLines = a.split("\n");
+  const bLines = b.split("\n");
+  const result: { type: "same" | "removed" | "added"; text: string }[] = [];
+
+  const maxLen = Math.max(aLines.length, bLines.length);
+  let ai = 0;
+  let bi = 0;
+
+  while (ai < aLines.length || bi < bLines.length) {
+    if (ai < aLines.length && bi < bLines.length && aLines[ai] === bLines[bi]) {
+      result.push({ type: "same", text: aLines[ai] });
+      ai++;
+      bi++;
+    } else {
+      const aRemainder = aLines.slice(ai);
+      const bRemainder = bLines.slice(bi);
+
+      let foundInA = -1;
+      let foundInB = -1;
+      const lookAhead = Math.min(5, maxLen);
+
+      for (let d = 0; d < lookAhead; d++) {
+        if (d < bRemainder.length && aRemainder.slice(0, lookAhead).includes(bRemainder[d])) {
+          foundInB = d;
+          foundInA = aRemainder.indexOf(bRemainder[d]);
+          break;
+        }
+        if (d < aRemainder.length && bRemainder.slice(0, lookAhead).includes(aRemainder[d])) {
+          foundInA = d;
+          foundInB = bRemainder.indexOf(aRemainder[d]);
+          break;
+        }
+      }
+
+      if (foundInA > 0) {
+        for (let i = 0; i < foundInA; i++) {
+          result.push({ type: "removed", text: aRemainder[i] });
+        }
+        ai += foundInA;
+      } else if (foundInB > 0) {
+        for (let i = 0; i < foundInB; i++) {
+          result.push({ type: "added", text: bRemainder[i] });
+        }
+        bi += foundInB;
+      } else {
+        if (ai < aLines.length) {
+          result.push({ type: "removed", text: aLines[ai] });
+          ai++;
+        }
+        if (bi < bLines.length) {
+          result.push({ type: "added", text: bLines[bi] });
+          bi++;
+        }
+      }
+    }
+  }
+
+  return result;
+}
+
+type RunCompareViewProps = {
+  runA: Run;
+  runB: Run;
+  versionLabelA: string;
+  versionLabelB: string;
+  onClose: () => void;
+};
+
+function RunCompareView({ runA, runB, versionLabelA, versionLabelB, onClose }: RunCompareViewProps) {
+  const [mode, setMode] = useState<"side-by-side" | "unified">("side-by-side");
+
+  const lastAssistantA =
+    [...runA.conversation].reverse().find((m) => m.role === "assistant")?.content ?? "";
+  const lastAssistantB =
+    [...runB.conversation].reverse().find((m) => m.role === "assistant")?.content ?? "";
+  const diff = diffLines(lastAssistantA, lastAssistantB);
+
+  return (
+    <div
+      className={styles.compareOverlay}
+      onClick={(e) => {
+        if (e.target === e.currentTarget) onClose();
+      }}
+      onKeyDown={(e) => {
+        if (e.key === "Escape") onClose();
+      }}
+    >
+      <div className={styles.compareBox}>
+        <div className={styles.compareHeader}>
+          <h3 className={styles.compareHeaderTitle}>Run 比較</h3>
+          <div className={styles.compareHeaderActions}>
+            <div className={styles.compareModeToggle}>
+              {(["side-by-side", "unified"] as const).map((m) => (
+                <button
+                  key={m}
+                  type="button"
+                  onClick={() => setMode(m)}
+                  className={`${styles.btnMode} ${mode === m ? styles.btnModeActive : styles.btnModeInactive}`}
+                >
+                  {m === "side-by-side" ? "並列" : "差分"}
+                </button>
+              ))}
+            </div>
+            <button type="button" onClick={onClose} className={styles.btnCloseCompare}>
+              閉じる
+            </button>
+          </div>
+        </div>
+
+        <div className={styles.compareContent}>
+          {mode === "side-by-side" ? (
+            <div className={styles.sideBySide}>
+              <div className={`${styles.comparePanel} ${styles.comparePanelLeft}`}>
+                <div className={`${styles.comparePanelHeader} ${styles.comparePanelHeaderA}`}>
+                  <span>Run #{runA.id}</span>
+                  <span className={styles.comparePanelMeta}>{versionLabelA}</span>
+                </div>
+                <div className={styles.compareChatList}>
+                  {runA.conversation.map((msg, i) => (
+                    <div
+                      key={`a-msg-${
+                        // biome-ignore lint/suspicious/noArrayIndexKey: 会話配列は順序で管理
+                        i
+                      }`}
+                      className={`${styles.bubbleWrapper} ${msg.role === "user" ? styles.bubbleWrapperUser : styles.bubbleWrapperAssistant}`}
+                    >
+                      <span className={styles.bubbleRole}>{msg.role === "user" ? "User" : "Assistant"}</span>
+                      <div className={`${styles.bubble} ${msg.role === "user" ? styles.bubbleUser : styles.bubbleAssistant}`}>
+                        {msg.content}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+              <div className={styles.comparePanel}>
+                <div className={`${styles.comparePanelHeader} ${styles.comparePanelHeaderB}`}>
+                  <span>Run #{runB.id}</span>
+                  <span className={styles.comparePanelMeta}>{versionLabelB}</span>
+                </div>
+                <div className={styles.compareChatList}>
+                  {runB.conversation.map((msg, i) => (
+                    <div
+                      key={`b-msg-${
+                        // biome-ignore lint/suspicious/noArrayIndexKey: 会話配列は順序で管理
+                        i
+                      }`}
+                      className={`${styles.bubbleWrapper} ${msg.role === "user" ? styles.bubbleWrapperUser : styles.bubbleWrapperAssistant}`}
+                    >
+                      <span className={styles.bubbleRole}>{msg.role === "user" ? "User" : "Assistant"}</span>
+                      <div className={`${styles.bubble} ${msg.role === "user" ? styles.bubbleUser : styles.bubbleAssistant}`}>
+                        {msg.content}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+          ) : (
+            <div className={styles.unifiedView}>
+              <div className={styles.unifiedHeader}>
+                <span className={styles.unifiedLabelA}>ー Run #{runA.id}</span>
+                <span className={styles.unifiedLabelB}>+ Run #{runB.id}</span>
+              </div>
+              <div className={styles.diffScroll}>
+                {diff.map((line, i) => (
+                  <div
+                    key={`diff-${line.type}-${i}`}
+                    className={`${styles.diffLine} ${
+                      line.type === "removed"
+                        ? styles.diffLineRemoved
+                        : line.type === "added"
+                          ? styles.diffLineAdded
+                          : ""
+                    }`}
+                  >
+                    <span className={styles.diffGutter}>
+                      {line.type === "removed" ? "-" : line.type === "added" ? "+" : " "}
+                    </span>
+                    <span className={styles.diffText}>{line.text || "\u00a0"}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
 
 function buildFullPrompt(version: PromptVersion, testCase: TestCase): string {
   const systemPrompt = testCase.context_content
@@ -116,21 +307,27 @@ function RunConversation({ conversation }: { conversation: ConversationMessage[]
 // Run一覧カードコンポーネント
 function RunCard({
   run,
+  projectId,
   versionLabel,
   testCaseLabel,
   onSetBest,
   isBestPending,
+  onCompare,
+  isCompareSelected,
 }: {
   run: Run;
+  projectId: number;
   versionLabel: string;
   testCaseLabel: string;
   onSetBest: () => void;
   isBestPending: boolean;
+  onCompare?: () => void;
+  isCompareSelected?: boolean;
 }) {
   const [expanded, setExpanded] = useState(false);
 
   return (
-    <div className={`${styles.runCard} ${run.is_best ? styles.runCardBest : ""}`}>
+    <div className={`${styles.runCard} ${run.is_best ? styles.runCardBest : ""} ${isCompareSelected ? styles.runCardCompareSelected : ""}`}>
       <div className={styles.runCardTop}>
         <div className={styles.runCardHeader}>
           <span className={styles.runId}>Run #{run.id}</span>
@@ -150,6 +347,21 @@ function RunCard({
           >
             {expanded ? "▲ 折りたたむ" : "▼ 会話を表示"}
           </button>
+          {onCompare && (
+            <button
+              type="button"
+              onClick={onCompare}
+              className={`${styles.btnCompare} ${isCompareSelected ? styles.btnCompareActive : ""}`}
+            >
+              {isCompareSelected ? "比較解除" : "比較"}
+            </button>
+          )}
+          <Link
+            to={`/projects/${projectId}/score`}
+            className={styles.btnScore}
+          >
+            採点
+          </Link>
           <button
             type="button"
             onClick={onSetBest}
@@ -187,6 +399,11 @@ export function RunsPage() {
   // 「Run 一覧」タブのフィルター状態
   const [filterVersionId, setFilterVersionId] = useState<number | "">("");
   const [filterTestCaseId, setFilterTestCaseId] = useState<number | "">("");
+
+  // 「Run 一覧」タブの比較状態
+  const [compareRunA, setCompareRunA] = useState<Run | null>(null);
+  const [compareRunB, setCompareRunB] = useState<Run | null>(null);
+  const [isCompareOpen, setIsCompareOpen] = useState(false);
 
   const { data: project } = useQuery({
     queryKey: ["projects", projectId],
@@ -303,6 +520,27 @@ export function RunsPage() {
   function handleNewRun() {
     setSavedRun(null);
     setStep("select");
+  }
+
+  function handleCompareRun(run: Run) {
+    if (compareRunA?.id === run.id) {
+      setCompareRunA(compareRunB);
+      setCompareRunB(null);
+      return;
+    }
+    if (compareRunB?.id === run.id) {
+      setCompareRunB(null);
+      return;
+    }
+    if (!compareRunA) {
+      setCompareRunA(run);
+    } else if (!compareRunB) {
+      setCompareRunB(run);
+    } else {
+      // 3つ目を選択した場合はAを置き換え
+      setCompareRunA(compareRunB);
+      setCompareRunB(run);
+    }
   }
 
   const isStartDisabled = selectedVersionId === "" || selectedTestCaseId === "";
@@ -557,6 +795,7 @@ export function RunsPage() {
                       <RunCard
                         key={run.id}
                         run={run}
+                        projectId={projectId}
                         versionLabel={getVersionLabel(run.prompt_version_id)}
                         testCaseLabel={getTestCaseLabel(run.test_case_id)}
                         onSetBest={() => setBestMutation.mutate(run.id)}
@@ -574,6 +813,53 @@ export function RunsPage() {
       {/* ============ タブ: Run 一覧 ============ */}
       {activeTab === "list" && (
         <div>
+          {/* 比較バー */}
+          {(compareRunA || compareRunB) && (
+            <div className={styles.compareBar}>
+              <span className={styles.compareBarLabel}>比較:</span>
+              {compareRunA && (
+                <span className={styles.compareBarSelected}>
+                  Run #{compareRunA.id} ({getVersionLabel(compareRunA.prompt_version_id)})
+                </span>
+              )}
+              {compareRunB ? (
+                <>
+                  <span className={styles.compareBarVs}>vs</span>
+                  <span className={styles.compareBarComparing}>
+                    Run #{compareRunB.id} ({getVersionLabel(compareRunB.prompt_version_id)})
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => setIsCompareOpen(true)}
+                    className={styles.btnOpenCompare}
+                  >
+                    比較を表示
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => { setCompareRunA(null); setCompareRunB(null); }}
+                    className={styles.btnClearCompare}
+                  >
+                    クリア
+                  </button>
+                </>
+              ) : (
+                <>
+                  <span className={styles.compareBarHint}>
+                    もう1つ「比較」をクリックしてください
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => setCompareRunA(null)}
+                    className={styles.btnClearCompare}
+                  >
+                    クリア
+                  </button>
+                </>
+              )}
+            </div>
+          )}
+
           {/* フィルターバー */}
           <div className={styles.filterBar}>
             <div className={styles.filterField}>
@@ -646,15 +932,29 @@ export function RunsPage() {
                 <RunCard
                   key={run.id}
                   run={run}
+                  projectId={projectId}
                   versionLabel={getVersionLabel(run.prompt_version_id)}
                   testCaseLabel={getTestCaseLabel(run.test_case_id)}
                   onSetBest={() => setBestMutation.mutate(run.id)}
                   isBestPending={setBestMutation.isPending}
+                  onCompare={() => handleCompareRun(run)}
+                  isCompareSelected={compareRunA?.id === run.id || compareRunB?.id === run.id}
                 />
               ))}
             </div>
           )}
         </div>
+      )}
+
+      {/* 比較ビュー */}
+      {isCompareOpen && compareRunA && compareRunB && (
+        <RunCompareView
+          runA={compareRunA}
+          runB={compareRunB}
+          versionLabelA={getVersionLabel(compareRunA.prompt_version_id)}
+          versionLabelB={getVersionLabel(compareRunB.prompt_version_id)}
+          onClose={() => setIsCompareOpen(false)}
+        />
       )}
     </div>
   );

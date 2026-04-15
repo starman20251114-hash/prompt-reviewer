@@ -34,7 +34,8 @@ export function ProjectDetailPage() {
         {[
           { to: "test-cases", label: "テストケース管理" },
           { to: "prompts", label: "プロンプト管理" },
-          { to: "runs", label: "Run 一覧・採点" },
+          { to: "runs", label: "Run 実行・管理" },
+          { to: "score", label: "採点" },
           { to: "settings", label: "プロジェクト設定" },
         ].map(({ to, label }) => (
           <Link

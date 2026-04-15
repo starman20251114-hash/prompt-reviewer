@@ -1,0 +1,272 @@
+/* ==================== Root ==================== */
+.root {
+  color: var(--c-text);
+}
+
+/* ==================== Page header ==================== */
+.pageHeader {
+  composes: pageHeader from '../styles/shared.module.css';
+  margin-bottom: 24px;
+}
+
+.pageTitle {
+  composes: pageTitle from '../styles/shared.module.css';
+  margin: 0 0 4px;
+}
+
+.projectName {
+  margin: 0;
+  color: var(--c-subtext);
+  font-size: 14px;
+}
+
+/* ==================== Tab switcher ==================== */
+.tabs {
+  display: flex;
+  gap: 4px;
+  margin-bottom: 24px;
+  border-bottom: 1px solid var(--c-border);
+  padding-bottom: 0;
+}
+
+.tabBtn {
+  padding: 8px 20px;
+  background: transparent;
+  border: none;
+  border-bottom: 2px solid transparent;
+  color: var(--c-subtext);
+  font-size: 14px;
+  cursor: pointer;
+  margin-bottom: -1px;
+  transition: color 0.15s, border-color 0.15s;
+}
+
+.tabBtnActive {
+  color: var(--c-accent);
+  border-bottom-color: var(--c-accent);
+}
+
+/* ==================== Filters ==================== */
+.filters {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  margin-bottom: 20px;
+  flex-wrap: wrap;
+}
+
+.filterLabel {
+  font-size: 13px;
+  color: var(--c-subtext);
+}
+
+.filterSelect {
+  padding: 6px 10px;
+  background: var(--c-card);
+  border: 1px solid var(--c-border);
+  border-radius: 6px;
+  color: var(--c-text);
+  font-size: 13px;
+  cursor: pointer;
+}
+
+/* ==================== Run card (shared) ==================== */
+.runCard {
+  background: var(--c-card);
+  border: 1px solid var(--c-border);
+  border-radius: 8px;
+  margin-bottom: 16px;
+  overflow: hidden;
+}
+
+.runCardHeader {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 16px;
+  background: var(--c-overlay);
+  cursor: pointer;
+  user-select: none;
+}
+
+.runId {
+  font-weight: 600;
+  font-size: 14px;
+  color: var(--c-accent);
+}
+
+.runMeta {
+  font-size: 12px;
+  color: var(--c-subtext);
+  flex: 1;
+}
+
+.statusBadge {
+  font-size: 11px;
+  padding: 2px 8px;
+  border-radius: 4px;
+  font-weight: 600;
+  border: 1px solid transparent;
+}
+
+.statusScored {
+  background: color-mix(in srgb, var(--c-green) 15%, transparent);
+  color: var(--c-green);
+  border-color: var(--c-green);
+}
+
+.statusUnscored {
+  background: color-mix(in srgb, var(--c-yellow) 15%, transparent);
+  color: var(--c-yellow);
+  border-color: var(--c-yellow);
+}
+
+.statusDiscarded {
+  background: color-mix(in srgb, var(--c-danger) 15%, transparent);
+  color: var(--c-danger);
+  border-color: var(--c-danger);
+}
+
+.runCardBody {
+  padding: 16px;
+}
+
+.responsePreview {
+  font-size: 13px;
+  color: var(--c-subtext);
+  margin: 0 0 12px;
+  white-space: pre-wrap;
+  word-break: break-word;
+  max-height: 120px;
+  overflow-y: auto;
+  line-height: 1.5;
+}
+
+/* ==================== Star rating ==================== */
+.starRow {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+  margin-bottom: 10px;
+}
+
+.starLabel {
+  font-size: 13px;
+  color: var(--c-subtext);
+  margin-right: 4px;
+}
+
+.starBtn {
+  background: none;
+  border: none;
+  font-size: 22px;
+  cursor: pointer;
+  padding: 2px;
+  line-height: 1;
+  transition: transform 0.1s;
+}
+
+.starBtn:hover {
+  transform: scale(1.2);
+}
+
+.starFilled {
+  color: var(--c-yellow);
+}
+
+.starEmpty {
+  color: var(--c-surface);
+}
+
+/* ==================== Comment input ==================== */
+.commentTextarea {
+  composes: fieldTextarea from '../styles/shared.module.css';
+  min-height: 64px;
+  margin-bottom: 10px;
+  font-size: 13px;
+}
+
+/* ==================== Individual scoring actions ==================== */
+.scoreActions {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+.btnSave {
+  composes: btnPrimary from '../styles/shared.module.css';
+  padding: 6px 16px;
+  font-size: 13px;
+}
+
+.btnDiscard {
+  padding: 6px 16px;
+  font-size: 13px;
+  background: transparent;
+  border: 1px solid var(--c-danger);
+  border-radius: 6px;
+  color: var(--c-danger);
+  cursor: pointer;
+}
+
+.btnDiscard:hover {
+  background: color-mix(in srgb, var(--c-danger) 15%, transparent);
+}
+
+.btnRestore {
+  padding: 6px 16px;
+  font-size: 13px;
+  background: transparent;
+  border: 1px solid var(--c-border);
+  border-radius: 6px;
+  color: var(--c-subtext);
+  cursor: pointer;
+}
+
+.savedMsg {
+  font-size: 12px;
+  color: var(--c-green);
+  margin: 0;
+}
+
+.errorMsg {
+  composes: errorMsg from '../styles/shared.module.css';
+}
+
+/* ==================== Bulk scoring ==================== */
+.bulkHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 16px;
+}
+
+.bulkCount {
+  font-size: 13px;
+  color: var(--c-subtext);
+}
+
+.btnBulkSave {
+  composes: btnPrimary from '../styles/shared.module.css';
+  padding: 8px 20px;
+  font-size: 14px;
+}
+
+.btnBulkSave:disabled {
+  cursor: not-allowed;
+  opacity: 0.6;
+}
+
+.bulkSavedMsg {
+  font-size: 13px;
+  color: var(--c-green);
+  margin: 0;
+}
+
+/* ==================== Empty state ==================== */
+.emptyMsg {
+  color: var(--c-subtext);
+  font-size: 14px;
+  padding: 32px;
+  text-align: center;
+}
