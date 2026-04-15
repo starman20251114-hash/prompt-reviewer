@@ -358,6 +358,8 @@
   font-size: 11px;
   color: var(--c-yellow);
   font-weight: 600;
+  white-space: nowrap;
+  flex-shrink: 0;
 }
 
 .runDate {
@@ -397,7 +399,11 @@
   background: rgba(249, 226, 175, 0.13);
   color: var(--c-yellow);
   border: 1px solid rgba(249, 226, 175, 0.33);
-  cursor: not-allowed;
+  cursor: pointer;
+}
+
+.btnBestActive:hover {
+  background: rgba(249, 226, 175, 0.25);
 }
 
 .btnScore {

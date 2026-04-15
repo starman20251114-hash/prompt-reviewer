@@ -217,9 +217,7 @@ function buildFullPrompt(version: PromptVersion, testCase: TestCase): string {
     .map((t) => `${t.role === "user" ? "User" : "Assistant"}: ${t.content}`)
     .join("\n\n");
 
-  return turnsText
-    ? `${systemPrompt}\n\n[Conversation]\n${turnsText}`
-    : systemPrompt;
+  return turnsText ? `${systemPrompt}\n\n[Conversation]\n${turnsText}` : systemPrompt;
 }
 
 function CopyPromptPanel({
@@ -256,12 +254,7 @@ function CopyPromptPanel({
         </button>
       </div>
       {open && (
-        <textarea
-          readOnly
-          value={fullPrompt}
-          className={styles.copyPromptTextarea}
-          rows={12}
-        />
+        <textarea readOnly value={fullPrompt} className={styles.copyPromptTextarea} rows={12} />
       )}
     </div>
   );
@@ -309,6 +302,7 @@ function RunCard({
   run,
   projectId,
   versionLabel,
+  versionNumber,
   testCaseLabel,
   onSetBest,
   isBestPending,
@@ -318,8 +312,9 @@ function RunCard({
   run: Run;
   projectId: number;
   versionLabel: string;
+  versionNumber: number;
   testCaseLabel: string;
-  onSetBest: () => void;
+  onSetBest: (unset: boolean) => void;
   isBestPending: boolean;
   onCompare?: () => void;
   isCompareSelected?: boolean;
@@ -331,7 +326,11 @@ function RunCard({
       <div className={styles.runCardTop}>
         <div className={styles.runCardHeader}>
           <span className={styles.runId}>Run #{run.id}</span>
-          {run.is_best && <span className={styles.badgeBest}>ベスト回答</span>}
+          {run.is_best && (
+            <span className={styles.badgeBest} title={`${versionLabel} のベスト回答`}>
+              ★ v{versionNumber} のベスト
+            </span>
+          )}
           <span className={styles.runMeta}>
             {versionLabel} &times; {testCaseLabel}
           </span>
@@ -364,11 +363,15 @@ function RunCard({
           </Link>
           <button
             type="button"
-            onClick={onSetBest}
-            disabled={isBestPending || run.is_best}
+            onClick={() => {
+              // ベスト設定済みの場合は解除（unset=true）、未設定の場合は設定（unset=false）
+              const unset = run.is_best;
+              onSetBest(unset);
+            }}
+            disabled={isBestPending}
             className={`${styles.btnBest} ${run.is_best ? styles.btnBestActive : styles.btnBestInactive}`}
           >
-            {run.is_best ? "ベスト済み" : "ベストに設定"}
+            {run.is_best ? "ベスト設定済み（解除）" : "バージョンのベストに設定"}
           </button>
         </div>
       </div>
@@ -473,7 +476,8 @@ export function RunsPage() {
   });
 
   const setBestMutation = useMutation({
-    mutationFn: (runId: number) => setBestRun(projectId, runId),
+    mutationFn: ({ id, unset }: { id: number; unset: boolean }) =>
+      setBestRun(projectId, id, unset),
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: ["runs", projectId] });
     },
@@ -488,6 +492,10 @@ export function RunsPage() {
     const v = promptVersions.find((pv) => pv.id === versionId);
     if (!v) return "v?";
     return `v${v.version}${v.name ? ` - ${v.name}` : ""}`;
+  }
+
+  function getVersionNumber(versionId: number): number {
+    return promptVersions.find((pv) => pv.id === versionId)?.version ?? 0;
   }
 
   function getTestCaseLabel(testCaseId: number): string {
@@ -797,8 +805,9 @@ export function RunsPage() {
                         run={run}
                         projectId={projectId}
                         versionLabel={getVersionLabel(run.prompt_version_id)}
+                        versionNumber={getVersionNumber(run.prompt_version_id)}
                         testCaseLabel={getTestCaseLabel(run.test_case_id)}
-                        onSetBest={() => setBestMutation.mutate(run.id)}
+                        onSetBest={(unset) => setBestMutation.mutate({ id: run.id, unset })}
                         isBestPending={setBestMutation.isPending}
                       />
                     ))}
@@ -934,8 +943,9 @@ export function RunsPage() {
                   run={run}
                   projectId={projectId}
                   versionLabel={getVersionLabel(run.prompt_version_id)}
+                  versionNumber={getVersionNumber(run.prompt_version_id)}
                   testCaseLabel={getTestCaseLabel(run.test_case_id)}
-                  onSetBest={() => setBestMutation.mutate(run.id)}
+                  onSetBest={(unset) => setBestMutation.mutate({ id: run.id, unset })}
                   isBestPending={setBestMutation.isPending}
                   onCompare={() => handleCompareRun(run)}
                   isCompareSelected={compareRunA?.id === run.id || compareRunB?.id === run.id}
