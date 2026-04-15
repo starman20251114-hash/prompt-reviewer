@@ -26,9 +26,7 @@ function buildFullPrompt(version: PromptVersion, testCase: TestCase): string {
     .map((t) => `${t.role === "user" ? "User" : "Assistant"}: ${t.content}`)
     .join("\n\n");
 
-  return turnsText
-    ? `${systemPrompt}\n\n[Conversation]\n${turnsText}`
-    : systemPrompt;
+  return turnsText ? `${systemPrompt}\n\n[Conversation]\n${turnsText}` : systemPrompt;
 }
 
 function CopyPromptPanel({
@@ -65,12 +63,7 @@ function CopyPromptPanel({
         </button>
       </div>
       {open && (
-        <textarea
-          readOnly
-          value={fullPrompt}
-          className={styles.copyPromptTextarea}
-          rows={12}
-        />
+        <textarea readOnly value={fullPrompt} className={styles.copyPromptTextarea} rows={12} />
       )}
     </div>
   );
@@ -134,7 +127,11 @@ function RunCard({
       <div className={styles.runCardTop}>
         <div className={styles.runCardHeader}>
           <span className={styles.runId}>Run #{run.id}</span>
-          {run.is_best && <span className={styles.badgeBest}>ベスト回答</span>}
+          {run.is_best && (
+            <span className={styles.badgeBest} title={`${versionLabel} のベスト回答`}>
+              ★ {versionLabel} のベスト
+            </span>
+          )}
           <span className={styles.runMeta}>
             {versionLabel} &times; {testCaseLabel}
           </span>
