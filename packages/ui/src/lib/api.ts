@@ -252,8 +252,8 @@ export function createRun(
   return api.post<Run>(`/projects/${projectId}/runs`, data);
 }
 
-export function setBestRun(projectId: number, id: number): Promise<Run> {
-  return api.patch<Run>(`/projects/${projectId}/runs/${id}/best`, {});
+export function setBestRun(projectId: number, id: number, unset = false): Promise<Run> {
+  return api.patch<Run>(`/projects/${projectId}/runs/${id}/best`, { unset });
 }
 
 export function setSelectedVersion(projectId: number, id: number): Promise<PromptVersion> {

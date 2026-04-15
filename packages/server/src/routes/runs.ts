@@ -142,6 +142,7 @@ export function createRunsRouter(db: DB) {
 
   // PATCH /api/projects/:projectId/runs/:id/best - ベスト回答フラグ更新
   // バージョン×テストケースごとに1件のみ設定できる（既存フラグは自動解除）
+  // { unset: true } を渡すと解除のみ行う
   router.patch("/:id/best", async (c) => {
     const projectId = parseIntParam(c.req.param("projectId"));
     const id = parseIntParam(c.req.param("id"));
@@ -157,6 +158,20 @@ export function createRunsRouter(db: DB) {
 
     if (!existing) {
       return c.json({ error: "Run not found" }, 404);
+    }
+
+    const body = await c.req.json().catch(() => ({})) as { unset?: boolean };
+
+    if (body.unset) {
+      // ベスト解除
+      const updateResult = await db
+        .update(runs)
+        .set({ is_best: false })
+        .where(and(eq(runs.id, id), eq(runs.project_id, projectId)))
+        .returning();
+      const updated = updateResult[0];
+      if (!updated) return c.json({ error: "Failed to update Run" }, 500);
+      return c.json({ ...updated, conversation: parseConversation(updated.conversation) });
     }
 
     // 同一 prompt_version_id × test_case_id の既存フラグを解除

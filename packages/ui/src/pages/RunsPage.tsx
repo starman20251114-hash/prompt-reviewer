@@ -110,14 +110,16 @@ function RunConversation({ conversation }: { conversation: ConversationMessage[]
 function RunCard({
   run,
   versionLabel,
+  versionNumber,
   testCaseLabel,
   onSetBest,
   isBestPending,
 }: {
   run: Run;
   versionLabel: string;
+  versionNumber: number;
   testCaseLabel: string;
-  onSetBest: () => void;
+  onSetBest: (unset: boolean) => void;
   isBestPending: boolean;
 }) {
   const [expanded, setExpanded] = useState(false);
@@ -129,7 +131,7 @@ function RunCard({
           <span className={styles.runId}>Run #{run.id}</span>
           {run.is_best && (
             <span className={styles.badgeBest} title={`${versionLabel} のベスト回答`}>
-              ★ {versionLabel} のベスト
+              ★ v{versionNumber} のベスト
             </span>
           )}
           <span className={styles.runMeta}>
@@ -149,11 +151,11 @@ function RunCard({
           </button>
           <button
             type="button"
-            onClick={onSetBest}
-            disabled={isBestPending || run.is_best}
+            onClick={() => onSetBest(run.is_best)}
+            disabled={isBestPending}
             className={`${styles.btnBest} ${run.is_best ? styles.btnBestActive : styles.btnBestInactive}`}
           >
-            {run.is_best ? "ベスト済み" : "ベストに設定"}
+            {run.is_best ? "ベスト設定済み（解除）" : "バージョンのベストに設定"}
           </button>
         </div>
       </div>
@@ -253,7 +255,8 @@ export function RunsPage() {
   });
 
   const setBestMutation = useMutation({
-    mutationFn: (runId: number) => setBestRun(projectId, runId),
+    mutationFn: ({ id, unset }: { id: number; unset: boolean }) =>
+      setBestRun(projectId, id, unset),
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: ["runs", projectId] });
     },
@@ -268,6 +271,10 @@ export function RunsPage() {
     const v = promptVersions.find((pv) => pv.id === versionId);
     if (!v) return "v?";
     return `v${v.version}${v.name ? ` - ${v.name}` : ""}`;
+  }
+
+  function getVersionNumber(versionId: number): number {
+    return promptVersions.find((pv) => pv.id === versionId)?.version ?? 0;
   }
 
   function getTestCaseLabel(testCaseId: number): string {
@@ -555,8 +562,9 @@ export function RunsPage() {
                         key={run.id}
                         run={run}
                         versionLabel={getVersionLabel(run.prompt_version_id)}
+                        versionNumber={getVersionNumber(run.prompt_version_id)}
                         testCaseLabel={getTestCaseLabel(run.test_case_id)}
-                        onSetBest={() => setBestMutation.mutate(run.id)}
+                        onSetBest={(unset) => setBestMutation.mutate({ id: run.id, unset })}
                         isBestPending={setBestMutation.isPending}
                       />
                     ))}
@@ -644,8 +652,9 @@ export function RunsPage() {
                   key={run.id}
                   run={run}
                   versionLabel={getVersionLabel(run.prompt_version_id)}
+                  versionNumber={getVersionNumber(run.prompt_version_id)}
                   testCaseLabel={getTestCaseLabel(run.test_case_id)}
-                  onSetBest={() => setBestMutation.mutate(run.id)}
+                  onSetBest={(unset) => setBestMutation.mutate({ id: run.id, unset })}
                   isBestPending={setBestMutation.isPending}
                 />
               ))}
