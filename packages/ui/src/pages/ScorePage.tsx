@@ -1,6 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useRef, useState } from "react";
 import { useParams, useSearchParams } from "react-router";
+import { RunCompareView } from "../components/RunCompareView";
 import {
   type Run,
   type Score,
@@ -259,6 +260,8 @@ function BulkRunRow({
   score,
   bulkState,
   onBulkChange,
+  onCompare,
+  isCompareSelected,
 }: {
   run: Run;
   versionName: string;
@@ -266,12 +269,14 @@ function BulkRunRow({
   score: Score | null;
   bulkState: BulkState;
   onBulkChange: (patch: Partial<BulkState>) => void;
+  onCompare: () => void;
+  isCompareSelected: boolean;
 }) {
   const lastResponse = getLastAssistantMessage(run);
 
   return (
-    <div className={styles.runCard}>
-      <div className={styles.runCardHeader} style={{ cursor: "default" }}>
+    <div className={`${styles.runCard} ${isCompareSelected ? styles.runCardCompareSelected : ""}`}>
+      <div className={styles.runCardHeader}>
         <span className={styles.runId}>Run #{run.id}</span>
         <span className={styles.runMeta}>
           {versionName} × {testCaseTitle} · {formatDate(run.created_at)}
@@ -295,6 +300,13 @@ function BulkRunRow({
               : score
           }
         />
+        <button
+          type="button"
+          className={`${styles.btnCompare} ${isCompareSelected ? styles.btnCompareActive : ""}`}
+          onClick={onCompare}
+        >
+          {isCompareSelected ? "比較解除" : "比較"}
+        </button>
       </div>
 
       <div className={styles.runCardBody}>
@@ -352,6 +364,16 @@ export function ScorePage() {
   const [filterVersionId, setFilterVersionId] = useState<number | "">("");
   const [bulkSaved, setBulkSaved] = useState(false);
   const [bulkSaving, setBulkSaving] = useState(false);
+  const [compareIds, setCompareIds] = useState<number[]>([]);
+  const [showCompare, setShowCompare] = useState(false);
+
+  function toggleCompare(runId: number) {
+    setCompareIds((prev) => {
+      if (prev.includes(runId)) return prev.filter((id) => id !== runId);
+      if (prev.length >= 2) return [prev[1], runId];
+      return [...prev, runId];
+    });
+  }
 
   const { data: project } = useQuery({
     queryKey: ["projects", projectId],
@@ -461,6 +483,9 @@ export function ScorePage() {
 
   const dirtyCount = runs.filter((r) => bulkEdits.get(r.id)?.dirty).length;
 
+  const compareRunA = compareIds[0] != null ? runs.find((r) => r.id === compareIds[0]) : undefined;
+  const compareRunB = compareIds[1] != null ? runs.find((r) => r.id === compareIds[1]) : undefined;
+
   return (
     <div className={styles.root}>
       {/* ヘッダー */}
@@ -550,6 +575,37 @@ export function ScorePage() {
             </div>
           </div>
 
+          {/* 比較バー */}
+          {compareIds.length > 0 && (
+            <div className={styles.compareBar}>
+              <span className={styles.compareBarLabel}>比較:</span>
+              <span className={styles.compareBarSelected}>Run #{compareIds[0]}</span>
+              {compareIds.length === 2 && (
+                <>
+                  <span className={styles.compareBarVs}>vs</span>
+                  <span className={styles.compareBarSelected}>Run #{compareIds[1]}</span>
+                  <button
+                    type="button"
+                    className={styles.btnOpenCompare}
+                    onClick={() => setShowCompare(true)}
+                  >
+                    比較を開く
+                  </button>
+                </>
+              )}
+              {compareIds.length === 1 && (
+                <span className={styles.compareBarHint}>もう1件選択してください</span>
+              )}
+              <button
+                type="button"
+                className={styles.btnClearCompare}
+                onClick={() => setCompareIds([])}
+              >
+                クリア
+              </button>
+            </div>
+          )}
+
           {runs.map((run) => (
             <BulkRunRow
               key={run.id}
@@ -559,6 +615,8 @@ export function ScorePage() {
               score={scoresMap.get(run.id) ?? null}
               bulkState={getBulkState(run.id)}
               onBulkChange={(patch) => updateBulkEdit(run.id, patch)}
+              onCompare={() => toggleCompare(run.id)}
+              isCompareSelected={compareIds.includes(run.id)}
             />
           ))}
 
@@ -575,6 +633,17 @@ export function ScorePage() {
             </div>
           )}
         </div>
+      )}
+
+      {/* 比較ウィンドウ */}
+      {showCompare && compareRunA && compareRunB && (
+        <RunCompareView
+          runA={compareRunA}
+          runB={compareRunB}
+          versionLabelA={getVersionName(compareRunA.prompt_version_id)}
+          versionLabelB={getVersionName(compareRunB.prompt_version_id)}
+          onClose={() => setShowCompare(false)}
+        />
       )}
     </div>
   );
