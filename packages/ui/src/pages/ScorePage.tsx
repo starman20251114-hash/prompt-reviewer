@@ -29,6 +29,9 @@ function getLastAssistantMessage(run: Run): string {
   return msgs[msgs.length - 1]?.content ?? "";
 }
 
+// --------------- Types ---------------
+type ScoreMode = "star" | "numeric";
+
 // --------------- StarRating ---------------
 function StarRating({
   value,
@@ -70,6 +73,66 @@ function StarRating({
   );
 }
 
+// --------------- NumericScore ---------------
+function NumericScore({
+  value,
+  onChange,
+  disabled,
+}: {
+  value: number | null;
+  onChange: (v: number | null) => void;
+  disabled?: boolean;
+}) {
+  return (
+    <div className={styles.numericRow}>
+      <span className={styles.numericLabel}>スコア</span>
+      <input
+        type="number"
+        min="1"
+        max="100"
+        step="1"
+        value={value ?? ""}
+        onChange={(e) => {
+          if (e.target.value === "") {
+            onChange(null);
+            return;
+          }
+          const n = Math.min(100, Math.max(1, Math.round(Number(e.target.value))));
+          onChange(n);
+        }}
+        disabled={disabled}
+        className={styles.numericInput}
+        placeholder="1〜100"
+      />
+      <span className={styles.numericSuffix}>/ 100</span>
+    </div>
+  );
+}
+
+// --------------- ScoreInput ---------------
+function ScoreInput({
+  mode,
+  value,
+  onChange,
+  disabled,
+}: {
+  mode: ScoreMode;
+  value: number | null;
+  onChange: (v: number | null) => void;
+  disabled?: boolean;
+}) {
+  if (mode === "numeric") {
+    return <NumericScore value={value} onChange={onChange} disabled={disabled} />;
+  }
+  return (
+    <StarRating
+      value={value}
+      onChange={(v) => onChange(v)}
+      disabled={disabled}
+    />
+  );
+}
+
 // --------------- StatusBadge ---------------
 function StatusBadge({ score }: { score: Score | null }) {
   if (!score) {
@@ -105,11 +168,13 @@ function IndividualRunRow({
   versionName,
   testCaseTitle,
   autoFocus,
+  scoreMode,
 }: {
   run: Run;
   versionName: string;
   testCaseTitle: string;
   autoFocus?: boolean;
+  scoreMode: ScoreMode;
 }) {
   const queryClient = useQueryClient();
   const [expanded, setExpanded] = useState(autoFocus ?? false);
@@ -208,7 +273,7 @@ function IndividualRunRow({
             </div>
           ) : (
             <>
-              <StarRating value={starValue} onChange={setStarValue} />
+              <ScoreInput mode={scoreMode} value={starValue} onChange={setStarValue} />
               <textarea
                 className={styles.commentTextarea}
                 value={comment}
@@ -262,6 +327,7 @@ function BulkRunRow({
   onBulkChange,
   onCompare,
   isCompareSelected,
+  scoreMode,
 }: {
   run: Run;
   versionName: string;
@@ -271,6 +337,7 @@ function BulkRunRow({
   onBulkChange: (patch: Partial<BulkState>) => void;
   onCompare: () => void;
   isCompareSelected: boolean;
+  scoreMode: ScoreMode;
 }) {
   const lastResponse = getLastAssistantMessage(run);
 
@@ -327,7 +394,8 @@ function BulkRunRow({
           </div>
         ) : (
           <>
-            <StarRating
+            <ScoreInput
+              mode={scoreMode}
               value={bulkState.starValue}
               onChange={(v) => onBulkChange({ starValue: v })}
             />
@@ -361,6 +429,7 @@ export function ScorePage() {
   const focusedRunId = searchParams.get("runId") ? Number(searchParams.get("runId")) : null;
 
   const [tab, setTab] = useState<"individual" | "bulk">("individual");
+  const [scoreMode, setScoreMode] = useState<ScoreMode>("star");
   const [filterVersionId, setFilterVersionId] = useState<number | "">("");
   const [bulkSaved, setBulkSaved] = useState(false);
   const [bulkSaving, setBulkSaving] = useState(false);
@@ -514,7 +583,7 @@ export function ScorePage() {
         </button>
       </div>
 
-      {/* バージョンフィルター */}
+      {/* フィルター・モード切替 */}
       <div className={styles.filters}>
         <label htmlFor="filter-version" className={styles.filterLabel}>
           バージョン
@@ -533,6 +602,26 @@ export function ScorePage() {
             </option>
           ))}
         </select>
+
+        <div className={styles.scoreModeToggle}>
+          <span className={styles.scoreModeLabel}>採点モード</span>
+          <div className={styles.scoreModeButtons}>
+            <button
+              type="button"
+              className={`${styles.scoreModeBtn} ${scoreMode === "star" ? styles.scoreModeBtnActive : ""}`}
+              onClick={() => setScoreMode("star")}
+            >
+              ★ 5段階
+            </button>
+            <button
+              type="button"
+              className={`${styles.scoreModeBtn} ${scoreMode === "numeric" ? styles.scoreModeBtnActive : ""}`}
+              onClick={() => setScoreMode("numeric")}
+            >
+              # 100点
+            </button>
+          </div>
+        </div>
       </div>
 
       {runs.length === 0 && (
@@ -549,6 +638,7 @@ export function ScorePage() {
               versionName={getVersionName(run.prompt_version_id)}
               testCaseTitle={`テストケース #${run.test_case_id}`}
               autoFocus={focusedRunId === run.id}
+              scoreMode={scoreMode}
             />
           ))}
         </div>
@@ -617,6 +707,7 @@ export function ScorePage() {
               onBulkChange={(patch) => updateBulkEdit(run.id, patch)}
               onCompare={() => toggleCompare(run.id)}
               isCompareSelected={compareIds.includes(run.id)}
+              scoreMode={scoreMode}
             />
           ))}
 
