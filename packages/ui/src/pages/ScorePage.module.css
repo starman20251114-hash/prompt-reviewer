@@ -127,6 +127,11 @@
   border-color: var(--c-danger);
 }
 
+.runCardFocused {
+  border-color: var(--c-accent);
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--c-accent) 30%, transparent);
+}
+
 .runCardBody {
   padding: 16px;
 }
@@ -137,7 +142,7 @@
   margin: 0 0 12px;
   white-space: pre-wrap;
   word-break: break-word;
-  max-height: 120px;
+  max-height: 240px;
   overflow-y: auto;
   line-height: 1.5;
 }
@@ -176,6 +181,75 @@
 
 .starEmpty {
   color: var(--c-surface);
+}
+
+/* ==================== Numeric score input ==================== */
+.numericRow {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+
+.numericLabel {
+  font-size: 13px;
+  color: var(--c-subtext);
+}
+
+.numericInput {
+  width: 80px;
+  padding: 5px 8px;
+  background: var(--c-overlay);
+  border: 1px solid var(--c-border);
+  border-radius: 6px;
+  color: var(--c-text);
+  font-size: 15px;
+  font-weight: 600;
+  text-align: center;
+}
+
+.numericInput:focus {
+  outline: none;
+  border-color: var(--c-accent);
+}
+
+.numericSuffix {
+  font-size: 13px;
+  color: var(--c-muted);
+}
+
+/* ==================== Score mode toggle ==================== */
+.scoreModeToggle {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-left: auto;
+}
+
+.scoreModeLabel {
+  font-size: 12px;
+  color: var(--c-subtext);
+}
+
+.scoreModeButtons {
+  display: flex;
+  border: 1px solid var(--c-border);
+  border-radius: 6px;
+  overflow: hidden;
+}
+
+.scoreModeBtn {
+  padding: 5px 12px;
+  border: none;
+  font-size: 12px;
+  cursor: pointer;
+  background: transparent;
+  color: var(--c-muted);
+}
+
+.scoreModeBtnActive {
+  background: var(--c-card);
+  color: var(--c-text);
 }
 
 /* ==================== Comment input ==================== */
@@ -261,6 +335,80 @@
   font-size: 13px;
   color: var(--c-green);
   margin: 0;
+}
+
+/* ==================== Compare button (on run card) ==================== */
+.btnCompare {
+  padding: 4px 10px;
+  border-radius: 5px;
+  font-size: 12px;
+  white-space: nowrap;
+  flex-shrink: 0;
+  background: transparent;
+  color: var(--c-blue);
+  border: 1px solid var(--c-blue);
+  cursor: pointer;
+}
+
+.btnCompareActive {
+  background: rgba(137, 180, 250, 0.13);
+}
+
+.runCardCompareSelected {
+  border-color: var(--c-blue);
+}
+
+/* ==================== Compare bar ==================== */
+.compareBar {
+  padding: 8px 12px;
+  background: var(--c-card);
+  border: 1px solid var(--c-border);
+  border-radius: 6px;
+  margin-bottom: 12px;
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  font-size: 13px;
+  flex-wrap: wrap;
+}
+
+.compareBarLabel {
+  color: var(--c-muted);
+}
+
+.compareBarSelected {
+  color: var(--c-accent);
+}
+
+.compareBarVs {
+  color: var(--c-muted);
+}
+
+.compareBarHint {
+  color: var(--c-muted);
+  font-size: 12px;
+}
+
+.btnOpenCompare {
+  padding: 5px 12px;
+  background: var(--c-blue);
+  color: var(--c-overlay);
+  border: none;
+  border-radius: 6px;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  margin-left: auto;
+}
+
+.btnClearCompare {
+  padding: 5px 10px;
+  background: transparent;
+  color: var(--c-muted);
+  border: 1px solid var(--c-border);
+  border-radius: 6px;
+  font-size: 12px;
+  cursor: pointer;
 }
 
 /* ==================== Empty state ==================== */

@@ -1,0 +1,242 @@
+/* ==================== Overlay ==================== */
+.overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.7);
+  display: flex;
+  align-items: stretch;
+  justify-content: center;
+  z-index: 100;
+  padding: 20px;
+}
+
+.box {
+  background: var(--c-overlay);
+  border: 1px solid var(--c-border);
+  border-radius: 12px;
+  width: 100%;
+  max-width: 1200px;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+/* ==================== Header ==================== */
+.header {
+  padding: 16px 20px;
+  border-bottom: 1px solid var(--c-border);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-shrink: 0;
+}
+
+.headerTitle {
+  margin: 0;
+  font-size: 16px;
+  color: var(--c-text);
+}
+
+.headerActions {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+.modeToggle {
+  display: flex;
+  border: 1px solid var(--c-border);
+  border-radius: 6px;
+  overflow: hidden;
+}
+
+.btnMode {
+  padding: 5px 12px;
+  border: none;
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.btnModeActive {
+  background: var(--c-card);
+  color: var(--c-text);
+}
+
+.btnModeInactive {
+  background: transparent;
+  color: var(--c-muted);
+}
+
+.btnClose {
+  padding: 5px 12px;
+  background: transparent;
+  border: 1px solid var(--c-border);
+  border-radius: 6px;
+  color: var(--c-subtext);
+  font-size: 13px;
+  cursor: pointer;
+}
+
+/* ==================== Content ==================== */
+.content {
+  flex: 1;
+  overflow: hidden;
+  display: flex;
+}
+
+/* ==================== Side-by-side ==================== */
+.sideBySide {
+  display: flex;
+  flex: 1;
+  overflow: hidden;
+}
+
+.panel {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.panelLeft {
+  border-right: 1px solid var(--c-border);
+}
+
+.panelHeader {
+  padding: 10px 14px;
+  background: var(--c-card);
+  font-size: 13px;
+  color: var(--c-subtext);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-shrink: 0;
+}
+
+.panelHeaderA {
+  border-bottom: 2px solid var(--c-danger);
+}
+
+.panelHeaderB {
+  border-bottom: 2px solid var(--c-green);
+}
+
+.panelMeta {
+  color: var(--c-muted);
+  font-size: 11px;
+}
+
+.chatList {
+  flex: 1;
+  overflow: auto;
+  padding: 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+/* ==================== Chat bubbles ==================== */
+.bubbleWrapper {
+  display: flex;
+  flex-direction: column;
+}
+
+.bubbleWrapperUser {
+  align-items: flex-end;
+}
+
+.bubbleWrapperAssistant {
+  align-items: flex-start;
+}
+
+.bubbleRole {
+  font-size: 11px;
+  color: var(--c-muted);
+  margin-bottom: 4px;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.bubble {
+  max-width: 85%;
+  padding: 10px 14px;
+  font-size: 14px;
+  line-height: 1.5;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.bubbleUser {
+  border-radius: 12px 12px 4px 12px;
+  background: rgba(203, 166, 247, 0.2);
+  border: 1px solid rgba(203, 166, 247, 0.33);
+}
+
+.bubbleAssistant {
+  border-radius: 12px 12px 12px 4px;
+  background: var(--c-surface);
+  border: 1px solid var(--c-border);
+}
+
+/* ==================== Unified diff ==================== */
+.unifiedView {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.unifiedHeader {
+  padding: 10px 14px;
+  background: var(--c-card);
+  border-bottom: 1px solid var(--c-border);
+  font-size: 13px;
+  display: flex;
+  gap: 16px;
+  flex-shrink: 0;
+}
+
+.unifiedLabelA {
+  color: var(--c-danger);
+}
+
+.unifiedLabelB {
+  color: var(--c-green);
+}
+
+.diffScroll {
+  flex: 1;
+  overflow: auto;
+  font-family: monospace;
+  font-size: 13px;
+  line-height: 1.7;
+}
+
+.diffLine {
+  padding: 0 14px;
+  display: flex;
+  gap: 8px;
+  color: var(--c-text);
+}
+
+.diffLineRemoved {
+  background: rgba(243, 139, 168, 0.12);
+  color: var(--c-danger);
+}
+
+.diffLineAdded {
+  background: rgba(166, 227, 161, 0.12);
+  color: var(--c-green);
+}
+
+.diffGutter {
+  width: 14px;
+  flex-shrink: 0;
+  user-select: none;
+}
+
+.diffText {
+  white-space: pre-wrap;
+  word-break: break-word;
+  flex: 1;
+}

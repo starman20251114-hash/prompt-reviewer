@@ -1,6 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { useState } from "react";
-import { useParams } from "react-router";
+import { useEffect, useRef, useState } from "react";
+import { useParams, useSearchParams } from "react-router";
+import { RunCompareView } from "../components/RunCompareView";
 import {
   type Run,
   type Score,
@@ -27,6 +28,9 @@ function getLastAssistantMessage(run: Run): string {
   const msgs = run.conversation.filter((m) => m.role === "assistant");
   return msgs[msgs.length - 1]?.content ?? "";
 }
+
+// --------------- Types ---------------
+type ScoreMode = "star" | "numeric";
 
 // --------------- StarRating ---------------
 function StarRating({
@@ -69,6 +73,66 @@ function StarRating({
   );
 }
 
+// --------------- NumericScore ---------------
+function NumericScore({
+  value,
+  onChange,
+  disabled,
+}: {
+  value: number | null;
+  onChange: (v: number | null) => void;
+  disabled?: boolean;
+}) {
+  return (
+    <div className={styles.numericRow}>
+      <span className={styles.numericLabel}>スコア</span>
+      <input
+        type="number"
+        min="1"
+        max="100"
+        step="1"
+        value={value ?? ""}
+        onChange={(e) => {
+          if (e.target.value === "") {
+            onChange(null);
+            return;
+          }
+          const n = Math.min(100, Math.max(1, Math.round(Number(e.target.value))));
+          onChange(n);
+        }}
+        disabled={disabled}
+        className={styles.numericInput}
+        placeholder="1〜100"
+      />
+      <span className={styles.numericSuffix}>/ 100</span>
+    </div>
+  );
+}
+
+// --------------- ScoreInput ---------------
+function ScoreInput({
+  mode,
+  value,
+  onChange,
+  disabled,
+}: {
+  mode: ScoreMode;
+  value: number | null;
+  onChange: (v: number | null) => void;
+  disabled?: boolean;
+}) {
+  if (mode === "numeric") {
+    return <NumericScore value={value} onChange={onChange} disabled={disabled} />;
+  }
+  return (
+    <StarRating
+      value={value}
+      onChange={(v) => onChange(v)}
+      disabled={disabled}
+    />
+  );
+}
+
 // --------------- StatusBadge ---------------
 function StatusBadge({ score }: { score: Score | null }) {
   if (!score) {
@@ -103,13 +167,24 @@ function IndividualRunRow({
   run,
   versionName,
   testCaseTitle,
+  autoFocus,
+  scoreMode,
 }: {
   run: Run;
   versionName: string;
   testCaseTitle: string;
+  autoFocus?: boolean;
+  scoreMode: ScoreMode;
 }) {
   const queryClient = useQueryClient();
-  const [expanded, setExpanded] = useState(false);
+  const [expanded, setExpanded] = useState(autoFocus ?? false);
+  const cardRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (autoFocus && cardRef.current) {
+      cardRef.current.scrollIntoView({ behavior: "smooth", block: "start" });
+    }
+  }, [autoFocus]);
   const [starValue, setStarValue] = useState<number | null>(null);
   const [comment, setComment] = useState("");
   const [saved, setSaved] = useState(false);
@@ -159,7 +234,10 @@ function IndividualRunRow({
   const isDiscarded = score?.is_discarded ?? false;
 
   return (
-    <div className={styles.runCard}>
+    <div
+      ref={cardRef}
+      className={`${styles.runCard} ${autoFocus ? styles.runCardFocused : ""}`}
+    >
       <button
         type="button"
         className={styles.runCardHeader}
@@ -195,7 +273,7 @@ function IndividualRunRow({
             </div>
           ) : (
             <>
-              <StarRating value={starValue} onChange={setStarValue} />
+              <ScoreInput mode={scoreMode} value={starValue} onChange={setStarValue} />
               <textarea
                 className={styles.commentTextarea}
                 value={comment}
@@ -247,6 +325,9 @@ function BulkRunRow({
   score,
   bulkState,
   onBulkChange,
+  onCompare,
+  isCompareSelected,
+  scoreMode,
 }: {
   run: Run;
   versionName: string;
@@ -254,12 +335,15 @@ function BulkRunRow({
   score: Score | null;
   bulkState: BulkState;
   onBulkChange: (patch: Partial<BulkState>) => void;
+  onCompare: () => void;
+  isCompareSelected: boolean;
+  scoreMode: ScoreMode;
 }) {
   const lastResponse = getLastAssistantMessage(run);
 
   return (
-    <div className={styles.runCard}>
-      <div className={styles.runCardHeader} style={{ cursor: "default" }}>
+    <div className={`${styles.runCard} ${isCompareSelected ? styles.runCardCompareSelected : ""}`}>
+      <div className={styles.runCardHeader}>
         <span className={styles.runId}>Run #{run.id}</span>
         <span className={styles.runMeta}>
           {versionName} × {testCaseTitle} · {formatDate(run.created_at)}
@@ -283,6 +367,13 @@ function BulkRunRow({
               : score
           }
         />
+        <button
+          type="button"
+          className={`${styles.btnCompare} ${isCompareSelected ? styles.btnCompareActive : ""}`}
+          onClick={onCompare}
+        >
+          {isCompareSelected ? "比較解除" : "比較"}
+        </button>
       </div>
 
       <div className={styles.runCardBody}>
@@ -303,7 +394,8 @@ function BulkRunRow({
           </div>
         ) : (
           <>
-            <StarRating
+            <ScoreInput
+              mode={scoreMode}
               value={bulkState.starValue}
               onChange={(v) => onBulkChange({ starValue: v })}
             />
@@ -333,11 +425,24 @@ export function ScorePage() {
   const { id } = useParams<{ id: string }>();
   const projectId = Number(id);
   const queryClient = useQueryClient();
+  const [searchParams] = useSearchParams();
+  const focusedRunId = searchParams.get("runId") ? Number(searchParams.get("runId")) : null;
 
   const [tab, setTab] = useState<"individual" | "bulk">("individual");
+  const [scoreMode, setScoreMode] = useState<ScoreMode>("star");
   const [filterVersionId, setFilterVersionId] = useState<number | "">("");
   const [bulkSaved, setBulkSaved] = useState(false);
   const [bulkSaving, setBulkSaving] = useState(false);
+  const [compareIds, setCompareIds] = useState<number[]>([]);
+  const [showCompare, setShowCompare] = useState(false);
+
+  function toggleCompare(runId: number) {
+    setCompareIds((prev) => {
+      if (prev.includes(runId)) return prev.filter((id) => id !== runId);
+      if (prev.length >= 2) return [prev[1], runId];
+      return [...prev, runId];
+    });
+  }
 
   const { data: project } = useQuery({
     queryKey: ["projects", projectId],
@@ -447,6 +552,9 @@ export function ScorePage() {
 
   const dirtyCount = runs.filter((r) => bulkEdits.get(r.id)?.dirty).length;
 
+  const compareRunA = compareIds[0] != null ? runs.find((r) => r.id === compareIds[0]) : undefined;
+  const compareRunB = compareIds[1] != null ? runs.find((r) => r.id === compareIds[1]) : undefined;
+
   return (
     <div className={styles.root}>
       {/* ヘッダー */}
@@ -475,7 +583,7 @@ export function ScorePage() {
         </button>
       </div>
 
-      {/* バージョンフィルター */}
+      {/* フィルター・モード切替 */}
       <div className={styles.filters}>
         <label htmlFor="filter-version" className={styles.filterLabel}>
           バージョン
@@ -494,6 +602,26 @@ export function ScorePage() {
             </option>
           ))}
         </select>
+
+        <div className={styles.scoreModeToggle}>
+          <span className={styles.scoreModeLabel}>採点モード</span>
+          <div className={styles.scoreModeButtons}>
+            <button
+              type="button"
+              className={`${styles.scoreModeBtn} ${scoreMode === "star" ? styles.scoreModeBtnActive : ""}`}
+              onClick={() => setScoreMode("star")}
+            >
+              ★ 5段階
+            </button>
+            <button
+              type="button"
+              className={`${styles.scoreModeBtn} ${scoreMode === "numeric" ? styles.scoreModeBtnActive : ""}`}
+              onClick={() => setScoreMode("numeric")}
+            >
+              # 100点
+            </button>
+          </div>
+        </div>
       </div>
 
       {runs.length === 0 && (
@@ -509,6 +637,8 @@ export function ScorePage() {
               run={run}
               versionName={getVersionName(run.prompt_version_id)}
               testCaseTitle={`テストケース #${run.test_case_id}`}
+              autoFocus={focusedRunId === run.id}
+              scoreMode={scoreMode}
             />
           ))}
         </div>
@@ -535,6 +665,37 @@ export function ScorePage() {
             </div>
           </div>
 
+          {/* 比較バー */}
+          {compareIds.length > 0 && (
+            <div className={styles.compareBar}>
+              <span className={styles.compareBarLabel}>比較:</span>
+              <span className={styles.compareBarSelected}>Run #{compareIds[0]}</span>
+              {compareIds.length === 2 && (
+                <>
+                  <span className={styles.compareBarVs}>vs</span>
+                  <span className={styles.compareBarSelected}>Run #{compareIds[1]}</span>
+                  <button
+                    type="button"
+                    className={styles.btnOpenCompare}
+                    onClick={() => setShowCompare(true)}
+                  >
+                    比較を開く
+                  </button>
+                </>
+              )}
+              {compareIds.length === 1 && (
+                <span className={styles.compareBarHint}>もう1件選択してください</span>
+              )}
+              <button
+                type="button"
+                className={styles.btnClearCompare}
+                onClick={() => setCompareIds([])}
+              >
+                クリア
+              </button>
+            </div>
+          )}
+
           {runs.map((run) => (
             <BulkRunRow
               key={run.id}
@@ -544,6 +705,9 @@ export function ScorePage() {
               score={scoresMap.get(run.id) ?? null}
               bulkState={getBulkState(run.id)}
               onBulkChange={(patch) => updateBulkEdit(run.id, patch)}
+              onCompare={() => toggleCompare(run.id)}
+              isCompareSelected={compareIds.includes(run.id)}
+              scoreMode={scoreMode}
             />
           ))}
 
@@ -560,6 +724,17 @@ export function ScorePage() {
             </div>
           )}
         </div>
+      )}
+
+      {/* 比較ウィンドウ */}
+      {showCompare && compareRunA && compareRunB && (
+        <RunCompareView
+          runA={compareRunA}
+          runB={compareRunB}
+          versionLabelA={getVersionName(compareRunA.prompt_version_id)}
+          versionLabelB={getVersionName(compareRunB.prompt_version_id)}
+          onClose={() => setShowCompare(false)}
+        />
       )}
     </div>
   );
