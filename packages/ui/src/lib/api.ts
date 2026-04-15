@@ -314,6 +314,29 @@ export function upsertScore(
   });
 }
 
+// ProjectSettings API
+
+export type ProjectSettings = {
+  id: number;
+  project_id: number;
+  model: string;
+  temperature: number;
+  api_provider: "anthropic" | "openai";
+  created_at: number;
+  updated_at: number;
+};
+
+export function getProjectSettings(projectId: number): Promise<ProjectSettings> {
+  return api.get<ProjectSettings>(`/projects/${projectId}/settings`);
+}
+
+export function upsertProjectSettings(
+  projectId: number,
+  data: { model: string; temperature: number; api_provider: "anthropic" | "openai" },
+): Promise<ProjectSettings> {
+  return api.put<ProjectSettings>(`/projects/${projectId}/settings`, data);
+}
+
 // Score Progression API
 
 export type VersionSummary = {
