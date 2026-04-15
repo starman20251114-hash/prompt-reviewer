@@ -2,6 +2,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { Link, useParams } from "react-router";
 import { RunCompareView } from "../components/RunCompareView";
+import { useApiKey } from "../hooks/useApiKey";
 import {
   type ConversationMessage,
   type PromptVersion,
@@ -416,6 +417,8 @@ export function RunsPage() {
   const projectId = Number(id);
   const queryClient = useQueryClient();
 
+  const { hasApiKey } = useApiKey(projectId);
+
   const [activeTab, setActiveTab] = useState<PageTab>("create");
 
   // 「Run 作成」タブの状態
@@ -576,7 +579,7 @@ export function RunsPage() {
     }
   }
 
-  const isStartDisabled = selectedVersionId === "" || selectedTestCaseId === "";
+  const isStartDisabled = selectedVersionId === "" || selectedTestCaseId === "" || !hasApiKey;
   const isSaveDisabled = !llmResponse.trim() || createRunMutation.isPending;
 
   return (
@@ -672,10 +675,23 @@ export function RunsPage() {
                 type="button"
                 onClick={handleStartRun}
                 disabled={isStartDisabled}
+                title={!hasApiKey ? "APIキーが未設定です（設定画面で入力してください）" : undefined}
                 className={`${styles.btnStart} ${isStartDisabled ? styles.btnStartDisabled : ""}`}
               >
                 Run を開始
               </button>
+              {!hasApiKey && (
+                <p className={styles.fieldHint}>
+                  APIキーが未設定です。
+                  <Link
+                    to={`/projects/${projectId}/settings`}
+                    className={styles.settingsLink}
+                  >
+                    設定画面
+                  </Link>
+                  で入力してください。
+                </p>
+              )}
             </div>
           )}
 
