@@ -1,0 +1,230 @@
+import { useRef, useState } from "react";
+import type { Run } from "../lib/api";
+import styles from "./RunCompareView.module.css";
+
+export function diffLines(
+  a: string,
+  b: string,
+): { type: "same" | "removed" | "added"; text: string }[] {
+  const aLines = a.split("\n");
+  const bLines = b.split("\n");
+  const result: { type: "same" | "removed" | "added"; text: string }[] = [];
+
+  const maxLen = Math.max(aLines.length, bLines.length);
+  let ai = 0;
+  let bi = 0;
+
+  while (ai < aLines.length || bi < bLines.length) {
+    if (ai < aLines.length && bi < bLines.length && aLines[ai] === bLines[bi]) {
+      result.push({ type: "same", text: aLines[ai] });
+      ai++;
+      bi++;
+    } else {
+      const aRemainder = aLines.slice(ai);
+      const bRemainder = bLines.slice(bi);
+
+      let foundInA = -1;
+      let foundInB = -1;
+      const lookAhead = Math.min(5, maxLen);
+
+      for (let d = 0; d < lookAhead; d++) {
+        if (d < bRemainder.length && aRemainder.slice(0, lookAhead).includes(bRemainder[d])) {
+          foundInB = d;
+          foundInA = aRemainder.indexOf(bRemainder[d]);
+          break;
+        }
+        if (d < aRemainder.length && bRemainder.slice(0, lookAhead).includes(aRemainder[d])) {
+          foundInA = d;
+          foundInB = bRemainder.indexOf(aRemainder[d]);
+          break;
+        }
+      }
+
+      if (foundInA > 0) {
+        for (let i = 0; i < foundInA; i++) {
+          result.push({ type: "removed", text: aRemainder[i] });
+        }
+        ai += foundInA;
+      } else if (foundInB > 0) {
+        for (let i = 0; i < foundInB; i++) {
+          result.push({ type: "added", text: bRemainder[i] });
+        }
+        bi += foundInB;
+      } else {
+        if (ai < aLines.length) {
+          result.push({ type: "removed", text: aLines[ai] });
+          ai++;
+        }
+        if (bi < bLines.length) {
+          result.push({ type: "added", text: bLines[bi] });
+          bi++;
+        }
+      }
+    }
+  }
+
+  return result;
+}
+
+type Props = {
+  runA: Run;
+  runB: Run;
+  versionLabelA: string;
+  versionLabelB: string;
+  onClose: () => void;
+};
+
+export function RunCompareView({ runA, runB, versionLabelA, versionLabelB, onClose }: Props) {
+  const [mode, setMode] = useState<"side-by-side" | "unified">("side-by-side");
+  const scrollRefA = useRef<HTMLDivElement>(null);
+  const scrollRefB = useRef<HTMLDivElement>(null);
+  const isSyncing = useRef(false);
+
+  function handleScrollA() {
+    if (isSyncing.current || !scrollRefA.current || !scrollRefB.current) return;
+    isSyncing.current = true;
+    scrollRefB.current.scrollTop = scrollRefA.current.scrollTop;
+    isSyncing.current = false;
+  }
+
+  function handleScrollB() {
+    if (isSyncing.current || !scrollRefA.current || !scrollRefB.current) return;
+    isSyncing.current = true;
+    scrollRefA.current.scrollTop = scrollRefB.current.scrollTop;
+    isSyncing.current = false;
+  }
+
+  const lastAssistantA =
+    [...runA.conversation].reverse().find((m) => m.role === "assistant")?.content ?? "";
+  const lastAssistantB =
+    [...runB.conversation].reverse().find((m) => m.role === "assistant")?.content ?? "";
+  const diff = diffLines(lastAssistantA, lastAssistantB);
+
+  return (
+    <div
+      className={styles.overlay}
+      onClick={(e) => {
+        if (e.target === e.currentTarget) onClose();
+      }}
+      onKeyDown={(e) => {
+        if (e.key === "Escape") onClose();
+      }}
+    >
+      <div className={styles.box}>
+        <div className={styles.header}>
+          <h3 className={styles.headerTitle}>Run 比較</h3>
+          <div className={styles.headerActions}>
+            <div className={styles.modeToggle}>
+              {(["side-by-side", "unified"] as const).map((m) => (
+                <button
+                  key={m}
+                  type="button"
+                  onClick={() => setMode(m)}
+                  className={`${styles.btnMode} ${mode === m ? styles.btnModeActive : styles.btnModeInactive}`}
+                >
+                  {m === "side-by-side" ? "並列" : "差分"}
+                </button>
+              ))}
+            </div>
+            <button type="button" onClick={onClose} className={styles.btnClose}>
+              閉じる
+            </button>
+          </div>
+        </div>
+
+        <div className={styles.content}>
+          {mode === "side-by-side" ? (
+            <div className={styles.sideBySide}>
+              <div className={`${styles.panel} ${styles.panelLeft}`}>
+                <div className={`${styles.panelHeader} ${styles.panelHeaderA}`}>
+                  <span>Run #{runA.id}</span>
+                  <span className={styles.panelMeta}>{versionLabelA}</span>
+                </div>
+                <div
+                  ref={scrollRefA}
+                  className={styles.chatList}
+                  onScroll={handleScrollA}
+                >
+                  {runA.conversation.map((msg, i) => (
+                    <div
+                      key={`a-msg-${
+                        // biome-ignore lint/suspicious/noArrayIndexKey: 会話配列は順序で管理
+                        i
+                      }`}
+                      className={`${styles.bubbleWrapper} ${msg.role === "user" ? styles.bubbleWrapperUser : styles.bubbleWrapperAssistant}`}
+                    >
+                      <span className={styles.bubbleRole}>
+                        {msg.role === "user" ? "User" : "Assistant"}
+                      </span>
+                      <div
+                        className={`${styles.bubble} ${msg.role === "user" ? styles.bubbleUser : styles.bubbleAssistant}`}
+                      >
+                        {msg.content}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+              <div className={styles.panel}>
+                <div className={`${styles.panelHeader} ${styles.panelHeaderB}`}>
+                  <span>Run #{runB.id}</span>
+                  <span className={styles.panelMeta}>{versionLabelB}</span>
+                </div>
+                <div
+                  ref={scrollRefB}
+                  className={styles.chatList}
+                  onScroll={handleScrollB}
+                >
+                  {runB.conversation.map((msg, i) => (
+                    <div
+                      key={`b-msg-${
+                        // biome-ignore lint/suspicious/noArrayIndexKey: 会話配列は順序で管理
+                        i
+                      }`}
+                      className={`${styles.bubbleWrapper} ${msg.role === "user" ? styles.bubbleWrapperUser : styles.bubbleWrapperAssistant}`}
+                    >
+                      <span className={styles.bubbleRole}>
+                        {msg.role === "user" ? "User" : "Assistant"}
+                      </span>
+                      <div
+                        className={`${styles.bubble} ${msg.role === "user" ? styles.bubbleUser : styles.bubbleAssistant}`}
+                      >
+                        {msg.content}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+          ) : (
+            <div className={styles.unifiedView}>
+              <div className={styles.unifiedHeader}>
+                <span className={styles.unifiedLabelA}>ー Run #{runA.id}</span>
+                <span className={styles.unifiedLabelB}>+ Run #{runB.id}</span>
+              </div>
+              <div className={styles.diffScroll}>
+                {diff.map((line, i) => (
+                  <div
+                    key={`diff-${line.type}-${i}`}
+                    className={`${styles.diffLine} ${
+                      line.type === "removed"
+                        ? styles.diffLineRemoved
+                        : line.type === "added"
+                          ? styles.diffLineAdded
+                          : ""
+                    }`}
+                  >
+                    <span className={styles.diffGutter}>
+                      {line.type === "removed" ? "-" : line.type === "added" ? "+" : " "}
+                    </span>
+                    <span className={styles.diffText}>{line.text || "\u00a0"}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}

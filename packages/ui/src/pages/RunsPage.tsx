@@ -1,6 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { Link, useParams } from "react-router";
+import { RunCompareView } from "../components/RunCompareView";
 import {
   type ConversationMessage,
   type PromptVersion,
@@ -380,7 +381,10 @@ function RunCard({
               {isCompareSelected ? "比較解除" : "比較"}
             </button>
           )}
-          <Link to={`/projects/${projectId}/score`} className={styles.btnScore}>
+          <Link
+            to={`/projects/${projectId}/score?runId=${run.id}`}
+            className={styles.btnScore}
+          >
             採点
           </Link>
           <button
