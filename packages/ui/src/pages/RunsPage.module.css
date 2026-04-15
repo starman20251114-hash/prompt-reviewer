@@ -86,6 +86,16 @@
   color: var(--c-muted);
 }
 
+.settingsLink {
+  color: var(--c-accent);
+  text-decoration: none;
+  margin: 0 2px;
+}
+
+.settingsLink:hover {
+  text-decoration: underline;
+}
+
 .btnStart {
   padding: 8px 20px;
   background: var(--c-accent);

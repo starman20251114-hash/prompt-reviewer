@@ -84,7 +84,7 @@ schema: [
 ### 2. Worktree作成と環境構築
 - worktrees/の下にディレクトリを作成して、Issueに対応するブランチをチェックアウトしてください。
 - 作成したディレクトリに移動してください。
-- `npx husky install`を実行してHuskyのパスを設定してください。
+- `git config core.hooksPath ../../.husky`を実行してHuskyのパスを設定してください（Husky v9では`husky install`が廃止されたため）。
 
 ### 3. 実装
 - Issue内容を確認して実装してください。use context7

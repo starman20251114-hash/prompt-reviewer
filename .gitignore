@@ -30,3 +30,6 @@ coverage/
 .claude/agents/
 .claude/agent-memory/
 .claude/settings.local.json
+
+# Local git worktrees
+worktrees/
