@@ -88,17 +88,20 @@ function diffLines(a: string, b: string): { type: "same" | "removed" | "added"; 
 }
 
 function buildFullPrompt(version: PromptVersion, testCase: TestCase): string {
+  const contextBlock = testCase.context_content
+    ? `[Context]\n${testCase.context_content}\n[/Context]`
+    : "";
   const systemPrompt = testCase.context_content
     ? version.content.includes("{{context}}")
-      ? version.content.replace("{{context}}", testCase.context_content)
-      : `${version.content}\n\n${testCase.context_content}`
+      ? version.content.replace("{{context}}", contextBlock)
+      : `${version.content}\n\n${contextBlock}`
     : version.content;
 
   const turnsText = testCase.turns
     .map((t) => `${t.role === "user" ? "User" : "Assistant"}: ${t.content}`)
     .join("\n\n");
 
-  return turnsText ? `${systemPrompt}\n\n[Conversation]\n${turnsText}` : systemPrompt;
+  return turnsText ? `${systemPrompt}\n\n[Conversation]\n${turnsText}\n[/Conversation]` : systemPrompt;
 }
 
 function CopyPromptPanel({
