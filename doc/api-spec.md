@@ -260,7 +260,7 @@ POST /projects/:projectId/test-cases
 | フィールド | 型 | 必須 | 説明 |
 |---|---|---|---|
 | `title` | string | ✅ | テストケース名 |
-| `turns` | `{role, content}[]` | ✅ | マルチターンの会話履歴 |
+| `turns` | `{role, content}[]` | | マルチターンの会話履歴（未指定時は空配列） |
 | `context_content` | string | | `{{context}}` に挿入するテキスト |
 | `expected_description` | string | | 期待する出力の自由記述 |
 | `display_order` | number | | 一覧の並び順（デフォルト: 0） |

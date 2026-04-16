@@ -193,8 +193,16 @@ describe("POST /api/projects/:projectId/test-cases", () => {
     expect(res.status).toBe(400);
   });
 
-  it("turns が空配列のとき400を返す", async () => {
-    const db = {};
+  it("turns が空配列のとき空の会話履歴として作成する", async () => {
+    const created = { ...sampleTestCase, title: "テスト", turns: JSON.stringify([]) };
+    const values = vi.fn(() => ({
+      returning: () => Promise.resolve([created]),
+    }));
+    const db = {
+      insert: () => ({
+        values,
+      }),
+    };
     const app = buildApp(db);
     const res = await app.request("/api/projects/1/test-cases", {
       method: "POST",
@@ -202,11 +210,27 @@ describe("POST /api/projects/:projectId/test-cases", () => {
       body: JSON.stringify({ title: "テスト", turns: [] }),
     });
 
-    expect(res.status).toBe(400);
+    expect(res.status).toBe(201);
+    expect(values).toHaveBeenCalledWith(
+      expect.objectContaining({
+        title: "テスト",
+        turns: "[]",
+      }),
+    );
+    const body = (await res.json()) as ParsedTestCase;
+    expect(body.turns).toEqual([]);
   });
 
-  it("turns が未指定のとき400を返す", async () => {
-    const db = {};
+  it("turns が未指定のとき空の会話履歴として作成する", async () => {
+    const created = { ...sampleTestCase, title: "テスト", turns: JSON.stringify([]) };
+    const values = vi.fn(() => ({
+      returning: () => Promise.resolve([created]),
+    }));
+    const db = {
+      insert: () => ({
+        values,
+      }),
+    };
     const app = buildApp(db);
     const res = await app.request("/api/projects/1/test-cases", {
       method: "POST",
@@ -214,7 +238,15 @@ describe("POST /api/projects/:projectId/test-cases", () => {
       body: JSON.stringify({ title: "テスト" }),
     });
 
-    expect(res.status).toBe(400);
+    expect(res.status).toBe(201);
+    expect(values).toHaveBeenCalledWith(
+      expect.objectContaining({
+        title: "テスト",
+        turns: "[]",
+      }),
+    );
+    const body = (await res.json()) as ParsedTestCase;
+    expect(body.turns).toEqual([]);
   });
 
   it("マルチターンのturnsが正しく保存・返却される", async () => {
