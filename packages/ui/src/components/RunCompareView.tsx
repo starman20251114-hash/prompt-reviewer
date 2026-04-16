@@ -15,8 +15,11 @@ export function diffLines(
   let bi = 0;
 
   while (ai < aLines.length || bi < bLines.length) {
-    if (ai < aLines.length && bi < bLines.length && aLines[ai] === bLines[bi]) {
-      result.push({ type: "same", text: aLines[ai] });
+    const currentA = aLines[ai];
+    const currentB = bLines[bi];
+
+    if (currentA !== undefined && currentB !== undefined && currentA === currentB) {
+      result.push({ type: "same", text: currentA });
       ai++;
       bi++;
     } else {
@@ -28,35 +31,44 @@ export function diffLines(
       const lookAhead = Math.min(5, maxLen);
 
       for (let d = 0; d < lookAhead; d++) {
-        if (d < bRemainder.length && aRemainder.slice(0, lookAhead).includes(bRemainder[d])) {
+        const candidateB = bRemainder[d];
+        if (candidateB !== undefined && aRemainder.slice(0, lookAhead).includes(candidateB)) {
           foundInB = d;
-          foundInA = aRemainder.indexOf(bRemainder[d]);
+          foundInA = aRemainder.indexOf(candidateB);
           break;
         }
-        if (d < aRemainder.length && bRemainder.slice(0, lookAhead).includes(aRemainder[d])) {
+
+        const candidateA = aRemainder[d];
+        if (candidateA !== undefined && bRemainder.slice(0, lookAhead).includes(candidateA)) {
           foundInA = d;
-          foundInB = bRemainder.indexOf(aRemainder[d]);
+          foundInB = bRemainder.indexOf(candidateA);
           break;
         }
       }
 
       if (foundInA > 0) {
         for (let i = 0; i < foundInA; i++) {
-          result.push({ type: "removed", text: aRemainder[i] });
+          const line = aRemainder[i];
+          if (line !== undefined) {
+            result.push({ type: "removed", text: line });
+          }
         }
         ai += foundInA;
       } else if (foundInB > 0) {
         for (let i = 0; i < foundInB; i++) {
-          result.push({ type: "added", text: bRemainder[i] });
+          const line = bRemainder[i];
+          if (line !== undefined) {
+            result.push({ type: "added", text: line });
+          }
         }
         bi += foundInB;
       } else {
-        if (ai < aLines.length) {
-          result.push({ type: "removed", text: aLines[ai] });
+        if (currentA !== undefined) {
+          result.push({ type: "removed", text: currentA });
           ai++;
         }
-        if (bi < bLines.length) {
-          result.push({ type: "added", text: bLines[bi] });
+        if (currentB !== undefined) {
+          result.push({ type: "added", text: currentB });
           bi++;
         }
       }
@@ -140,11 +152,7 @@ export function RunCompareView({ runA, runB, versionLabelA, versionLabelB, onClo
                   <span>Run #{runA.id}</span>
                   <span className={styles.panelMeta}>{versionLabelA}</span>
                 </div>
-                <div
-                  ref={scrollRefA}
-                  className={styles.chatList}
-                  onScroll={handleScrollA}
-                >
+                <div ref={scrollRefA} className={styles.chatList} onScroll={handleScrollA}>
                   {runA.conversation.map((msg, i) => (
                     <div
                       key={`a-msg-${
@@ -170,11 +178,7 @@ export function RunCompareView({ runA, runB, versionLabelA, versionLabelB, onClo
                   <span>Run #{runB.id}</span>
                   <span className={styles.panelMeta}>{versionLabelB}</span>
                 </div>
-                <div
-                  ref={scrollRefB}
-                  className={styles.chatList}
-                  onScroll={handleScrollB}
-                >
+                <div ref={scrollRefB} className={styles.chatList} onScroll={handleScrollB}>
                   {runB.conversation.map((msg, i) => (
                     <div
                       key={`b-msg-${

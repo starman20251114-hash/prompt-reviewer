@@ -17,76 +17,6 @@ import {
 } from "../lib/api";
 import styles from "./RunsPage.module.css";
 
-function diffLines(a: string, b: string): { type: "same" | "removed" | "added"; text: string }[] {
-  const aLines = a.split("\n");
-  const bLines = b.split("\n");
-  const result: { type: "same" | "removed" | "added"; text: string }[] = [];
-
-  const maxLen = Math.max(aLines.length, bLines.length);
-  let ai = 0;
-  let bi = 0;
-
-  while (ai < aLines.length || bi < bLines.length) {
-    if (ai < aLines.length && bi < bLines.length && aLines[ai] === bLines[bi]) {
-      // biome-ignore lint/style/noNonNullAssertion: bounds checked above
-      result.push({ type: "same", text: aLines[ai]! });
-      ai++;
-      bi++;
-    } else {
-      const aRemainder = aLines.slice(ai);
-      const bRemainder = bLines.slice(bi);
-
-      let foundInA = -1;
-      let foundInB = -1;
-      const lookAhead = Math.min(5, maxLen);
-
-      for (let d = 0; d < lookAhead; d++) {
-        // biome-ignore lint/style/noNonNullAssertion: d < bRemainder.length checked
-        if (d < bRemainder.length && aRemainder.slice(0, lookAhead).includes(bRemainder[d]!)) {
-          foundInB = d;
-          // biome-ignore lint/style/noNonNullAssertion: d < bRemainder.length checked
-          foundInA = aRemainder.indexOf(bRemainder[d]!);
-          break;
-        }
-        // biome-ignore lint/style/noNonNullAssertion: d < aRemainder.length checked
-        if (d < aRemainder.length && bRemainder.slice(0, lookAhead).includes(aRemainder[d]!)) {
-          foundInA = d;
-          // biome-ignore lint/style/noNonNullAssertion: d < aRemainder.length checked
-          foundInB = bRemainder.indexOf(aRemainder[d]!);
-          break;
-        }
-      }
-
-      if (foundInA > 0) {
-        for (let i = 0; i < foundInA; i++) {
-          // biome-ignore lint/style/noNonNullAssertion: i < foundInA <= aRemainder.length
-          result.push({ type: "removed", text: aRemainder[i]! });
-        }
-        ai += foundInA;
-      } else if (foundInB > 0) {
-        for (let i = 0; i < foundInB; i++) {
-          // biome-ignore lint/style/noNonNullAssertion: i < foundInB <= bRemainder.length
-          result.push({ type: "added", text: bRemainder[i]! });
-        }
-        bi += foundInB;
-      } else {
-        if (ai < aLines.length) {
-          // biome-ignore lint/style/noNonNullAssertion: bounds checked above
-          result.push({ type: "removed", text: aLines[ai]! });
-          ai++;
-        }
-        if (bi < bLines.length) {
-          // biome-ignore lint/style/noNonNullAssertion: bounds checked above
-          result.push({ type: "added", text: bLines[bi]! });
-          bi++;
-        }
-      }
-    }
-  }
-
-  return result;
-}
-
 function buildFullPrompt(version: PromptVersion, testCase: TestCase): string {
   const systemPrompt = testCase.context_content
     ? version.content.includes("{{context}}")
@@ -238,10 +168,7 @@ function RunCard({
               {isCompareSelected ? "比較解除" : "比較"}
             </button>
           )}
-          <Link
-            to={`/projects/${projectId}/score?runId=${run.id}`}
-            className={styles.btnScore}
-          >
+          <Link to={`/projects/${projectId}/score?runId=${run.id}`} className={styles.btnScore}>
             採点
           </Link>
           <button
@@ -539,10 +466,7 @@ export function RunsPage() {
               {!hasApiKey && (
                 <p className={styles.fieldHint}>
                   APIキーが未設定です。
-                  <Link
-                    to={`/projects/${projectId}/settings`}
-                    className={styles.settingsLink}
-                  >
+                  <Link to={`/projects/${projectId}/settings`} className={styles.settingsLink}>
                     設定画面
                   </Link>
                   で入力してください。
