@@ -410,6 +410,143 @@ describe("POST /api/projects/:projectId/runs/execute", () => {
     expect(capturedInsertValues[0]?.api_provider).toBe("anthropic");
   });
 
+  it("turnsが空のときプロンプトをuser messageとして送信してRunを保存する", async () => {
+    const version = {
+      id: 1,
+      project_id: 1,
+      content: "次のルールで回答してください。\n\n{{context}}",
+    };
+    const testCase = {
+      id: 1,
+      project_id: 1,
+      turns: JSON.stringify([]),
+      context_content: "入力文: 今日は晴れです。",
+    };
+    const settings = {
+      model: "claude-sonnet-4-6",
+      temperature: 0.4,
+      api_provider: "anthropic",
+    };
+    const promptMessage = "次のルールで回答してください。\n\n入力文: 今日は晴れです。";
+    const created = {
+      ...sampleRun,
+      conversation: JSON.stringify([
+        { role: "user", content: promptMessage },
+        { role: "assistant", content: "今日は晴れです。" },
+      ]),
+      model: settings.model,
+      temperature: settings.temperature,
+      api_provider: settings.api_provider,
+    };
+
+    const capturedRequests: LLMRequest[] = [];
+    const capturedInsertValues: Array<{ conversation: string }> = [];
+    let selectCallCount = 0;
+
+    const db = {
+      select: () => {
+        selectCallCount++;
+        const result =
+          selectCallCount === 1 ? [version] : selectCallCount === 2 ? [testCase] : [settings];
+        return {
+          from: () => ({
+            where: () => Promise.resolve(result),
+          }),
+        };
+      },
+      insert: () => ({
+        values: (values: { conversation: string }) => {
+          capturedInsertValues.push(values);
+          return {
+            returning: () => Promise.resolve([created]),
+          };
+        },
+      }),
+    };
+
+    const app = new Hono();
+    app.route(
+      "/api/projects/:projectId/runs",
+      createRunsRouter(db as unknown as DB, {
+        llmClientFactory: () => ({
+          async sendMessage() {
+            throw new Error("sendMessage should not be used for streaming execute");
+          },
+          async *stream(request: LLMRequest) {
+            capturedRequests.push(request);
+            yield { type: "text-delta" as const, text: "今日は晴れです。" };
+            yield {
+              type: "response" as const,
+              response: {
+                content: "今日は晴れです。",
+                stopReason: "end_turn",
+                raw: {},
+              },
+            };
+          },
+        }),
+      }),
+    );
+
+    const res = await app.request("/api/projects/1/runs/execute", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        prompt_version_id: 1,
+        test_case_id: 1,
+        api_key: "sk-ant-test",
+      }),
+    });
+
+    expect(res.status).toBe(200);
+    expect(capturedRequests).toEqual([
+      {
+        model: "claude-sonnet-4-6",
+        messages: [{ role: "user", content: promptMessage }],
+        temperature: 0.4,
+      },
+    ]);
+    expect(JSON.parse(capturedInsertValues[0]?.conversation ?? "[]")).toEqual([
+      { role: "user", content: promptMessage },
+      { role: "assistant", content: "今日は晴れです。" },
+    ]);
+  });
+
+  it("turnsもプロンプトも空のとき400を返す", async () => {
+    let selectCallCount = 0;
+    const db = {
+      select: () => {
+        selectCallCount++;
+        const result =
+          selectCallCount === 1
+            ? [{ id: 1, project_id: 1, content: "   " }]
+            : selectCallCount === 2
+              ? [{ id: 1, project_id: 1, turns: JSON.stringify([]), context_content: "" }]
+              : [{ model: "claude-sonnet-4-6", temperature: 0.7, api_provider: "anthropic" }];
+        return {
+          from: () => ({
+            where: () => Promise.resolve(result),
+          }),
+        };
+      },
+    };
+
+    const app = buildApp(db);
+    const res = await app.request("/api/projects/1/runs/execute", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        prompt_version_id: 1,
+        test_case_id: 1,
+        api_key: "sk-ant-test",
+      }),
+    });
+
+    expect(res.status).toBe(400);
+    const body = (await res.json()) as { error: string };
+    expect(body.error).toBe("Prompt or test case turns are required");
+  });
+
   it("プロジェクト設定が未作成のとき404を返す", async () => {
     let selectCallCount = 0;
     const db = {

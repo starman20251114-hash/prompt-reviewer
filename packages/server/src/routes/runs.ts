@@ -98,6 +98,40 @@ function buildSystemPrompt(version: StoredPromptVersion, testCase: StoredTestCas
   return `${version.content}\n\n${testCase.context_content}`;
 }
 
+function buildExecutionRequest(params: {
+  model: string;
+  messages: ConversationMessage[];
+  systemPrompt: string;
+  temperature: number;
+}): { request: LLMRequest; conversationBase: ConversationMessage[] } | null {
+  if (params.messages.length > 0) {
+    return {
+      request: {
+        model: params.model,
+        messages: params.messages,
+        systemPrompt: params.systemPrompt,
+        temperature: params.temperature,
+      },
+      conversationBase: params.messages,
+    };
+  }
+
+  const promptMessage = params.systemPrompt.trim();
+  if (promptMessage.length === 0) {
+    return null;
+  }
+
+  const fallbackMessages: ConversationMessage[] = [{ role: "user", content: promptMessage }];
+  return {
+    request: {
+      model: params.model,
+      messages: fallbackMessages,
+      temperature: params.temperature,
+    },
+    conversationBase: fallbackMessages,
+  };
+}
+
 function encodeSse(event: string, data: unknown): Uint8Array {
   return encoder.encode(`event: ${event}\ndata: ${JSON.stringify(data)}\n\n`);
 }
@@ -251,13 +285,16 @@ export function createRunsRouter(db: DB, options: RunsRouterOptions = {}) {
       return c.json({ error: "Provider execution is not implemented" }, 501);
     }
 
-    const messages = parseConversation(testCase.turns);
-    const request: LLMRequest = {
+    const execution = buildExecutionRequest({
       model: settings.model,
-      messages,
+      messages: parseConversation(testCase.turns),
       systemPrompt: buildSystemPrompt(version, testCase),
       temperature: settings.temperature,
-    };
+    });
+
+    if (!execution) {
+      return c.json({ error: "Prompt or test case turns are required" }, 400);
+    }
 
     return new Response(
       new ReadableStream({
@@ -265,7 +302,7 @@ export function createRunsRouter(db: DB, options: RunsRouterOptions = {}) {
           let assistantContent = "";
 
           try {
-            for await (const event of client.stream(request)) {
+            for await (const event of client.stream(execution.request)) {
               if (event.type === "text-delta") {
                 assistantContent += event.text;
                 controller.enqueue(encodeSse("delta", { text: event.text }));
@@ -273,7 +310,7 @@ export function createRunsRouter(db: DB, options: RunsRouterOptions = {}) {
             }
 
             const conversation: ConversationMessage[] = [
-              ...messages,
+              ...execution.conversationBase,
               { role: "assistant", content: assistantContent },
             ];
 
