@@ -85,6 +85,43 @@ export function getProject(id: number): Promise<Project> {
   return api.get<Project>(`/projects/${id}`);
 }
 
+export type ContextFileSummary = {
+  name: string;
+  path: string;
+  mime_type: string;
+  size: number;
+  updated_at: number;
+};
+
+export type ContextFileDetail = ContextFileSummary & {
+  content: string;
+};
+
+export function getContextFiles(projectId: number): Promise<ContextFileSummary[]> {
+  return api.get<ContextFileSummary[]>(`/projects/${projectId}/context-files`);
+}
+
+export function getContextFile(projectId: number, filePath: string): Promise<ContextFileDetail> {
+  const params = new URLSearchParams({ path: filePath });
+  return api.get<ContextFileDetail>(`/projects/${projectId}/context-files/content?${params}`);
+}
+
+export function uploadContextFile(
+  projectId: number,
+  data: { file_name: string; content: string; mime_type?: string },
+): Promise<ContextFileSummary> {
+  return api.post<ContextFileSummary>(`/projects/${projectId}/context-files`, data);
+}
+
+export function updateContextFile(
+  projectId: number,
+  filePath: string,
+  data: { content: string },
+): Promise<ContextFileDetail> {
+  const params = new URLSearchParams({ path: filePath });
+  return api.put<ContextFileDetail>(`/projects/${projectId}/context-files/content?${params}`, data);
+}
+
 export function createProject(data: {
   name: string;
   description?: string;
