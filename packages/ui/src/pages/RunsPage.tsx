@@ -15,6 +15,7 @@ import {
   getRuns,
   getTestCases,
   setBestRun,
+  setDiscardedRun,
 } from "../lib/api";
 import styles from "./RunsPage.module.css";
 
@@ -123,6 +124,8 @@ function RunCard({
   isBestPending,
   onCompare,
   isCompareSelected,
+  onSetDiscarded,
+  isDiscardPending,
 }: {
   run: Run;
   projectId: number;
@@ -133,6 +136,8 @@ function RunCard({
   isBestPending: boolean;
   onCompare?: () => void;
   isCompareSelected?: boolean;
+  onSetDiscarded: (unset: boolean) => void;
+  isDiscardPending: boolean;
 }) {
   const [expanded, setExpanded] = useState(false);
 
@@ -187,6 +192,14 @@ function RunCard({
           >
             {run.is_best ? "ベスト設定済み（解除）" : "バージョンのベストに設定"}
           </button>
+          <button
+            type="button"
+            onClick={() => onSetDiscarded(run.is_discarded)}
+            disabled={isDiscardPending}
+            className={`${styles.btnDiscard} ${run.is_discarded ? styles.btnDiscardUndo : styles.btnDiscardActive}`}
+          >
+            {run.is_discarded ? "破棄を取り消す" : "破棄"}
+          </button>
         </div>
       </div>
 
@@ -219,6 +232,7 @@ export function RunsPage() {
   // 「Run 一覧」タブのフィルター状態
   const [filterVersionId, setFilterVersionId] = useState<number | "">("");
   const [filterTestCaseId, setFilterTestCaseId] = useState<number | "">("");
+  const [includeDiscarded, setIncludeDiscarded] = useState(false);
 
   // 「Run 一覧」タブの比較状態
   const [compareRunA, setCompareRunA] = useState<Run | null>(null);
@@ -248,12 +262,17 @@ export function RunsPage() {
     queryKey: [
       "runs",
       projectId,
-      { prompt_version_id: selectedVersionId, test_case_id: selectedTestCaseId },
+      {
+        prompt_version_id: selectedVersionId,
+        test_case_id: selectedTestCaseId,
+        include_discarded: includeDiscarded,
+      },
     ],
     queryFn: () =>
       getRuns(projectId, {
         prompt_version_id: selectedVersionId !== "" ? selectedVersionId : undefined,
         test_case_id: selectedTestCaseId !== "" ? selectedTestCaseId : undefined,
+        include_discarded: includeDiscarded || undefined,
       }),
     enabled: step === "saved" && selectedVersionId !== "" && selectedTestCaseId !== "",
   });
@@ -263,12 +282,17 @@ export function RunsPage() {
     queryKey: [
       "runs",
       projectId,
-      { prompt_version_id: filterVersionId, test_case_id: filterTestCaseId },
+      {
+        prompt_version_id: filterVersionId,
+        test_case_id: filterTestCaseId,
+        include_discarded: includeDiscarded,
+      },
     ],
     queryFn: () =>
       getRuns(projectId, {
         prompt_version_id: filterVersionId !== "" ? filterVersionId : undefined,
         test_case_id: filterTestCaseId !== "" ? filterTestCaseId : undefined,
+        include_discarded: includeDiscarded || undefined,
       }),
     enabled: activeTab === "list" && !Number.isNaN(projectId),
   });
@@ -317,6 +341,14 @@ export function RunsPage() {
 
   const setBestMutation = useMutation({
     mutationFn: ({ id, unset }: { id: number; unset: boolean }) => setBestRun(projectId, id, unset),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: ["runs", projectId] });
+    },
+  });
+
+  const setDiscardMutation = useMutation({
+    mutationFn: ({ id, unset }: { id: number; unset: boolean }) =>
+      setDiscardedRun(projectId, id, unset),
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: ["runs", projectId] });
     },
@@ -680,6 +712,8 @@ export function RunsPage() {
                         testCaseLabel={getTestCaseLabel(run.test_case_id)}
                         onSetBest={(unset) => setBestMutation.mutate({ id: run.id, unset })}
                         isBestPending={setBestMutation.isPending}
+                        onSetDiscarded={(unset) => setDiscardMutation.mutate({ id: run.id, unset })}
+                        isDiscardPending={setDiscardMutation.isPending}
                       />
                     ))}
                   </div>
@@ -788,11 +822,22 @@ export function RunsPage() {
               </select>
             </div>
 
+            <label className={styles.filterCheckboxLabel}>
+              <input
+                type="checkbox"
+                checked={includeDiscarded}
+                onChange={(e) => setIncludeDiscarded(e.target.checked)}
+                className={styles.filterCheckbox}
+              />
+              破棄済みを表示
+            </label>
+
             <button
               type="button"
               onClick={() => {
                 setFilterVersionId("");
                 setFilterTestCaseId("");
+                setIncludeDiscarded(false);
               }}
               className={styles.btnClearFilter}
             >
@@ -821,6 +866,8 @@ export function RunsPage() {
                   testCaseLabel={getTestCaseLabel(run.test_case_id)}
                   onSetBest={(unset) => setBestMutation.mutate({ id: run.id, unset })}
                   isBestPending={setBestMutation.isPending}
+                  onSetDiscarded={(unset) => setDiscardMutation.mutate({ id: run.id, unset })}
+                  isDiscardPending={setDiscardMutation.isPending}
                   onCompare={() => handleCompareRun(run)}
                   isCompareSelected={compareRunA?.id === run.id || compareRunB?.id === run.id}
                 />

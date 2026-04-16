@@ -380,8 +380,7 @@ GET /projects/:projectId/runs
 |---|---|---|
 | `prompt_version_id` | number | バージョンで絞り込み |
 | `test_case_id` | number | テストケースで絞り込み |
-| `is_best` | `0`\|`1` | ベスト回答のみ |
-| `is_discarded` | `0`\|`1` | 破棄フラグで絞り込み |
+| `include_discarded` | `true`\|`false` | `true` のとき破棄済みRunも含める（デフォルトは `false`） |
 
 **レスポンス `200`**
 
@@ -400,6 +399,7 @@ GET /projects/:projectId/runs
     "temperature": 0.7,
     "api_provider": "anthropic",
     "is_best": 0,
+    "is_discarded": 0,
     "created_at": 1744281600000
   }
 ]
@@ -472,7 +472,9 @@ PATCH /projects/:projectId/runs/:id/best
 PATCH /projects/:projectId/runs/:id/discard
 ```
 
-**レスポンス `200`**: 更新後のRunオブジェクト（`is_discarded: 1`）
+`{ "unset": true }` を渡すと破棄を取り消す。
+
+**レスポンス `200`**: 更新後のRunオブジェクト
 
 ---
 

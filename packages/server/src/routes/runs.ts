@@ -81,6 +81,13 @@ function parseIntParam(value: string | undefined): number | null {
   return Number.isNaN(parsed) ? null : parsed;
 }
 
+function parseBooleanParam(value: string | undefined): boolean | null {
+  if (value === undefined) return null;
+  if (value === "true" || value === "1") return true;
+  if (value === "false" || value === "0") return false;
+  return null;
+}
+
 /** JSON 文字列を ConversationMessage[] に変換する */
 function parseConversation(json: string): ConversationMessage[] {
   return JSON.parse(json) as ConversationMessage[];
@@ -156,7 +163,7 @@ export function createRunsRouter(db: DB, options: RunsRouterOptions = {}) {
   const router = new Hono();
   const llmClientFactory = options.llmClientFactory ?? defaultLLMClientFactory;
 
-  // GET /api/projects/:projectId/runs - Run一覧取得（prompt_version_id / test_case_id でフィルタ可能）
+  // GET /api/projects/:projectId/runs - Run一覧取得（prompt_version_id / test_case_id / include_discarded でフィルタ可能）
   router.get("/", async (c) => {
     const projectId = parseIntParam(c.req.param("projectId"));
 
@@ -166,6 +173,7 @@ export function createRunsRouter(db: DB, options: RunsRouterOptions = {}) {
 
     const promptVersionIdParam = c.req.query("prompt_version_id");
     const testCaseIdParam = c.req.query("test_case_id");
+    const includeDiscardedParam = c.req.query("include_discarded");
 
     const conditions = [eq(runs.project_id, projectId)];
 
@@ -183,6 +191,18 @@ export function createRunsRouter(db: DB, options: RunsRouterOptions = {}) {
         return c.json({ error: "Invalid test_case_id" }, 400);
       }
       conditions.push(eq(runs.test_case_id, testCaseId));
+    }
+
+    if (includeDiscardedParam !== undefined) {
+      const includeDiscarded = parseBooleanParam(includeDiscardedParam);
+      if (includeDiscarded === null) {
+        return c.json({ error: "Invalid include_discarded" }, 400);
+      }
+      if (!includeDiscarded) {
+        conditions.push(eq(runs.is_discarded, false));
+      }
+    } else {
+      conditions.push(eq(runs.is_discarded, false));
     }
 
     const result = await db
@@ -216,6 +236,7 @@ export function createRunsRouter(db: DB, options: RunsRouterOptions = {}) {
         test_case_id: body.test_case_id,
         conversation: JSON.stringify(body.conversation),
         is_best: false,
+        is_discarded: false,
         model: body.model,
         temperature: body.temperature,
         api_provider: body.api_provider,
@@ -322,6 +343,7 @@ export function createRunsRouter(db: DB, options: RunsRouterOptions = {}) {
                 test_case_id: body.test_case_id,
                 conversation: JSON.stringify(conversation),
                 is_best: false,
+                is_discarded: false,
                 model: settings.model,
                 temperature: settings.temperature,
                 api_provider: settings.api_provider,
@@ -433,6 +455,42 @@ export function createRunsRouter(db: DB, options: RunsRouterOptions = {}) {
     const updateResult = await db
       .update(runs)
       .set({ is_best: true })
+      .where(and(eq(runs.id, id), eq(runs.project_id, projectId)))
+      .returning();
+
+    const updated = updateResult[0];
+    if (!updated) {
+      return c.json({ error: "Failed to update Run" }, 500);
+    }
+
+    return c.json({
+      ...updated,
+      conversation: parseConversation(updated.conversation),
+    });
+  });
+
+  // PATCH /api/projects/:projectId/runs/:id/discard - Run破棄フラグ更新
+  router.patch("/:id/discard", async (c) => {
+    const projectId = parseIntParam(c.req.param("projectId"));
+    const id = parseIntParam(c.req.param("id"));
+
+    if (projectId === null || id === null) {
+      return c.json({ error: "Invalid ID" }, 400);
+    }
+
+    const [existing] = await db
+      .select()
+      .from(runs)
+      .where(and(eq(runs.id, id), eq(runs.project_id, projectId)));
+
+    if (!existing) {
+      return c.json({ error: "Run not found" }, 404);
+    }
+
+    const body = (await c.req.json().catch(() => ({}))) as { unset?: boolean };
+    const updateResult = await db
+      .update(runs)
+      .set({ is_discarded: !body.unset })
       .where(and(eq(runs.id, id), eq(runs.project_id, projectId)))
       .returning();
 

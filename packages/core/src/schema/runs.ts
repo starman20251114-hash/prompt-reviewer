@@ -23,6 +23,7 @@ export const runs = sqliteTable("runs", {
     .references(() => test_cases.id),
   conversation: text("conversation").notNull(),
   is_best: integer("is_best", { mode: "boolean" }).notNull().default(false),
+  is_discarded: integer("is_discarded", { mode: "boolean" }).notNull().default(false),
   created_at: integer("created_at").notNull(),
   // 実行時設定スナップショット（project_settings からコピー）
   model: text("model").notNull(),

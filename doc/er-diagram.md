@@ -111,6 +111,7 @@ erDiagram
 - `conversation`: 実行時の全会話履歴（JSON）
 - `model` / `temperature` / `api_provider`: 実行時の `project_settings` をスナップショット保存。設定変更後も過去の実行条件を正確に参照できる
 - `is_best`: バージョン×ケースごとのベスト回答フラグ（0|1）
+- `is_discarded`: Run の破棄フラグ。既定の一覧では除外し、必要時のみ表示する（0|1）
 
 ### scores
 Run に対する評価スコアを管理する。1つの Run に対して複数のスコアを保持可能（再採点・LLM Judge追加を想定）。

@@ -421,6 +421,27 @@
   background: rgba(249, 226, 175, 0.25);
 }
 
+.btnDiscard {
+  padding: 6px 12px;
+  border-radius: 6px;
+  font-size: 12px;
+  white-space: nowrap;
+  flex-shrink: 0;
+  cursor: pointer;
+}
+
+.btnDiscardActive {
+  background: transparent;
+  color: var(--c-danger);
+  border: 1px solid rgba(243, 139, 168, 0.45);
+}
+
+.btnDiscardUndo {
+  background: rgba(243, 139, 168, 0.14);
+  color: var(--c-danger);
+  border: 1px solid rgba(243, 139, 168, 0.45);
+}
+
 .btnScore {
   padding: 6px 12px;
   border-radius: 6px;
@@ -511,6 +532,19 @@
   font-size: 13px;
   cursor: pointer;
   align-self: flex-end;
+}
+
+.filterCheckboxLabel {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  color: var(--c-subtext);
+  min-height: 34px;
+}
+
+.filterCheckbox {
+  margin: 0;
 }
 
 /* ==================== Run card (accordion) ==================== */

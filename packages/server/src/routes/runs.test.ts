@@ -32,6 +32,7 @@ type MockRun = {
   test_case_id: number;
   conversation: string;
   is_best: boolean;
+  is_discarded: boolean;
   created_at: number;
   model: string;
   temperature: number;
@@ -60,6 +61,7 @@ const sampleRun: MockRun = {
   test_case_id: 1,
   conversation: JSON.stringify(sampleConversation),
   is_best: false,
+  is_discarded: false,
   created_at: 1000000,
   model: "claude-sonnet-4-6",
   temperature: 0.7,
@@ -183,6 +185,17 @@ describe("GET /api/projects/:projectId/runs", () => {
     const body = (await res.json()) as { error: string };
     expect(body.error).toBe("Invalid test_case_id");
   });
+
+  it("不正なinclude_discardedに対して400を返す", async () => {
+    const db = {};
+
+    const app = buildApp(db);
+    const res = await app.request("/api/projects/1/runs?include_discarded=maybe");
+
+    expect(res.status).toBe(400);
+    const body = (await res.json()) as { error: string };
+    expect(body.error).toBe("Invalid include_discarded");
+  });
 });
 
 describe("POST /api/projects/:projectId/runs", () => {
@@ -248,6 +261,39 @@ describe("POST /api/projects/:projectId/runs", () => {
     expect(res.status).toBe(201);
     const body = (await res.json()) as MockRun;
     expect(body.is_best).toBe(false);
+  });
+
+  it("is_discardedがfalseで初期化される", async () => {
+    const created = { ...sampleRun, is_discarded: false };
+
+    const db = {
+      insert: () => ({
+        values: (values: { is_discarded: boolean }) => ({
+          returning: () => {
+            expect(values.is_discarded).toBe(false);
+            return Promise.resolve([created]);
+          },
+        }),
+      }),
+    };
+
+    const app = buildApp(db);
+    const res = await app.request("/api/projects/1/runs", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        prompt_version_id: 1,
+        test_case_id: 1,
+        conversation: sampleConversation,
+        model: "claude-sonnet-4-6",
+        temperature: 0.7,
+        api_provider: "anthropic",
+      }),
+    });
+
+    expect(res.status).toBe(201);
+    const body = (await res.json()) as MockRun;
+    expect(body.is_discarded).toBe(false);
   });
 
   it("conversationが空配列のとき400を返す", async () => {
@@ -772,5 +818,91 @@ describe("PATCH /api/projects/:projectId/runs/:id/best", () => {
     });
 
     expect(res.status).toBe(400);
+  });
+});
+
+describe("PATCH /api/projects/:projectId/runs/:id/discard", () => {
+  it("存在するIDに対して200でis_discarded=trueのRunを返す", async () => {
+    const updated = { ...sampleRun, is_discarded: true };
+
+    const db = {
+      select: () => ({
+        from: () => ({
+          where: () => Promise.resolve([sampleRun]),
+        }),
+      }),
+      update: () => ({
+        set: (values: { is_discarded: boolean }) => ({
+          where: () => ({
+            returning: () => {
+              expect(values.is_discarded).toBe(true);
+              return Promise.resolve([updated]);
+            },
+          }),
+        }),
+      }),
+    };
+
+    const app = buildApp(db);
+    const res = await app.request("/api/projects/1/runs/1/discard", {
+      method: "PATCH",
+    });
+
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as MockRun & { conversation: MockConversationMessage[] };
+    expect(body.is_discarded).toBe(true);
+  });
+
+  it("unset=true のとき破棄を取り消す", async () => {
+    const existing = { ...sampleRun, is_discarded: true };
+    const updated = { ...sampleRun, is_discarded: false };
+
+    const db = {
+      select: () => ({
+        from: () => ({
+          where: () => Promise.resolve([existing]),
+        }),
+      }),
+      update: () => ({
+        set: (values: { is_discarded: boolean }) => ({
+          where: () => ({
+            returning: () => {
+              expect(values.is_discarded).toBe(false);
+              return Promise.resolve([updated]);
+            },
+          }),
+        }),
+      }),
+    };
+
+    const app = buildApp(db);
+    const res = await app.request("/api/projects/1/runs/1/discard", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ unset: true }),
+    });
+
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as MockRun & { conversation: MockConversationMessage[] };
+    expect(body.is_discarded).toBe(false);
+  });
+
+  it("存在しないIDに対して404を返す", async () => {
+    const db = {
+      select: () => ({
+        from: () => ({
+          where: () => Promise.resolve([]),
+        }),
+      }),
+    };
+
+    const app = buildApp(db);
+    const res = await app.request("/api/projects/1/runs/999/discard", {
+      method: "PATCH",
+    });
+
+    expect(res.status).toBe(404);
+    const body = (await res.json()) as { error: string };
+    expect(body.error).toBe("Run not found");
   });
 });

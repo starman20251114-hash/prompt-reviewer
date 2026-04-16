@@ -212,6 +212,7 @@ export type Run = {
   test_case_id: number;
   conversation: ConversationMessage[];
   is_best: boolean;
+  is_discarded: boolean;
   model: string;
   temperature: number;
   api_provider: string;
@@ -220,7 +221,7 @@ export type Run = {
 
 export function getRuns(
   projectId: number,
-  filters?: { prompt_version_id?: number; test_case_id?: number },
+  filters?: { prompt_version_id?: number; test_case_id?: number; include_discarded?: boolean },
 ): Promise<Run[]> {
   const params = new URLSearchParams();
   if (filters?.prompt_version_id !== undefined) {
@@ -228,6 +229,9 @@ export function getRuns(
   }
   if (filters?.test_case_id !== undefined) {
     params.set("test_case_id", String(filters.test_case_id));
+  }
+  if (filters?.include_discarded !== undefined) {
+    params.set("include_discarded", String(filters.include_discarded));
   }
   const query = params.toString();
   const path = query ? `/projects/${projectId}/runs?${query}` : `/projects/${projectId}/runs`;
@@ -364,6 +368,10 @@ export async function executeRunStream(
 
 export function setBestRun(projectId: number, id: number, unset = false): Promise<Run> {
   return api.patch<Run>(`/projects/${projectId}/runs/${id}/best`, { unset });
+}
+
+export function setDiscardedRun(projectId: number, id: number, unset = false): Promise<Run> {
+  return api.patch<Run>(`/projects/${projectId}/runs/${id}/discard`, { unset });
 }
 
 export function setSelectedVersion(projectId: number, id: number): Promise<PromptVersion> {
