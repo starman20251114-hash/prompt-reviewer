@@ -14,6 +14,7 @@ import {
   getPromptVersions,
   getRuns,
   getTestCases,
+  discardRun,
   setBestRun,
 } from "../lib/api";
 import styles from "./RunsPage.module.css";
@@ -123,6 +124,8 @@ function RunCard({
   isBestPending,
   onCompare,
   isCompareSelected,
+  onDiscard,
+  isDiscardPending,
 }: {
   run: Run;
   projectId: number;
@@ -133,6 +136,8 @@ function RunCard({
   isBestPending: boolean;
   onCompare?: () => void;
   isCompareSelected?: boolean;
+  onDiscard: () => void;
+  isDiscardPending: boolean;
 }) {
   const [expanded, setExpanded] = useState(false);
 
@@ -186,6 +191,14 @@ function RunCard({
             className={`${styles.btnBest} ${run.is_best ? styles.btnBestActive : styles.btnBestInactive}`}
           >
             {run.is_best ? "ベスト設定済み（解除）" : "バージョンのベストに設定"}
+          </button>
+          <button
+            type="button"
+            onClick={onDiscard}
+            disabled={isDiscardPending}
+            className={`${styles.btnDiscard} ${styles.btnDiscardActive}`}
+          >
+            破棄
           </button>
         </div>
       </div>
@@ -322,6 +335,13 @@ export function RunsPage() {
     },
   });
 
+  const discardMutation = useMutation({
+    mutationFn: (id: number) => discardRun(projectId, id),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: ["runs", projectId] });
+    },
+  });
+
   const selectedVersion =
     selectedVersionId !== "" ? promptVersions.find((v) => v.id === selectedVersionId) : undefined;
   const selectedTestCase =
@@ -400,6 +420,14 @@ export function RunsPage() {
       setCompareRunA(compareRunB);
       setCompareRunB(run);
     }
+  }
+
+  function handleDiscardRun(run: Run) {
+    const confirmed = window.confirm(
+      `この操作は元に戻せません。本当に Run #${run.id} を破棄しますか？`,
+    );
+    if (!confirmed) return;
+    discardMutation.mutate(run.id);
   }
 
   const isStartDisabled = selectedVersionId === "" || selectedTestCaseId === "" || !hasApiKey;
@@ -680,6 +708,8 @@ export function RunsPage() {
                         testCaseLabel={getTestCaseLabel(run.test_case_id)}
                         onSetBest={(unset) => setBestMutation.mutate({ id: run.id, unset })}
                         isBestPending={setBestMutation.isPending}
+                        onDiscard={() => handleDiscardRun(run)}
+                        isDiscardPending={discardMutation.isPending}
                       />
                     ))}
                   </div>
@@ -821,6 +851,8 @@ export function RunsPage() {
                   testCaseLabel={getTestCaseLabel(run.test_case_id)}
                   onSetBest={(unset) => setBestMutation.mutate({ id: run.id, unset })}
                   isBestPending={setBestMutation.isPending}
+                  onDiscard={() => handleDiscardRun(run)}
+                  isDiscardPending={discardMutation.isPending}
                   onCompare={() => handleCompareRun(run)}
                   isCompareSelected={compareRunA?.id === run.id || compareRunB?.id === run.id}
                 />

@@ -166,8 +166,7 @@ export function createRunsRouter(db: DB, options: RunsRouterOptions = {}) {
 
     const promptVersionIdParam = c.req.query("prompt_version_id");
     const testCaseIdParam = c.req.query("test_case_id");
-
-    const conditions = [eq(runs.project_id, projectId)];
+    const conditions = [eq(runs.project_id, projectId), eq(runs.is_discarded, false)];
 
     if (promptVersionIdParam !== undefined) {
       const promptVersionId = parseIntParam(promptVersionIdParam);
@@ -216,6 +215,7 @@ export function createRunsRouter(db: DB, options: RunsRouterOptions = {}) {
         test_case_id: body.test_case_id,
         conversation: JSON.stringify(body.conversation),
         is_best: false,
+        is_discarded: false,
         model: body.model,
         temperature: body.temperature,
         api_provider: body.api_provider,
@@ -322,6 +322,7 @@ export function createRunsRouter(db: DB, options: RunsRouterOptions = {}) {
                 test_case_id: body.test_case_id,
                 conversation: JSON.stringify(conversation),
                 is_best: false,
+                is_discarded: false,
                 model: settings.model,
                 temperature: settings.temperature,
                 api_provider: settings.api_provider,
@@ -433,6 +434,41 @@ export function createRunsRouter(db: DB, options: RunsRouterOptions = {}) {
     const updateResult = await db
       .update(runs)
       .set({ is_best: true })
+      .where(and(eq(runs.id, id), eq(runs.project_id, projectId)))
+      .returning();
+
+    const updated = updateResult[0];
+    if (!updated) {
+      return c.json({ error: "Failed to update Run" }, 500);
+    }
+
+    return c.json({
+      ...updated,
+      conversation: parseConversation(updated.conversation),
+    });
+  });
+
+  // PATCH /api/projects/:projectId/runs/:id/discard - Run破棄
+  router.patch("/:id/discard", async (c) => {
+    const projectId = parseIntParam(c.req.param("projectId"));
+    const id = parseIntParam(c.req.param("id"));
+
+    if (projectId === null || id === null) {
+      return c.json({ error: "Invalid ID" }, 400);
+    }
+
+    const [existing] = await db
+      .select()
+      .from(runs)
+      .where(and(eq(runs.id, id), eq(runs.project_id, projectId)));
+
+    if (!existing) {
+      return c.json({ error: "Run not found" }, 404);
+    }
+
+    const updateResult = await db
+      .update(runs)
+      .set({ is_discarded: true })
       .where(and(eq(runs.id, id), eq(runs.project_id, projectId)))
       .returning();
 
