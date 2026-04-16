@@ -380,7 +380,8 @@ GET /projects/:projectId/runs
 |---|---|---|
 | `prompt_version_id` | number | バージョンで絞り込み |
 | `test_case_id` | number | テストケースで絞り込み |
-| `include_discarded` | `true`\|`false` | `true` のとき破棄済みRunも含める（デフォルトは `false`） |
+
+破棄済みRun（`is_discarded = 1`）は既定で一覧に含めない。
 
 **レスポンス `200`**
 
@@ -472,9 +473,9 @@ PATCH /projects/:projectId/runs/:id/best
 PATCH /projects/:projectId/runs/:id/discard
 ```
 
-`{ "unset": true }` を渡すと破棄を取り消す。
+対象Runの `is_discarded` を `1` に設定する。
 
-**レスポンス `200`**: 更新後のRunオブジェクト
+**レスポンス `200`**: 更新後のRunオブジェクト（`is_discarded: 1`）
 
 ---
 

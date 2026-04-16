@@ -186,16 +186,6 @@ describe("GET /api/projects/:projectId/runs", () => {
     expect(body.error).toBe("Invalid test_case_id");
   });
 
-  it("不正なinclude_discardedに対して400を返す", async () => {
-    const db = {};
-
-    const app = buildApp(db);
-    const res = await app.request("/api/projects/1/runs?include_discarded=maybe");
-
-    expect(res.status).toBe(400);
-    const body = (await res.json()) as { error: string };
-    expect(body.error).toBe("Invalid include_discarded");
-  });
 });
 
 describe("POST /api/projects/:projectId/runs", () => {
@@ -851,40 +841,6 @@ describe("PATCH /api/projects/:projectId/runs/:id/discard", () => {
     expect(res.status).toBe(200);
     const body = (await res.json()) as MockRun & { conversation: MockConversationMessage[] };
     expect(body.is_discarded).toBe(true);
-  });
-
-  it("unset=true のとき破棄を取り消す", async () => {
-    const existing = { ...sampleRun, is_discarded: true };
-    const updated = { ...sampleRun, is_discarded: false };
-
-    const db = {
-      select: () => ({
-        from: () => ({
-          where: () => Promise.resolve([existing]),
-        }),
-      }),
-      update: () => ({
-        set: (values: { is_discarded: boolean }) => ({
-          where: () => ({
-            returning: () => {
-              expect(values.is_discarded).toBe(false);
-              return Promise.resolve([updated]);
-            },
-          }),
-        }),
-      }),
-    };
-
-    const app = buildApp(db);
-    const res = await app.request("/api/projects/1/runs/1/discard", {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ unset: true }),
-    });
-
-    expect(res.status).toBe(200);
-    const body = (await res.json()) as MockRun & { conversation: MockConversationMessage[] };
-    expect(body.is_discarded).toBe(false);
   });
 
   it("存在しないIDに対して404を返す", async () => {

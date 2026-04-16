@@ -221,7 +221,7 @@ export type Run = {
 
 export function getRuns(
   projectId: number,
-  filters?: { prompt_version_id?: number; test_case_id?: number; include_discarded?: boolean },
+  filters?: { prompt_version_id?: number; test_case_id?: number },
 ): Promise<Run[]> {
   const params = new URLSearchParams();
   if (filters?.prompt_version_id !== undefined) {
@@ -229,9 +229,6 @@ export function getRuns(
   }
   if (filters?.test_case_id !== undefined) {
     params.set("test_case_id", String(filters.test_case_id));
-  }
-  if (filters?.include_discarded !== undefined) {
-    params.set("include_discarded", String(filters.include_discarded));
   }
   const query = params.toString();
   const path = query ? `/projects/${projectId}/runs?${query}` : `/projects/${projectId}/runs`;
@@ -370,8 +367,8 @@ export function setBestRun(projectId: number, id: number, unset = false): Promis
   return api.patch<Run>(`/projects/${projectId}/runs/${id}/best`, { unset });
 }
 
-export function setDiscardedRun(projectId: number, id: number, unset = false): Promise<Run> {
-  return api.patch<Run>(`/projects/${projectId}/runs/${id}/discard`, { unset });
+export function discardRun(projectId: number, id: number): Promise<Run> {
+  return api.patch<Run>(`/projects/${projectId}/runs/${id}/discard`, {});
 }
 
 export function setSelectedVersion(projectId: number, id: number): Promise<PromptVersion> {
