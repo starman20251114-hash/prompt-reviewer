@@ -1,6 +1,7 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Route, Routes } from "react-router";
 import { Layout } from "./components/Layout";
+import { ContextFilesPage } from "./pages/ContextFilesPage";
 import { HealthPage } from "./pages/HealthPage";
 import { NotFoundPage } from "./pages/NotFoundPage";
 import { ProjectDetailPage } from "./pages/ProjectDetailPage";
@@ -31,6 +32,7 @@ export function App() {
             <Route index element={<ProjectsPage />} />
             {/* プロジェクト詳細 */}
             <Route path="projects/:id" element={<ProjectDetailPage />} />
+            <Route path="projects/:id/context-files" element={<ContextFilesPage />} />
             <Route path="projects/:id/test-cases" element={<TestCasesPage />} />
             <Route path="projects/:id/prompts" element={<PromptsPage />} />
             <Route path="projects/:id/runs" element={<RunsPage />} />

@@ -6,7 +6,11 @@ export function ProjectDetailPage() {
   const { id } = useParams<{ id: string }>();
   const projectId = Number(id);
 
-  const { data: project, isLoading, isError } = useQuery({
+  const {
+    data: project,
+    isLoading,
+    isError,
+  } = useQuery({
     queryKey: ["project", projectId],
     queryFn: () => getProject(projectId),
     enabled: !Number.isNaN(projectId),
@@ -32,6 +36,7 @@ export function ProjectDetailPage() {
         }}
       >
         {[
+          { to: "context-files", label: "コンテキスト管理" },
           { to: "test-cases", label: "テストケース管理" },
           { to: "prompts", label: "プロンプト管理" },
           { to: "runs", label: "Run 実行・管理" },
