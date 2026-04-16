@@ -5,6 +5,7 @@ import { json } from "@codemirror/lang-json";
 import { markdown } from "@codemirror/lang-markdown";
 import { python } from "@codemirror/lang-python";
 import { sql } from "@codemirror/lang-sql";
+import { EditorView } from "@codemirror/view";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import CodeMirror from "@uiw/react-codemirror";
 import { useEffect, useRef, useState } from "react";
@@ -37,6 +38,7 @@ function formatBytes(size: number): string {
 
 function getLanguageExtensions(filePath: string) {
   const lowerPath = filePath.toLowerCase();
+  const baseExtensions = [EditorView.lineWrapping];
   if (
     lowerPath.endsWith(".ts") ||
     lowerPath.endsWith(".tsx") ||
@@ -44,19 +46,20 @@ function getLanguageExtensions(filePath: string) {
     lowerPath.endsWith(".jsx")
   ) {
     return [
+      ...baseExtensions,
       javascript({
         jsx: lowerPath.endsWith("x"),
         typescript: lowerPath.endsWith(".ts") || lowerPath.endsWith(".tsx"),
       }),
     ];
   }
-  if (lowerPath.endsWith(".json")) return [json()];
-  if (lowerPath.endsWith(".md")) return [markdown()];
-  if (lowerPath.endsWith(".py")) return [python()];
-  if (lowerPath.endsWith(".sql")) return [sql()];
-  if (lowerPath.endsWith(".css")) return [css()];
-  if (lowerPath.endsWith(".html")) return [html()];
-  return [];
+  if (lowerPath.endsWith(".json")) return [...baseExtensions, json()];
+  if (lowerPath.endsWith(".md")) return [...baseExtensions, markdown()];
+  if (lowerPath.endsWith(".py")) return [...baseExtensions, python()];
+  if (lowerPath.endsWith(".sql")) return [...baseExtensions, sql()];
+  if (lowerPath.endsWith(".css")) return [...baseExtensions, css()];
+  if (lowerPath.endsWith(".html")) return [...baseExtensions, html()];
+  return baseExtensions;
 }
 
 export function ContextFilesPage() {
@@ -268,7 +271,7 @@ export function ContextFilesPage() {
             <div className={styles.editorArea}>
               <CodeMirror
                 value={draftContent}
-                height="100%"
+                height="70vh"
                 theme="dark"
                 extensions={getLanguageExtensions(selectedDetail.path)}
                 onChange={(value) => setDraftContent(value)}

@@ -176,6 +176,7 @@
 .editorArea {
   flex: 1;
   min-height: 0;
+  overflow: hidden;
 }
 
 :global(.cm-editor) {
@@ -185,6 +186,7 @@
 
 :global(.cm-scroller) {
   font-family: Consolas, "SFMono-Regular", Monaco, monospace;
+  overflow: auto;
 }
 
 @media (max-width: 900px) {
@@ -194,5 +196,9 @@
 
   .sidebar {
     max-height: 280px;
+  }
+
+  .editorArea {
+    min-height: 55vh;
   }
 }
