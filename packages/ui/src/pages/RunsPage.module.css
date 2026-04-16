@@ -264,6 +264,10 @@
   flex-direction: column;
 }
 
+.inputActionsTop {
+  margin-bottom: 12px;
+}
+
 .btnSave {
   padding: 10px 20px;
   background: var(--c-green);

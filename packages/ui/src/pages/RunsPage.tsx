@@ -386,6 +386,10 @@ export function RunsPage() {
   }
 
   function handleNewRun() {
+    if (savedRun) {
+      setSelectedVersionId(savedRun.prompt_version_id);
+      setSelectedTestCaseId(savedRun.test_case_id);
+    }
     setSavedRun(null);
     setLlmResponse("");
     setExecuteError(null);
@@ -474,7 +478,7 @@ export function RunsPage() {
           {/* Step 1: 選択フォーム */}
           {step === "select" && (
             <div className={styles.selectCard}>
-              <h3 className={styles.selectCardTitle}>Run を開始する</h3>
+              <h3 className={styles.selectCardTitle}>Run を取得する</h3>
 
               <div className={styles.fieldGroup}>
                 <label htmlFor="select-version" className={styles.fieldLabel}>
@@ -536,7 +540,7 @@ export function RunsPage() {
                 title={!hasApiKey ? "APIキーが未設定です（設定画面で入力してください）" : undefined}
                 className={`${styles.btnStart} ${isStartDisabled ? styles.btnStartDisabled : ""}`}
               >
-                Run を開始
+                Run の取得
               </button>
               {!hasApiKey && (
                 <p className={styles.fieldHint}>
@@ -613,6 +617,17 @@ export function RunsPage() {
                     実行すると応答をストリーミング表示し、完了後に Run として保存します。
                   </p>
 
+                  <div className={styles.inputActionsTop}>
+                    <button
+                      type="button"
+                      onClick={handleExecuteRun}
+                      disabled={isExecuteDisabled}
+                      className={`${styles.btnLlmRun} ${isExecuteDisabled ? styles.btnLlmRunDisabled : ""}`}
+                    >
+                      {executeRunMutation.isPending ? "実行中..." : "実行"}
+                    </button>
+                  </div>
+
                   <textarea
                     value={llmResponse}
                     onChange={(e) => setLlmResponse(e.target.value)}
@@ -622,15 +637,6 @@ export function RunsPage() {
                   />
 
                   <div className={styles.inputActions}>
-                    <button
-                      type="button"
-                      onClick={handleExecuteRun}
-                      disabled={isExecuteDisabled}
-                      className={`${styles.btnLlmRun} ${isExecuteDisabled ? styles.btnLlmRunDisabled : ""}`}
-                    >
-                      {executeRunMutation.isPending ? "実行中..." : "実行"}
-                    </button>
-
                     <button
                       type="button"
                       onClick={handleSaveRun}
