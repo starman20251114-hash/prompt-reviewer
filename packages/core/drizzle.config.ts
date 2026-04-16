@@ -1,4 +1,17 @@
+import path from "node:path";
+import { pathToFileURL } from "node:url";
 import { defineConfig } from "drizzle-kit";
+
+function resolveDrizzleDbUrl(): string {
+  const configuredPath = process.env.DB_PATH ?? "../../dev.db";
+
+  if (/^(file:|libsql:|https?:|wss?:)/.test(configuredPath)) {
+    return configuredPath;
+  }
+
+  const absolutePath = path.resolve(process.cwd(), configuredPath);
+  return pathToFileURL(absolutePath).href;
+}
 
 export default defineConfig({
   dialect: "sqlite",
@@ -11,6 +24,6 @@ export default defineConfig({
   ],
   out: "./drizzle",
   dbCredentials: {
-    url: process.env.DB_PATH ?? "../../dev.db",
+    url: resolveDrizzleDbUrl(),
   },
 });

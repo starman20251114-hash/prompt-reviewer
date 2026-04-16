@@ -2,6 +2,8 @@ import { serve } from "@hono/node-server";
 import { db } from "@prompt-reviewer/core";
 import { Hono } from "hono";
 import { cors } from "hono/cors";
+import { readFile } from "node:fs/promises";
+import path from "node:path";
 import { createProjectSettingsRouter } from "./routes/project-settings.js";
 import { createProjectsRouter } from "./routes/projects.js";
 import { createPromptVersionsRouter } from "./routes/prompt-versions.js";
@@ -11,6 +13,42 @@ import { createScoresRouter, createVersionSummaryRouter } from "./routes/scores.
 import { createTestCasesRouter } from "./routes/test-cases.js";
 
 const app = new Hono();
+const uiDistDir = process.env.UI_DIST_DIR ? path.resolve(process.cwd(), process.env.UI_DIST_DIR) : null;
+
+const contentTypes: Record<string, string> = {
+  ".css": "text/css; charset=utf-8",
+  ".html": "text/html; charset=utf-8",
+  ".js": "text/javascript; charset=utf-8",
+  ".json": "application/json; charset=utf-8",
+  ".png": "image/png",
+  ".svg": "image/svg+xml",
+  ".woff": "font/woff",
+  ".woff2": "font/woff2",
+};
+
+function resolveUiFilePath(requestPath: string): string | null {
+  if (!uiDistDir) return null;
+
+  const safePath = requestPath === "/" ? "index.html" : requestPath.replace(/^\/+/, "");
+  const resolvedPath = path.resolve(uiDistDir, safePath);
+  const relativePath = path.relative(uiDistDir, resolvedPath);
+
+  if (relativePath.startsWith("..") || path.isAbsolute(relativePath)) {
+    return null;
+  }
+
+  return resolvedPath;
+}
+
+async function readUiFile(filePath: string | null): Promise<Uint8Array | null> {
+  if (!filePath) return null;
+
+  try {
+    return await readFile(filePath);
+  } catch {
+    return null;
+  }
+}
 
 app.use(
   "/*",
@@ -33,6 +71,42 @@ app.route("/api/projects/:projectId/runs", createRunsRouter(db));
 app.route("/api/runs", createScoresRouter(db));
 app.route("/api/projects/:projectId/score-progression", createScoreProgressionRouter(db));
 app.route("/api/projects/:projectId/settings", createProjectSettingsRouter(db));
+app.get("*", async (c) => {
+  if (!uiDistDir) {
+    return c.notFound();
+  }
+
+  const requestPath = c.req.path;
+  if (requestPath.startsWith("/api/")) {
+    return c.notFound();
+  }
+
+  const assetFilePath = resolveUiFilePath(requestPath);
+  const asset = await readUiFile(assetFilePath);
+  if (asset && assetFilePath) {
+    return new Response(asset, {
+      headers: {
+        "Content-Type": contentTypes[path.extname(assetFilePath)] ?? "application/octet-stream",
+      },
+    });
+  }
+
+  if (path.extname(requestPath)) {
+    return c.notFound();
+  }
+
+  const indexFilePath = resolveUiFilePath("/index.html");
+  const indexHtml = await readUiFile(indexFilePath);
+  if (!indexHtml) {
+    return c.notFound();
+  }
+
+  return new Response(indexHtml, {
+    headers: {
+      "Content-Type": "text/html; charset=utf-8",
+    },
+  });
+});
 
 const port = Number(process.env.PORT ?? 3001);
 
