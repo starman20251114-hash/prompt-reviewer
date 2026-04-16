@@ -1,6 +1,11 @@
 import { zValidator } from "@hono/zod-validator";
 import type { DB } from "@prompt-reviewer/core";
-import { project_settings } from "@prompt-reviewer/core";
+import {
+  AnthropicLLMClient,
+  LLMAuthenticationError,
+  LLMConfigurationError,
+  project_settings,
+} from "@prompt-reviewer/core";
 import { eq } from "drizzle-orm";
 import { Hono } from "hono";
 import { z } from "zod";
@@ -16,7 +21,31 @@ const upsertSettingsSchema = z.object({
   }),
 });
 
+const listModelsSchema = z.object({
+  api_provider: z.enum(["anthropic", "openai"], {
+    error: 'api_providerは "anthropic" または "openai" である必要があります',
+  }),
+  api_key: z.string().min(1, "api_keyは1文字以上必要です"),
+});
+
 type UpsertBody = z.infer<typeof upsertSettingsSchema>;
+type ListModelsBody = z.infer<typeof listModelsSchema>;
+
+type ModelListClient = {
+  listModels(): Promise<unknown[]>;
+};
+
+type ProjectSettingsRouterOptions = {
+  modelClientFactory?: (body: ListModelsBody) => ModelListClient | null;
+};
+
+function defaultModelClientFactory(body: ListModelsBody): ModelListClient | null {
+  if (body.api_provider === "anthropic") {
+    return new AnthropicLLMClient({ apiKey: body.api_key });
+  }
+
+  return null;
+}
 
 /** 文字列または undefined を整数に変換する。無効・undefined の場合は null を返す */
 function parseIntParam(value: string | undefined): number | null {
@@ -62,8 +91,9 @@ async function createSettings(db: DB, projectId: number, body: UpsertBody, now: 
  * GET /api/projects/:projectId/settings  - 設定取得（存在しなければ404）
  * PUT /api/projects/:projectId/settings  - 設定のupsert（存在しなければ作成、あれば更新）
  */
-export function createProjectSettingsRouter(db: DB) {
+export function createProjectSettingsRouter(db: DB, options: ProjectSettingsRouterOptions = {}) {
   const router = new Hono();
+  const modelClientFactory = options.modelClientFactory ?? defaultModelClientFactory;
 
   // GET /api/projects/:projectId/settings - 設定取得
   router.get("/", async (c) => {
@@ -111,6 +141,30 @@ export function createProjectSettingsRouter(db: DB) {
     const created = await createSettings(db, projectId, body, now);
     if (!created) return c.json({ error: "Failed to create Settings" }, 500);
     return c.json(created, 201);
+  });
+
+  router.post("/models", zValidator("json", listModelsSchema), async (c) => {
+    const body = c.req.valid("json");
+    const client = modelClientFactory(body);
+
+    if (!client) {
+      return c.json({ error: "Provider model listing is not implemented" }, 501);
+    }
+
+    try {
+      const models = await client.listModels();
+      return c.json({ models });
+    } catch (error) {
+      if (error instanceof LLMConfigurationError) {
+        return c.json({ error: error.message }, 400);
+      }
+
+      if (error instanceof LLMAuthenticationError) {
+        return c.json({ error: error.message }, 401);
+      }
+
+      return c.json({ error: "Failed to fetch models" }, 502);
+    }
   });
 
   return router;
