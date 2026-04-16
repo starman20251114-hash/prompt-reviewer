@@ -662,6 +662,10 @@
   flex-wrap: wrap;
 }
 
+.compareBarBottom {
+  margin-top: 12px;
+}
+
 .compareBarLabel {
   color: var(--c-muted);
 }

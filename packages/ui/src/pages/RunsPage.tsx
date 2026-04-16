@@ -212,6 +212,60 @@ function RunCard({
   );
 }
 
+function RunCompareBar({
+  compareRunA,
+  compareRunB,
+  getVersionLabel,
+  onOpenCompare,
+  onClearFirst,
+  onClearAll,
+  className,
+}: {
+  compareRunA: Run | null;
+  compareRunB: Run | null;
+  getVersionLabel: (versionId: number) => string;
+  onOpenCompare: () => void;
+  onClearFirst: () => void;
+  onClearAll: () => void;
+  className?: string;
+}) {
+  if (!compareRunA && !compareRunB) {
+    return null;
+  }
+
+  return (
+    <div className={`${styles.compareBar} ${className ?? ""}`.trim()}>
+      <span className={styles.compareBarLabel}>比較:</span>
+      {compareRunA && (
+        <span className={styles.compareBarSelected}>
+          Run #{compareRunA.id} ({getVersionLabel(compareRunA.prompt_version_id)})
+        </span>
+      )}
+      {compareRunB ? (
+        <>
+          <span className={styles.compareBarVs}>vs</span>
+          <span className={styles.compareBarComparing}>
+            Run #{compareRunB.id} ({getVersionLabel(compareRunB.prompt_version_id)})
+          </span>
+          <button type="button" onClick={onOpenCompare} className={styles.btnOpenCompare}>
+            比較を表示
+          </button>
+          <button type="button" onClick={onClearAll} className={styles.btnClearCompare}>
+            クリア
+          </button>
+        </>
+      ) : (
+        <>
+          <span className={styles.compareBarHint}>もう1つ「比較」をクリックしてください</span>
+          <button type="button" onClick={onClearFirst} className={styles.btnClearCompare}>
+            クリア
+          </button>
+        </>
+      )}
+    </div>
+  );
+}
+
 export function RunsPage() {
   const { id } = useParams<{ id: string }>();
   const projectId = Number(id);
@@ -723,55 +777,17 @@ export function RunsPage() {
       {/* ============ タブ: Run 一覧 ============ */}
       {activeTab === "list" && (
         <div>
-          {/* 比較バー */}
-          {(compareRunA || compareRunB) && (
-            <div className={styles.compareBar}>
-              <span className={styles.compareBarLabel}>比較:</span>
-              {compareRunA && (
-                <span className={styles.compareBarSelected}>
-                  Run #{compareRunA.id} ({getVersionLabel(compareRunA.prompt_version_id)})
-                </span>
-              )}
-              {compareRunB ? (
-                <>
-                  <span className={styles.compareBarVs}>vs</span>
-                  <span className={styles.compareBarComparing}>
-                    Run #{compareRunB.id} ({getVersionLabel(compareRunB.prompt_version_id)})
-                  </span>
-                  <button
-                    type="button"
-                    onClick={() => setIsCompareOpen(true)}
-                    className={styles.btnOpenCompare}
-                  >
-                    比較を表示
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setCompareRunA(null);
-                      setCompareRunB(null);
-                    }}
-                    className={styles.btnClearCompare}
-                  >
-                    クリア
-                  </button>
-                </>
-              ) : (
-                <>
-                  <span className={styles.compareBarHint}>
-                    もう1つ「比較」をクリックしてください
-                  </span>
-                  <button
-                    type="button"
-                    onClick={() => setCompareRunA(null)}
-                    className={styles.btnClearCompare}
-                  >
-                    クリア
-                  </button>
-                </>
-              )}
-            </div>
-          )}
+          <RunCompareBar
+            compareRunA={compareRunA}
+            compareRunB={compareRunB}
+            getVersionLabel={getVersionLabel}
+            onOpenCompare={() => setIsCompareOpen(true)}
+            onClearFirst={() => setCompareRunA(null)}
+            onClearAll={() => {
+              setCompareRunA(null);
+              setCompareRunB(null);
+            }}
+          />
 
           {/* フィルターバー */}
           <div className={styles.filterBar}>
@@ -859,6 +875,19 @@ export function RunsPage() {
               ))}
             </div>
           )}
+
+          <RunCompareBar
+            compareRunA={compareRunA}
+            compareRunB={compareRunB}
+            getVersionLabel={getVersionLabel}
+            onOpenCompare={() => setIsCompareOpen(true)}
+            onClearFirst={() => setCompareRunA(null)}
+            onClearAll={() => {
+              setCompareRunA(null);
+              setCompareRunB(null);
+            }}
+            className={styles.compareBarBottom}
+          />
         </div>
       )}
 
