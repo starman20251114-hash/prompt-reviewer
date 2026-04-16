@@ -175,18 +175,34 @@
 
 .editorArea {
   flex: 1;
+  display: flex;
   min-height: 0;
   overflow: hidden;
 }
 
+:global(.cm-theme) {
+  flex: 1;
+  min-height: 0;
+}
+
 :global(.cm-editor) {
+  flex: 1;
   height: 100%;
+  min-height: 0;
   font-size: 13px;
+  overflow: hidden;
 }
 
 :global(.cm-scroller) {
   font-family: Consolas, "SFMono-Regular", Monaco, monospace;
-  overflow: auto;
+  height: 100%;
+  overflow: auto !important;
+  scrollbar-gutter: stable;
+}
+
+:global(.cm-content),
+:global(.cm-gutter) {
+  min-height: 100%;
 }
 
 @media (max-width: 900px) {

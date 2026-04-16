@@ -243,17 +243,6 @@ function TestCaseModal({ projectId, testCase, onClose, onSubmit, isLoading }: Te
           </div>
 
           <div className={styles.fieldGroup}>
-            <p className={styles.fieldLabel}>会話ターン（任意）</p>
-            <p className={styles.modeHint}>
-              会話として固定したい内容はターンで入力します。実行時の補足情報は下のコンテキスト欄に入力します。
-            </p>
-            <TurnEditor
-              turns={formData.turns}
-              onChange={(turns) => setFormData((prev) => ({ ...prev, turns }))}
-            />
-          </div>
-
-          <div className={styles.fieldGroup}>
             <label htmlFor="test-case-context" className={styles.fieldLabel}>
               コンテキスト（任意）
             </label>
@@ -310,6 +299,17 @@ function TestCaseModal({ projectId, testCase, onClose, onSubmit, isLoading }: Te
               placeholder="参照テキストや前提条件を入力..."
               rows={6}
               className={styles.fieldTextareaContext}
+            />
+          </div>
+
+          <div className={styles.fieldGroup}>
+            <p className={styles.fieldLabel}>会話ターン（任意）</p>
+            <p className={styles.modeHint}>
+              実行時の補足情報は上のコンテキスト欄に入力し、会話として固定したい内容はターンで入力します。
+            </p>
+            <TurnEditor
+              turns={formData.turns}
+              onChange={(turns) => setFormData((prev) => ({ ...prev, turns }))}
             />
           </div>
 

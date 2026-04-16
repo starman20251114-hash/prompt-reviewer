@@ -687,6 +687,7 @@ export function RunsPage() {
                     >
                       {executeRunMutation.isPending ? "実行中..." : "実行"}
                     </button>
+                    {executeError && <p className={styles.errorMsgTop}>{executeError}</p>}
                   </div>
 
                   <textarea
@@ -707,8 +708,6 @@ export function RunsPage() {
                       {createRunMutation.isPending ? "保存中..." : "Run を保存"}
                     </button>
                   </div>
-
-                  {executeError && <p className={styles.errorMsg}>{executeError}</p>}
                   {createRunMutation.isError && (
                     <p className={styles.errorMsg}>保存に失敗しました。もう一度お試しください。</p>
                   )}
