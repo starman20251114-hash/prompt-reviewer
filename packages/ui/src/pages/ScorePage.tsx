@@ -124,13 +124,7 @@ function ScoreInput({
   if (mode === "numeric") {
     return <NumericScore value={value} onChange={onChange} disabled={disabled} />;
   }
-  return (
-    <StarRating
-      value={value}
-      onChange={(v) => onChange(v)}
-      disabled={disabled}
-    />
-  );
+  return <StarRating value={value} onChange={(v) => onChange(v)} disabled={disabled} />;
 }
 
 // --------------- StatusBadge ---------------
@@ -234,10 +228,7 @@ function IndividualRunRow({
   const isDiscarded = score?.is_discarded ?? false;
 
   return (
-    <div
-      ref={cardRef}
-      className={`${styles.runCard} ${autoFocus ? styles.runCardFocused : ""}`}
-    >
+    <div ref={cardRef} className={`${styles.runCard} ${autoFocus ? styles.runCardFocused : ""}`}>
       <button
         type="button"
         className={styles.runCardHeader}
@@ -439,7 +430,10 @@ export function ScorePage() {
   function toggleCompare(runId: number) {
     setCompareIds((prev) => {
       if (prev.includes(runId)) return prev.filter((id) => id !== runId);
-      if (prev.length >= 2) return [prev[1], runId];
+      if (prev.length >= 2) {
+        const previousSecond = prev[1];
+        return previousSecond === undefined ? [runId] : [previousSecond, runId];
+      }
       return [...prev, runId];
     });
   }
