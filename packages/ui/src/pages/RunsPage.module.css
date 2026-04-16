@@ -160,6 +160,10 @@
   display: flex;
   flex-direction: column;
   gap: 10px;
+  max-height: min(60vh, 720px);
+  overflow-y: auto;
+  scrollbar-gutter: stable;
+  padding-right: 4px;
 }
 
 .bubbleWrapper {
@@ -185,6 +189,9 @@
 
 .bubble {
   max-width: 85%;
+  max-height: min(32vh, 360px);
+  overflow: auto;
+  scrollbar-gutter: stable;
   padding: 10px 14px;
   font-size: 14px;
   line-height: 1.5;
