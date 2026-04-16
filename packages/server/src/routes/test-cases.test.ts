@@ -279,6 +279,45 @@ describe("POST /api/projects/:projectId/test-cases", () => {
     expect(body.turns).toEqual(multiTurns);
   });
 
+  it("turns と context_content を同時に持つテストケースを作成できる", async () => {
+    const created = {
+      ...sampleTestCase,
+      turns: JSON.stringify(sampleTurns),
+      context_content: "補足コンテキスト",
+    };
+    const values = vi.fn(() => ({
+      returning: () => Promise.resolve([created]),
+    }));
+    const db = {
+      insert: () => ({
+        values,
+      }),
+    };
+
+    const app = buildApp(db);
+    const res = await app.request("/api/projects/1/test-cases", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        title: "併存ケース",
+        turns: sampleTurns,
+        context_content: "補足コンテキスト",
+      }),
+    });
+
+    expect(res.status).toBe(201);
+    expect(values).toHaveBeenCalledWith(
+      expect.objectContaining({
+        title: "併存ケース",
+        turns: JSON.stringify(sampleTurns),
+        context_content: "補足コンテキスト",
+      }),
+    );
+    const body = (await res.json()) as ParsedTestCase;
+    expect(body.turns).toEqual(sampleTurns);
+    expect(body.context_content).toBe("補足コンテキスト");
+  });
+
   it("display_order を指定した場合に正しく反映される", async () => {
     const created = { ...sampleTestCase, display_order: 5 };
 
@@ -425,6 +464,53 @@ describe("PATCH /api/projects/:projectId/test-cases/:id", () => {
     expect(res.status).toBe(200);
     const body = (await res.json()) as ParsedTestCase;
     expect(body.turns).toEqual(newTurns);
+  });
+
+  it("turns と context_content を同時に更新できる", async () => {
+    const newTurns: Turn[] = [{ role: "assistant", content: "補足を踏まえた回答" }];
+    const updated = {
+      ...sampleTestCase,
+      turns: JSON.stringify(newTurns),
+      context_content: "更新後コンテキスト",
+      updated_at: 2000000,
+    };
+    const set = vi.fn(() => ({
+      where: () => ({
+        returning: () => Promise.resolve([updated]),
+      }),
+    }));
+
+    const db = {
+      select: () => ({
+        from: () => ({
+          where: () => Promise.resolve([sampleTestCase]),
+        }),
+      }),
+      update: () => ({
+        set,
+      }),
+    };
+
+    const app = buildApp(db);
+    const res = await app.request("/api/projects/1/test-cases/1", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        turns: newTurns,
+        context_content: "更新後コンテキスト",
+      }),
+    });
+
+    expect(res.status).toBe(200);
+    expect(set).toHaveBeenCalledWith(
+      expect.objectContaining({
+        turns: JSON.stringify(newTurns),
+        context_content: "更新後コンテキスト",
+      }),
+    );
+    const body = (await res.json()) as ParsedTestCase;
+    expect(body.turns).toEqual(newTurns);
+    expect(body.context_content).toBe("更新後コンテキスト");
   });
 
   it("存在しないIDに対して404を返す", async () => {

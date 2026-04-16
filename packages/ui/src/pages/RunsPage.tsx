@@ -655,6 +655,13 @@ export function RunsPage() {
                     ))}
                   </div>
 
+                  {selectedTestCase.context_content && (
+                    <div className={styles.expectedBox}>
+                      <p className={styles.expectedLabel}>コンテキスト</p>
+                      <p className={styles.expectedText}>{selectedTestCase.context_content}</p>
+                    </div>
+                  )}
+
                   {/* 期待される説明 */}
                   {selectedTestCase.expected_description && (
                     <div className={styles.expectedBox}>

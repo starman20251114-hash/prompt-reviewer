@@ -125,12 +125,8 @@ function TurnEditor({ turns, onChange }: TurnEditorProps) {
   );
 }
 
-// テストケースフォームの状態型
-type InputMode = "turns" | "context";
-
 type TestCaseFormData = {
   title: string;
-  inputMode: InputMode;
   turns: Turn[];
   context_content: string;
   expected_description: string;
@@ -138,10 +134,8 @@ type TestCaseFormData = {
 
 function getInitialFormData(testCase?: TestCase): TestCaseFormData {
   if (testCase) {
-    const inputMode: InputMode = testCase.turns.length === 0 ? "context" : "turns";
     return {
       title: testCase.title,
-      inputMode,
       turns: testCase.turns,
       context_content: testCase.context_content ?? "",
       expected_description: testCase.expected_description ?? "",
@@ -149,7 +143,6 @@ function getInitialFormData(testCase?: TestCase): TestCaseFormData {
   }
   return {
     title: "",
-    inputMode: "turns",
     turns: [createEmptyTurn()],
     context_content: "",
     expected_description: "",
@@ -174,12 +167,13 @@ function TestCaseModal({ testCase, onClose, onSubmit, isLoading }: TestCaseModal
     e.preventDefault();
     const trimmedTitle = formData.title.trim();
     if (!trimmedTitle) return;
-    if (formData.inputMode === "turns") {
-      const validTurns = formData.turns.filter((t) => t.content.trim());
-      onSubmit({ ...formData, title: trimmedTitle, turns: validTurns, context_content: "" });
-    } else {
-      onSubmit({ ...formData, title: trimmedTitle, turns: [] });
-    }
+    const validTurns = formData.turns.filter((t) => t.content.trim());
+    onSubmit({
+      ...formData,
+      title: trimmedTitle,
+      turns: validTurns,
+      context_content: formData.context_content.trim(),
+    });
   }
 
   const isSubmittable = formData.title.trim() !== "";
@@ -215,58 +209,32 @@ function TestCaseModal({ testCase, onClose, onSubmit, isLoading }: TestCaseModal
             />
           </div>
 
-          {/* 入力モード切替 */}
           <div className={styles.fieldGroup}>
-            <p className={styles.modeLabel}>入力モード</p>
-            <div className={styles.modeToggle}>
-              <button
-                type="button"
-                onClick={() => setFormData((prev) => ({ ...prev, inputMode: "turns" }))}
-                className={`${styles.btnModeBase} ${formData.inputMode === "turns" ? styles.btnModeActive : styles.btnModeInactive}`}
-              >
-                ターン形式
-              </button>
-              <button
-                type="button"
-                onClick={() => setFormData((prev) => ({ ...prev, inputMode: "context" }))}
-                className={`${styles.btnModeBase} ${styles.btnModeRight} ${formData.inputMode === "context" ? styles.btnModeActive : styles.btnModeInactive}`}
-              >
-                テキスト形式
-              </button>
-            </div>
+            <p className={styles.fieldLabel}>会話ターン（任意）</p>
             <p className={styles.modeHint}>
-              {formData.inputMode === "turns"
-                ? "会話をターンごとに分けて入力します（ターンは任意）。"
-                : "会話履歴をまとめてテキストとして入力します（context_content）。"}
+              会話として固定したい内容はターンで入力します。実行時の補足情報は下のコンテキスト欄に入力します。
             </p>
+            <TurnEditor
+              turns={formData.turns}
+              onChange={(turns) => setFormData((prev) => ({ ...prev, turns }))}
+            />
           </div>
 
-          {/* 入力内容 */}
-          {formData.inputMode === "turns" ? (
-            <div className={styles.fieldGroup}>
-              <p className={styles.fieldLabel}>会話ターン（任意）</p>
-              <TurnEditor
-                turns={formData.turns}
-                onChange={(turns) => setFormData((prev) => ({ ...prev, turns }))}
-              />
-            </div>
-          ) : (
-            <div className={styles.fieldGroup}>
-              <label htmlFor="test-case-context" className={styles.fieldLabel}>
-                コンテキスト（任意）
-              </label>
-              <textarea
-                id="test-case-context"
-                value={formData.context_content}
-                onChange={(e) =>
-                  setFormData((prev) => ({ ...prev, context_content: e.target.value }))
-                }
-                placeholder="会話履歴や参照テキストをまとめて入力..."
-                rows={6}
-                className={styles.fieldTextareaContext}
-              />
-            </div>
-          )}
+          <div className={styles.fieldGroup}>
+            <label htmlFor="test-case-context" className={styles.fieldLabel}>
+              コンテキスト（任意）
+            </label>
+            <textarea
+              id="test-case-context"
+              value={formData.context_content}
+              onChange={(e) =>
+                setFormData((prev) => ({ ...prev, context_content: e.target.value }))
+              }
+              placeholder="参照テキストや前提条件を入力..."
+              rows={6}
+              className={styles.fieldTextareaContext}
+            />
+          </div>
 
           {/* 期待記述 */}
           <div className={styles.fieldGroupLg}>
@@ -353,7 +321,6 @@ type TestCaseCardProps = {
 };
 
 function TestCaseCard({ testCase, onEdit, onDelete }: TestCaseCardProps) {
-  const isContextMode = testCase.turns.length === 0;
   const userTurns = testCase.turns.filter((t) => t.role === "user").length;
   const assistantTurns = testCase.turns.filter((t) => t.role === "assistant").length;
 
@@ -381,22 +348,19 @@ function TestCaseCard({ testCase, onEdit, onDelete }: TestCaseCardProps) {
 
       {/* ターン情報バッジ */}
       <div className={styles.badgeRow}>
-        {isContextMode ? (
-          <span className={`${styles.badge} ${styles.badgeTextMode}`}>テキスト形式</span>
-        ) : (
-          <>
-            <span className={`${styles.badge} ${styles.badgeTurnCount}`}>
-              計 {testCase.turns.length} ターン
-            </span>
-            {userTurns > 0 && (
-              <span className={`${styles.badge} ${styles.badgeUser}`}>user × {userTurns}</span>
-            )}
-            {assistantTurns > 0 && (
-              <span className={`${styles.badge} ${styles.badgeAssistant}`}>
-                assistant × {assistantTurns}
-              </span>
-            )}
-          </>
+        <span className={`${styles.badge} ${styles.badgeTurnCount}`}>
+          計 {testCase.turns.length} ターン
+        </span>
+        {userTurns > 0 && (
+          <span className={`${styles.badge} ${styles.badgeUser}`}>user × {userTurns}</span>
+        )}
+        {assistantTurns > 0 && (
+          <span className={`${styles.badge} ${styles.badgeAssistant}`}>
+            assistant × {assistantTurns}
+          </span>
+        )}
+        {testCase.context_content && (
+          <span className={`${styles.badge} ${styles.badgeTextMode}`}>コンテキストあり</span>
         )}
         {testCase.expected_description && (
           <span className={`${styles.badge} ${styles.badgeExpected}`}>期待記述あり</span>
@@ -404,15 +368,11 @@ function TestCaseCard({ testCase, onEdit, onDelete }: TestCaseCardProps) {
       </div>
 
       {/* プレビュー */}
-      {isContextMode
-        ? testCase.context_content && (
-            <p className={`${styles.preview} ${styles.previewMono}`}>
-              {testCase.context_content}
-            </p>
-          )
-        : testCase.turns[0] && (
-            <p className={styles.preview}>{testCase.turns[0].content}</p>
-          )}
+      {testCase.turns[0] ? (
+        <p className={styles.preview}>{testCase.turns[0].content}</p>
+      ) : testCase.context_content ? (
+        <p className={`${styles.preview} ${styles.previewMono}`}>{testCase.context_content}</p>
+      ) : null}
     </div>
   );
 }
@@ -488,7 +448,7 @@ export function TestCasesPage() {
       </div>
 
       <p className={styles.pageDescription}>
-        プロジェクトのテストケース一覧です。参照情報と期待記述を管理します。
+        プロジェクトのテストケース一覧です。会話ターン、コンテキスト、期待記述をまとめて管理します。
       </p>
 
       {isLoading && (
