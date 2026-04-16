@@ -61,7 +61,7 @@ pnpm setup:local
 pnpm start:local
 ```
 
-ブラウザで http://localhost:3000 を開くと利用できます。詳細は [README.local.md](README.local.md) を参照してください。
+`pnpm start:local` で既定ブラウザが自動で開きます。詳細は [README.local.md](README.local.md) を参照してください。
 
 ### 環境変数
 

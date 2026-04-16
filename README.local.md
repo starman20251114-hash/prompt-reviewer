@@ -28,7 +28,7 @@ pnpm setup:local
 pnpm start:local
 ```
 
-起動後はブラウザで `http://localhost:3000` を開いてください。
+起動後は既定ブラウザで `http://localhost:3000` が自動で開きます。
 
 ## データ保存先
 
@@ -63,6 +63,7 @@ pnpm start:local
 | `PORT` | `3000` | ローカル試用版サーバーのポート |
 | `DB_PATH` | `./data/prompt-reviewer.sqlite` | SQLite DB ファイルの保存先 |
 | `UI_DIST_DIR` | `./packages/ui/dist` | 配信する build 済み UI のディレクトリ |
+| `OPEN_BROWSER_ON_START` | `true` | `pnpm start:local` 実行時に既定ブラウザを自動起動するか |
 
 `pnpm start:local` は `UI_DIST_DIR` に build 済み UI が存在しない場合は起動せず、`pnpm build:local` の実行を促します。
 
