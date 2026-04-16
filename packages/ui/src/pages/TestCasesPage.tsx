@@ -1,7 +1,9 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useParams } from "react-router";
 import {
+  getContextFile,
+  getContextFiles,
   type TestCase,
   type Turn,
   createTestCase,
@@ -151,17 +153,48 @@ function getInitialFormData(testCase?: TestCase): TestCaseFormData {
 
 // 作成・編集モーダルコンポーネント
 type TestCaseModalProps = {
+  projectId: number;
   testCase?: TestCase;
   onClose: () => void;
   onSubmit: (data: TestCaseFormData) => void;
   isLoading: boolean;
 };
 
-function TestCaseModal({ testCase, onClose, onSubmit, isLoading }: TestCaseModalProps) {
+function TestCaseModal({ projectId, testCase, onClose, onSubmit, isLoading }: TestCaseModalProps) {
   const [formData, setFormData] = useState<TestCaseFormData>(() =>
     getInitialFormData(testCase),
   );
+  const [selectedContextFilePath, setSelectedContextFilePath] = useState("");
+  const [importNotice, setImportNotice] = useState<string | null>(null);
   const isEdit = !!testCase;
+
+  const contextFilesQuery = useQuery({
+    queryKey: ["context-files", projectId],
+    queryFn: () => getContextFiles(projectId),
+    enabled: !Number.isNaN(projectId),
+  });
+
+  useEffect(() => {
+    const files = contextFilesQuery.data ?? [];
+    if (files.length === 0) {
+      setSelectedContextFilePath("");
+      return;
+    }
+
+    if (!selectedContextFilePath || !files.some((file) => file.path === selectedContextFilePath)) {
+      setSelectedContextFilePath(files[0]?.path ?? "");
+    }
+  }, [contextFilesQuery.data, selectedContextFilePath]);
+
+  const importContextMutation = useMutation({
+    mutationFn: (filePath: string) => getContextFile(projectId, filePath),
+    onSuccess: (file) => {
+      setFormData((prev) => ({ ...prev, context_content: file.content }));
+      setImportNotice(
+        `${file.path} の内容を取り込みました。保存するとこのスナップショットがテストケースに保存されます。`,
+      );
+    },
+  });
 
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -224,6 +257,50 @@ function TestCaseModal({ testCase, onClose, onSubmit, isLoading }: TestCaseModal
             <label htmlFor="test-case-context" className={styles.fieldLabel}>
               コンテキスト（任意）
             </label>
+            <div className={styles.contextImportRow}>
+              <div className={styles.contextImportControls}>
+                <select
+                  value={selectedContextFilePath}
+                  onChange={(e) => {
+                    setImportNotice(null);
+                    setSelectedContextFilePath(e.target.value);
+                  }}
+                  disabled={(contextFilesQuery.data?.length ?? 0) === 0 || importContextMutation.isPending}
+                  className={styles.contextFileSelect}
+                >
+                  {(contextFilesQuery.data?.length ?? 0) === 0 ? (
+                    <option value="">利用可能なコンテキストファイルはありません</option>
+                  ) : (
+                    (contextFilesQuery.data ?? []).map((file) => (
+                      <option key={file.path} value={file.path}>
+                        {file.path}
+                      </option>
+                    ))
+                  )}
+                </select>
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (!selectedContextFilePath) return;
+                    importContextMutation.mutate(selectedContextFilePath);
+                  }}
+                  disabled={!selectedContextFilePath || importContextMutation.isPending}
+                  className={`${styles.btnSecondary} ${styles.contextImportButton}`}
+                >
+                  {importContextMutation.isPending ? "取込中..." : "取り込む"}
+                </button>
+              </div>
+              <p className={styles.modeHint}>
+                コンテキスト管理で取り込んだファイルをここへコピーします。取り込み後に編集して保存できます。
+              </p>
+              {contextFilesQuery.isError && (
+                <p className={styles.contextImportError}>コンテキストファイル一覧の取得に失敗しました。</p>
+              )}
+              {importContextMutation.isError && (
+                <p className={styles.contextImportError}>選択したコンテキストファイルの取り込みに失敗しました。</p>
+              )}
+              {importNotice && <p className={styles.contextImportNotice}>{importNotice}</p>}
+            </div>
             <textarea
               id="test-case-context"
               value={formData.context_content}
@@ -485,6 +562,7 @@ export function TestCasesPage() {
 
       {isCreateOpen && (
         <TestCaseModal
+          projectId={projectId}
           onClose={() => setIsCreateOpen(false)}
           onSubmit={(data) => createMutation.mutate(data)}
           isLoading={createMutation.isPending}
@@ -493,6 +571,7 @@ export function TestCasesPage() {
 
       {editTarget && (
         <TestCaseModal
+          projectId={projectId}
           testCase={editTarget}
           onClose={() => setEditTarget(null)}
           onSubmit={(data) => updateMutation.mutate({ id: editTarget.id, data })}
