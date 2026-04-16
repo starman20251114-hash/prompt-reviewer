@@ -275,14 +275,19 @@
 
 .btnLlmRun {
   padding: 10px 20px;
-  background: var(--c-muted);
+  background: var(--c-blue);
   color: var(--c-overlay);
   border: none;
   border-radius: 6px;
   font-size: 14px;
   font-weight: 600;
+  cursor: pointer;
+}
+
+.btnLlmRunDisabled {
+  background: var(--c-muted);
   cursor: not-allowed;
-  opacity: 0.5;
+  opacity: 0.55;
 }
 
 .errorMsg {

@@ -13,7 +13,7 @@ vi.mock("better-sqlite3", () => {
   };
 });
 
-import type { DB } from "@prompt-reviewer/core";
+import type { DB, LLMRequest } from "@prompt-reviewer/core";
 import { Hono } from "hono";
 import { describe, expect, it, vi } from "vitest";
 import { createRunsRouter } from "./runs.js";
@@ -283,6 +283,215 @@ describe("POST /api/projects/:projectId/runs", () => {
     });
 
     expect(res.status).toBe(400);
+  });
+});
+
+describe("POST /api/projects/:projectId/runs/execute", () => {
+  it("LLM応答をSSEで返し、完了時にRunとして保存する", async () => {
+    const version = {
+      id: 1,
+      project_id: 1,
+      content: "あなたは親切なアシスタントです。\n\n{{context}}",
+    };
+    const testCase = {
+      id: 1,
+      project_id: 1,
+      turns: JSON.stringify([{ role: "user", content: "要約してください" }]),
+      context_content: "入力文: 今日は晴れです。",
+    };
+    const settings = {
+      model: "claude-sonnet-4-6",
+      temperature: 0.4,
+      api_provider: "anthropic",
+    };
+    const created = {
+      ...sampleRun,
+      conversation: JSON.stringify([
+        { role: "user", content: "要約してください" },
+        { role: "assistant", content: "今日は晴れです。" },
+      ]),
+      model: settings.model,
+      temperature: settings.temperature,
+      api_provider: settings.api_provider,
+    };
+
+    const capturedRequests: LLMRequest[] = [];
+    const capturedInsertValues: Array<{
+      conversation: string;
+      model: string;
+      temperature: number;
+      api_provider: string;
+    }> = [];
+    let selectCallCount = 0;
+
+    const db = {
+      select: () => {
+        selectCallCount++;
+        const result =
+          selectCallCount === 1 ? [version] : selectCallCount === 2 ? [testCase] : [settings];
+        return {
+          from: () => ({
+            where: () => Promise.resolve(result),
+          }),
+        };
+      },
+      insert: () => ({
+        values: (values: {
+          conversation: string;
+          model: string;
+          temperature: number;
+          api_provider: string;
+        }) => {
+          capturedInsertValues.push(values);
+          return {
+            returning: () => Promise.resolve([created]),
+          };
+        },
+      }),
+    };
+
+    const app = new Hono();
+    app.route(
+      "/api/projects/:projectId/runs",
+      createRunsRouter(db as unknown as DB, {
+        llmClientFactory: () => ({
+          async sendMessage() {
+            throw new Error("sendMessage should not be used for streaming execute");
+          },
+          async *stream(request: LLMRequest) {
+            capturedRequests.push(request);
+            yield { type: "text-delta" as const, text: "今日は" };
+            yield { type: "text-delta" as const, text: "晴れです。" };
+            yield {
+              type: "response" as const,
+              response: {
+                content: "今日は晴れです。",
+                stopReason: "end_turn",
+                raw: {},
+              },
+            };
+          },
+        }),
+      }),
+    );
+
+    const res = await app.request("/api/projects/1/runs/execute", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        prompt_version_id: 1,
+        test_case_id: 1,
+        api_key: "sk-ant-test",
+      }),
+    });
+
+    expect(res.status).toBe(200);
+    expect(res.headers.get("content-type")).toContain("text/event-stream");
+
+    const streamText = await res.text();
+    expect(streamText).toContain('event: delta\ndata: {"text":"今日は"}');
+    expect(streamText).toContain('event: delta\ndata: {"text":"晴れです。"}');
+    expect(streamText).toContain("event: run");
+
+    expect(capturedRequests).toEqual([
+      {
+        model: "claude-sonnet-4-6",
+        messages: [{ role: "user", content: "要約してください" }],
+        systemPrompt: "あなたは親切なアシスタントです。\n\n入力文: 今日は晴れです。",
+        temperature: 0.4,
+      },
+    ]);
+    expect(JSON.parse(capturedInsertValues[0]?.conversation ?? "[]")).toEqual([
+      { role: "user", content: "要約してください" },
+      { role: "assistant", content: "今日は晴れです。" },
+    ]);
+    expect(capturedInsertValues[0]?.model).toBe("claude-sonnet-4-6");
+    expect(capturedInsertValues[0]?.temperature).toBe(0.4);
+    expect(capturedInsertValues[0]?.api_provider).toBe("anthropic");
+  });
+
+  it("プロジェクト設定が未作成のとき404を返す", async () => {
+    let selectCallCount = 0;
+    const db = {
+      select: () => {
+        selectCallCount++;
+        const result =
+          selectCallCount === 1
+            ? [{ id: 1, project_id: 1, content: "system" }]
+            : selectCallCount === 2
+              ? [
+                  {
+                    id: 1,
+                    project_id: 1,
+                    turns: JSON.stringify(sampleConversation),
+                    context_content: "",
+                  },
+                ]
+              : [];
+        return {
+          from: () => ({
+            where: () => Promise.resolve(result),
+          }),
+        };
+      },
+    };
+
+    const app = buildApp(db);
+    const res = await app.request("/api/projects/1/runs/execute", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        prompt_version_id: 1,
+        test_case_id: 1,
+        api_key: "sk-ant-test",
+      }),
+    });
+
+    expect(res.status).toBe(404);
+    const body = (await res.json()) as { error: string };
+    expect(body.error).toBe("Project settings not found");
+  });
+
+  it("未対応プロバイダーのとき501を返す", async () => {
+    let selectCallCount = 0;
+    const db = {
+      select: () => {
+        selectCallCount++;
+        const result =
+          selectCallCount === 1
+            ? [{ id: 1, project_id: 1, content: "system" }]
+            : selectCallCount === 2
+              ? [
+                  {
+                    id: 1,
+                    project_id: 1,
+                    turns: JSON.stringify(sampleConversation),
+                    context_content: "",
+                  },
+                ]
+              : [{ model: "gpt-4o", temperature: 0.7, api_provider: "openai" }];
+        return {
+          from: () => ({
+            where: () => Promise.resolve(result),
+          }),
+        };
+      },
+    };
+
+    const app = buildApp(db);
+    const res = await app.request("/api/projects/1/runs/execute", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        prompt_version_id: 1,
+        test_case_id: 1,
+        api_key: "sk-test",
+      }),
+    });
+
+    expect(res.status).toBe(501);
+    const body = (await res.json()) as { error: string };
+    expect(body.error).toBe("Provider execution is not implemented");
   });
 });
 
