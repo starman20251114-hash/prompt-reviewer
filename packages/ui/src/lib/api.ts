@@ -252,6 +252,116 @@ export function createRun(
   return api.post<Run>(`/projects/${projectId}/runs`, data);
 }
 
+type ExecuteRunStreamOptions = {
+  prompt_version_id: number;
+  test_case_id: number;
+  api_key: string;
+  onDelta: (text: string) => void;
+};
+
+type RunExecuteEvent =
+  | {
+      event: "delta";
+      data: { text: string };
+    }
+  | {
+      event: "run";
+      data: Run;
+    }
+  | {
+      event: "error";
+      data: { status?: number; message?: string };
+    };
+
+function parseSseEvent(chunk: string): RunExecuteEvent | null {
+  const lines = chunk.split("\n");
+  const eventLine = lines.find((line) => line.startsWith("event: "));
+  const dataLine = lines.find((line) => line.startsWith("data: "));
+
+  if (!eventLine || !dataLine) {
+    return null;
+  }
+
+  const event = eventLine.slice("event: ".length) as RunExecuteEvent["event"];
+  const data = JSON.parse(dataLine.slice("data: ".length)) as RunExecuteEvent["data"];
+
+  if (event === "delta" || event === "run" || event === "error") {
+    return { event, data } as RunExecuteEvent;
+  }
+
+  return null;
+}
+
+export async function executeRunStream(
+  projectId: number,
+  options: ExecuteRunStreamOptions,
+): Promise<Run> {
+  const response = await fetch(`${API_BASE_URL}/projects/${projectId}/runs/execute`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      prompt_version_id: options.prompt_version_id,
+      test_case_id: options.test_case_id,
+      api_key: options.api_key,
+    }),
+  });
+
+  if (!response.ok) {
+    throw new ApiError(response.status, `API error: ${response.status} ${response.statusText}`);
+  }
+
+  if (!response.body) {
+    throw new ApiError(502, "API error: empty streaming response");
+  }
+
+  const reader = response.body.getReader();
+  const decoder = new TextDecoder();
+  let buffer = "";
+  let savedRun: Run | null = null;
+
+  while (true) {
+    const { value, done } = await reader.read();
+    if (value) {
+      buffer += decoder.decode(value, { stream: !done });
+    }
+
+    const chunks = buffer.split("\n\n");
+    buffer = chunks.pop() ?? "";
+
+    for (const chunk of chunks) {
+      const parsed = parseSseEvent(chunk.trim());
+      if (!parsed) continue;
+
+      if (parsed.event === "delta") {
+        options.onDelta(parsed.data.text);
+      }
+
+      if (parsed.event === "run") {
+        savedRun = parsed.data;
+      }
+
+      if (parsed.event === "error") {
+        throw new ApiError(
+          parsed.data.status ?? 502,
+          parsed.data.message ?? "Run execution failed",
+        );
+      }
+    }
+
+    if (done) {
+      break;
+    }
+  }
+
+  if (!savedRun) {
+    throw new ApiError(502, "API error: run was not returned");
+  }
+
+  return savedRun;
+}
+
 export function setBestRun(projectId: number, id: number, unset = false): Promise<Run> {
   return api.patch<Run>(`/projects/${projectId}/runs/${id}/best`, { unset });
 }

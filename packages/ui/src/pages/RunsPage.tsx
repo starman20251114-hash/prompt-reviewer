@@ -9,6 +9,7 @@ import {
   type Run,
   type TestCase,
   createRun,
+  executeRunStream,
   getProject,
   getPromptVersions,
   getRuns,
@@ -203,7 +204,7 @@ export function RunsPage() {
   const projectId = Number(id);
   const queryClient = useQueryClient();
 
-  const { hasApiKey } = useApiKey(projectId);
+  const { apiKey, hasApiKey } = useApiKey(projectId);
 
   const [activeTab, setActiveTab] = useState<PageTab>("create");
 
@@ -213,6 +214,7 @@ export function RunsPage() {
   const [selectedTestCaseId, setSelectedTestCaseId] = useState<number | "">("");
   const [llmResponse, setLlmResponse] = useState("");
   const [savedRun, setSavedRun] = useState<Run | null>(null);
+  const [executeError, setExecuteError] = useState<string | null>(null);
 
   // 「Run 一覧」タブのフィルター状態
   const [filterVersionId, setFilterVersionId] = useState<number | "">("");
@@ -290,6 +292,29 @@ export function RunsPage() {
     },
   });
 
+  const executeRunMutation = useMutation({
+    mutationFn: (data: { prompt_version_id: number; test_case_id: number }) =>
+      executeRunStream(projectId, {
+        ...data,
+        api_key: apiKey,
+        onDelta: (text) => {
+          setLlmResponse((prev) => `${prev}${text}`);
+        },
+      }),
+    onMutate: () => {
+      setExecuteError(null);
+      setLlmResponse("");
+    },
+    onSuccess: (run) => {
+      setSavedRun(run);
+      setStep("saved");
+      void queryClient.invalidateQueries({ queryKey: ["runs", projectId] });
+    },
+    onError: (error) => {
+      setExecuteError(error instanceof Error ? error.message : "LLM 実行に失敗しました。");
+    },
+  });
+
   const setBestMutation = useMutation({
     mutationFn: ({ id, unset }: { id: number; unset: boolean }) => setBestRun(projectId, id, unset),
     onSuccess: () => {
@@ -320,6 +345,7 @@ export function RunsPage() {
   function handleStartRun() {
     if (selectedVersionId === "" || selectedTestCaseId === "") return;
     setLlmResponse("");
+    setExecuteError(null);
     setStep("input");
   }
 
@@ -341,7 +367,18 @@ export function RunsPage() {
 
   function handleNewRun() {
     setSavedRun(null);
+    setLlmResponse("");
+    setExecuteError(null);
     setStep("select");
+  }
+
+  function handleExecuteRun() {
+    if (selectedVersionId === "" || selectedTestCaseId === "" || !hasApiKey) return;
+
+    executeRunMutation.mutate({
+      prompt_version_id: selectedVersionId,
+      test_case_id: selectedTestCaseId,
+    });
   }
 
   function handleCompareRun(run: Run) {
@@ -366,7 +403,14 @@ export function RunsPage() {
   }
 
   const isStartDisabled = selectedVersionId === "" || selectedTestCaseId === "" || !hasApiKey;
-  const isSaveDisabled = !llmResponse.trim() || createRunMutation.isPending;
+  const isSaveDisabled =
+    !llmResponse.trim() || createRunMutation.isPending || executeRunMutation.isPending;
+  const isExecuteDisabled =
+    selectedVersionId === "" ||
+    selectedTestCaseId === "" ||
+    !hasApiKey ||
+    executeRunMutation.isPending ||
+    createRunMutation.isPending;
 
   return (
     <div className={`${styles.root} ${styles.page}`}>
@@ -534,19 +578,31 @@ export function RunsPage() {
                   )}
                 </div>
 
-                {/* 右カラム: 手動入力エリア */}
+                {/* 右カラム: LLM実行・手動入力エリア */}
                 <div className={`${styles.panel} ${styles.panelFlex}`}>
-                  <h3 className={styles.panelSubtitle}>LLM 応答の入力</h3>
-                  <p className={styles.inputDescription}>LLM 応答を手動で入力してください</p>
+                  <h3 className={styles.panelSubtitle}>LLM 応答</h3>
+                  <p className={styles.inputDescription}>
+                    実行すると応答をストリーミング表示し、完了後に Run として保存します。
+                  </p>
 
                   <textarea
                     value={llmResponse}
                     onChange={(e) => setLlmResponse(e.target.value)}
-                    placeholder="LLM の応答をここにペーストまたは入力してください..."
+                    placeholder="実行結果がここに表示されます。手動入力して保存することもできます。"
                     className={styles.responseTextarea}
+                    readOnly={executeRunMutation.isPending}
                   />
 
                   <div className={styles.inputActions}>
+                    <button
+                      type="button"
+                      onClick={handleExecuteRun}
+                      disabled={isExecuteDisabled}
+                      className={`${styles.btnLlmRun} ${isExecuteDisabled ? styles.btnLlmRunDisabled : ""}`}
+                    >
+                      {executeRunMutation.isPending ? "実行中..." : "実行"}
+                    </button>
+
                     <button
                       type="button"
                       onClick={handleSaveRun}
@@ -555,18 +611,9 @@ export function RunsPage() {
                     >
                       {createRunMutation.isPending ? "保存中..." : "Run を保存"}
                     </button>
-
-                    {/* TODO: Phase 2 - LLM実行ボタン */}
-                    <button
-                      type="button"
-                      disabled
-                      title="Phase 2 で実装予定"
-                      className={styles.btnLlmRun}
-                    >
-                      LLM 実行（Phase 2）
-                    </button>
                   </div>
 
+                  {executeError && <p className={styles.errorMsg}>{executeError}</p>}
                   {createRunMutation.isError && (
                     <p className={styles.errorMsg}>保存に失敗しました。もう一度お試しください。</p>
                   )}

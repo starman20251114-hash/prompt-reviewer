@@ -3,8 +3,8 @@ import { useEffect, useState } from "react";
 import { useParams } from "react-router";
 import { useApiKey } from "../hooks/useApiKey";
 import {
-  type ApiProvider,
   ApiError,
+  type ApiProvider,
   getProjectSettings,
   listProjectSettingsModels,
   upsertProjectSettings,
@@ -170,7 +170,9 @@ export function ProjectSettingsPage() {
               <p className={styles.fieldHint}>取得した候補からモデルを選択してください</p>
             )}
             {!hasApiKey && (
-              <p className={styles.fieldHint}>先に API キーを保存すると、利用可能なモデル候補を取得します</p>
+              <p className={styles.fieldHint}>
+                先に API キーを保存すると、利用可能なモデル候補を取得します
+              </p>
             )}
             {modelsError instanceof ApiError && (
               <p className={styles.fieldError}>
@@ -232,8 +234,8 @@ export function ProjectSettingsPage() {
         <div className={styles.section}>
           <h3 className={styles.sectionTitle}>API キー</h3>
           <p className={styles.apiKeyNote}>
-            APIキーはブラウザの localStorage に保存され、モデル候補取得時にサーバーへ一時送信されます。
-            サーバー側では保存しません。
+            APIキーはブラウザの localStorage に保存され、モデル候補取得時と Run
+            実行時にサーバーへ一時送信されます。 サーバー側では保存しません。
           </p>
 
           <div className={styles.fieldGroup}>
