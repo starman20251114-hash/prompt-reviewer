@@ -423,7 +423,9 @@ export function RunsPage() {
   }
 
   function handleDiscardRun(run: Run) {
-    const confirmed = window.confirm(`Run #${run.id} を破棄します。よろしいですか？`);
+    const confirmed = window.confirm(
+      `この操作は元に戻せません。本当に Run #${run.id} を破棄しますか？`,
+    );
     if (!confirmed) return;
     discardMutation.mutate(run.id);
   }
