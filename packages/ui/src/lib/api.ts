@@ -212,6 +212,7 @@ export type Run = {
   test_case_id: number;
   conversation: ConversationMessage[];
   is_best: boolean;
+  is_discarded: boolean;
   model: string;
   temperature: number;
   api_provider: string;
@@ -364,6 +365,10 @@ export async function executeRunStream(
 
 export function setBestRun(projectId: number, id: number, unset = false): Promise<Run> {
   return api.patch<Run>(`/projects/${projectId}/runs/${id}/best`, { unset });
+}
+
+export function discardRun(projectId: number, id: number): Promise<Run> {
+  return api.patch<Run>(`/projects/${projectId}/runs/${id}/discard`, {});
 }
 
 export function setSelectedVersion(projectId: number, id: number): Promise<PromptVersion> {
