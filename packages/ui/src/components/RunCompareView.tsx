@@ -2,6 +2,10 @@ import { useRef, useState } from "react";
 import type { Run } from "../lib/api";
 import styles from "./RunCompareView.module.css";
 
+function getLastAssistantMessage(run: Run): string {
+  return [...run.conversation].reverse().find((message) => message.role === "assistant")?.content ?? "";
+}
+
 export function diffLines(
   a: string,
   b: string,
@@ -106,10 +110,8 @@ export function RunCompareView({ runA, runB, versionLabelA, versionLabelB, onClo
     isSyncing.current = false;
   }
 
-  const lastAssistantA =
-    [...runA.conversation].reverse().find((m) => m.role === "assistant")?.content ?? "";
-  const lastAssistantB =
-    [...runB.conversation].reverse().find((m) => m.role === "assistant")?.content ?? "";
+  const lastAssistantA = getLastAssistantMessage(runA);
+  const lastAssistantB = getLastAssistantMessage(runB);
   const diff = diffLines(lastAssistantA, lastAssistantB);
 
   return (
@@ -153,24 +155,10 @@ export function RunCompareView({ runA, runB, versionLabelA, versionLabelB, onClo
                   <span className={styles.panelMeta}>{versionLabelA}</span>
                 </div>
                 <div ref={scrollRefA} className={styles.chatList} onScroll={handleScrollA}>
-                  {runA.conversation.map((msg, i) => (
-                    <div
-                      key={`a-msg-${
-                        // biome-ignore lint/suspicious/noArrayIndexKey: 会話配列は順序で管理
-                        i
-                      }`}
-                      className={`${styles.bubbleWrapper} ${msg.role === "user" ? styles.bubbleWrapperUser : styles.bubbleWrapperAssistant}`}
-                    >
-                      <span className={styles.bubbleRole}>
-                        {msg.role === "user" ? "User" : "Assistant"}
-                      </span>
-                      <div
-                        className={`${styles.bubble} ${msg.role === "user" ? styles.bubbleUser : styles.bubbleAssistant}`}
-                      >
-                        {msg.content}
-                      </div>
-                    </div>
-                  ))}
+                  <div className={`${styles.bubbleWrapper} ${styles.bubbleWrapperAssistant}`}>
+                    <span className={styles.bubbleRole}>Assistant</span>
+                    <div className={`${styles.bubble} ${styles.bubbleAssistant}`}>{lastAssistantA}</div>
+                  </div>
                 </div>
               </div>
               <div className={styles.panel}>
@@ -179,24 +167,10 @@ export function RunCompareView({ runA, runB, versionLabelA, versionLabelB, onClo
                   <span className={styles.panelMeta}>{versionLabelB}</span>
                 </div>
                 <div ref={scrollRefB} className={styles.chatList} onScroll={handleScrollB}>
-                  {runB.conversation.map((msg, i) => (
-                    <div
-                      key={`b-msg-${
-                        // biome-ignore lint/suspicious/noArrayIndexKey: 会話配列は順序で管理
-                        i
-                      }`}
-                      className={`${styles.bubbleWrapper} ${msg.role === "user" ? styles.bubbleWrapperUser : styles.bubbleWrapperAssistant}`}
-                    >
-                      <span className={styles.bubbleRole}>
-                        {msg.role === "user" ? "User" : "Assistant"}
-                      </span>
-                      <div
-                        className={`${styles.bubble} ${msg.role === "user" ? styles.bubbleUser : styles.bubbleAssistant}`}
-                      >
-                        {msg.content}
-                      </div>
-                    </div>
-                  ))}
+                  <div className={`${styles.bubbleWrapper} ${styles.bubbleWrapperAssistant}`}>
+                    <span className={styles.bubbleRole}>Assistant</span>
+                    <div className={`${styles.bubble} ${styles.bubbleAssistant}`}>{lastAssistantB}</div>
+                  </div>
                 </div>
               </div>
             </div>
