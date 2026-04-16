@@ -1,9 +1,10 @@
+import { readFile } from "node:fs/promises";
+import path from "node:path";
 import { serve } from "@hono/node-server";
 import { db } from "@prompt-reviewer/core";
 import { Hono } from "hono";
 import { cors } from "hono/cors";
-import { readFile } from "node:fs/promises";
-import path from "node:path";
+import { createContextFilesRouter } from "./routes/context-files.js";
 import { createProjectSettingsRouter } from "./routes/project-settings.js";
 import { createProjectsRouter } from "./routes/projects.js";
 import { createPromptVersionsRouter } from "./routes/prompt-versions.js";
@@ -13,7 +14,9 @@ import { createScoresRouter, createVersionSummaryRouter } from "./routes/scores.
 import { createTestCasesRouter } from "./routes/test-cases.js";
 
 const app = new Hono();
-const uiDistDir = process.env.UI_DIST_DIR ? path.resolve(process.cwd(), process.env.UI_DIST_DIR) : null;
+const uiDistDir = process.env.UI_DIST_DIR
+  ? path.resolve(process.cwd(), process.env.UI_DIST_DIR)
+  : null;
 
 const contentTypes: Record<string, string> = {
   ".css": "text/css; charset=utf-8",
@@ -64,6 +67,7 @@ app.get("/api/health", (c) => {
 });
 
 app.route("/api/projects", createProjectsRouter(db));
+app.route("/api/projects/:projectId/context-files", createContextFilesRouter());
 app.route("/api/projects/:projectId/test-cases", createTestCasesRouter(db));
 app.route("/api/projects/:projectId/prompt-versions", createPromptVersionsRouter(db));
 app.route("/api/projects/:projectId/prompt-versions", createVersionSummaryRouter(db));

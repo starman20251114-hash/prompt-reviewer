@@ -15,6 +15,7 @@ const navLinkStyle = ({ isActive }: { isActive: boolean }) => ({
 function ProjectSubNav({ projectId }: { projectId: string }) {
   const subNavItems = [
     { to: `/projects/${projectId}`, label: "概要", end: true },
+    { to: `/projects/${projectId}/context-files`, label: "コンテキスト" },
     { to: `/projects/${projectId}/test-cases`, label: "テストケース" },
     { to: `/projects/${projectId}/prompts`, label: "プロンプト" },
     { to: `/projects/${projectId}/runs`, label: "Run 一覧" },
