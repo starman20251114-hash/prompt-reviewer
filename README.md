@@ -52,6 +52,17 @@ pnpm dev
 
 ブラウザで http://localhost:5173 を開くと UI にアクセスできます。
 
+## ローカル試用版
+
+build 済み UI を server から配信するローカル試用版も利用できます。
+
+```bash
+pnpm setup:local
+pnpm start:local
+```
+
+ブラウザで http://localhost:3000 を開くと利用できます。詳細は [README.local.md](README.local.md) を参照してください。
+
 ### 環境変数
 
 `.env.example` をコピーして `.env` を作成し、必要に応じて値を変更してください。

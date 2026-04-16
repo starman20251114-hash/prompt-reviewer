@@ -4,6 +4,11 @@
   "type": "module",
   "scripts": {
     "dev": "concurrently -n core,server,ui -c yellow,blue,green \"pnpm --filter @prompt-reviewer/core build:watch\" \"pnpm --filter @prompt-reviewer/server dev\" \"pnpm --filter @prompt-reviewer/ui dev\"",
+    "setup:local": "node scripts/local.mjs setup",
+    "build:local": "node scripts/local.mjs build",
+    "migrate:local": "node scripts/local.mjs migrate",
+    "seed:local": "node scripts/local.mjs seed",
+    "start:local": "node scripts/local.mjs start",
     "check": "biome check .",
     "check:fix": "biome check --write .",
     "typecheck": "tsc --noEmit",
