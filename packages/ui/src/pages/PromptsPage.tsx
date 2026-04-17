@@ -2,6 +2,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { useParams } from "react-router";
 import {
+  type PromptExecutionStepDefinition,
   type PromptVersion,
   branchPromptVersion,
   createPromptVersion,
@@ -93,6 +94,14 @@ function flattenTree(nodes: VersionTreeNode[]): VersionTreeNode[] {
     traverse(node);
   }
   return result;
+}
+
+function createWorkflowStep(): PromptExecutionStepDefinition {
+  return {
+    id: `step_${Math.random().toString(36).slice(2, 8)}`,
+    title: "",
+    prompt: "",
+  };
 }
 
 // Determine whether to draw a vertical line at depth d for each node
@@ -220,9 +229,17 @@ function PromptEditor({ version, projectId, isNew = false, onSave, onCancel }: P
   const [name, setName] = useState(version?.name ?? "");
   const [memo, setMemo] = useState(version?.memo ?? "");
   const [content, setContent] = useState(version?.content ?? "");
+  const [workflowSteps, setWorkflowSteps] = useState<PromptExecutionStepDefinition[]>(
+    version?.workflow_definition?.steps ?? [],
+  );
 
   const createMutation = useMutation({
-    mutationFn: (data: { content: string; name?: string; memo?: string }) =>
+    mutationFn: (data: {
+      content: string;
+      name?: string;
+      memo?: string;
+      workflow_definition?: { steps: PromptExecutionStepDefinition[] };
+    }) =>
       createPromptVersion(projectId, data),
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: ["promptVersions", projectId] });
@@ -231,7 +248,12 @@ function PromptEditor({ version, projectId, isNew = false, onSave, onCancel }: P
   });
 
   const updateMutation = useMutation({
-    mutationFn: (data: { content?: string; name?: string | null; memo?: string | null }) => {
+    mutationFn: (data: {
+      content?: string;
+      name?: string | null;
+      memo?: string | null;
+      workflow_definition?: { steps: PromptExecutionStepDefinition[] } | null;
+    }) => {
       if (!version) throw new Error("version is required for update");
       return updatePromptVersion(projectId, version.id, data);
     },
@@ -242,7 +264,22 @@ function PromptEditor({ version, projectId, isNew = false, onSave, onCancel }: P
   });
 
   const isPending = createMutation.isPending || updateMutation.isPending;
-  const isDisabled = !content.trim() || isPending;
+  const hasInvalidWorkflowStep = workflowSteps.some(
+    (step) => !step.id.trim() || !step.prompt.trim(),
+  );
+  const isDisabled = !content.trim() || isPending || hasInvalidWorkflowStep;
+
+  function buildWorkflowDefinition() {
+    const steps = workflowSteps
+      .map((step, index) => ({
+        id: step.id.trim(),
+        title: step.title.trim() || `ステップ ${index + 2}`,
+        prompt: step.prompt.trim(),
+      }))
+      .filter((step) => step.id && step.prompt);
+
+    return steps.length > 0 ? { steps } : undefined;
+  }
 
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -253,12 +290,14 @@ function PromptEditor({ version, projectId, isNew = false, onSave, onCancel }: P
         content: content.trim(),
         name: name.trim() || undefined,
         memo: memo.trim() || undefined,
+        workflow_definition: buildWorkflowDefinition(),
       });
     } else {
       updateMutation.mutate({
         content: content.trim(),
         name: name.trim() || null,
         memo: memo.trim() || null,
+        workflow_definition: buildWorkflowDefinition() ?? null,
       });
     }
   }
@@ -267,14 +306,18 @@ function PromptEditor({ version, projectId, isNew = false, onSave, onCancel }: P
     <form onSubmit={handleSubmit} className={styles.editorForm}>
       <div>
         <label htmlFor="editor-name" className={styles.fieldLabel}>
-          バージョン名（任意）
+          {isNew || version?.parent_version_id === null ? "プロンプト名（任意）" : "バージョン名（任意）"}
         </label>
         <input
           id="editor-name"
           type="text"
           value={name}
           onChange={(e) => setName(e.target.value)}
-          placeholder="例: 丁寧語対応版"
+          placeholder={
+            isNew || version?.parent_version_id === null
+              ? "未入力なら自動で名前を付けます"
+              : "例: 丁寧語対応版"
+          }
           className={styles.fieldInput}
         />
       </div>
@@ -293,7 +336,7 @@ function PromptEditor({ version, projectId, isNew = false, onSave, onCancel }: P
       </div>
       <div className={styles.fieldTextareaWrapper}>
         <label htmlFor="editor-content" className={styles.fieldLabel}>
-          プロンプト本文
+          プロンプト本文（Step 1）
           <span className={styles.requiredMark}>*</span>
         </label>
         <textarea
@@ -303,6 +346,92 @@ function PromptEditor({ version, projectId, isNew = false, onSave, onCancel }: P
           placeholder="システムプロンプトを入力..."
           className={styles.fieldTextarea}
         />
+      </div>
+      <div className={styles.workflowSection}>
+        <div className={styles.workflowHeader}>
+          <div>
+            <label className={styles.fieldLabel}>追加ステップ（Step 2 以降）</label>
+            <p className={styles.workflowHint}>
+              各ステップで `{"{{conversation}}"}`、`{"{{context}}"}`、`{"{{previous_output}}"}`、
+              `{"{{step:step_id}}"}` を利用できます。
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={() => setWorkflowSteps((prev) => [...prev, createWorkflowStep()])}
+            className={styles.btnWorkflowAdd}
+          >
+            + ステップ追加
+          </button>
+        </div>
+        {workflowSteps.length === 0 ? (
+          <div className={styles.workflowEmpty}>
+            追加ステップ未設定の場合は、プロンプト本文（Step 1）のみを実行します。
+          </div>
+        ) : (
+          <div className={styles.workflowList}>
+            {workflowSteps.map((step, index) => (
+              <div key={step.id || `workflow-step-${index}`} className={styles.workflowCard}>
+                <div className={styles.workflowCardHeader}>
+                  <span className={styles.workflowCardTitle}>ステップ {index + 2}</span>
+                  <button
+                    type="button"
+                    onClick={() =>
+                      setWorkflowSteps((prev) => prev.filter((_, current) => current !== index))
+                    }
+                    className={styles.btnWorkflowRemove}
+                  >
+                    削除
+                  </button>
+                </div>
+                <div className={styles.workflowFields}>
+                  <input
+                    type="text"
+                    value={step.id}
+                    onChange={(e) =>
+                      setWorkflowSteps((prev) =>
+                        prev.map((current, currentIndex) =>
+                          currentIndex === index ? { ...current, id: e.target.value } : current,
+                        ),
+                      )
+                    }
+                    placeholder="step_id"
+                    className={styles.fieldInput}
+                  />
+                  <input
+                    type="text"
+                    value={step.title}
+                    onChange={(e) =>
+                      setWorkflowSteps((prev) =>
+                        prev.map((current, currentIndex) =>
+                          currentIndex === index
+                            ? { ...current, title: e.target.value }
+                            : current,
+                        ),
+                      )
+                    }
+                    placeholder={`表示名（未入力なら ステップ ${index + 2}）`}
+                    className={styles.fieldInput}
+                  />
+                </div>
+                <textarea
+                  value={step.prompt}
+                  onChange={(e) =>
+                    setWorkflowSteps((prev) =>
+                      prev.map((current, currentIndex) =>
+                        currentIndex === index
+                          ? { ...current, prompt: e.target.value }
+                          : current,
+                      ),
+                    )
+                  }
+                  placeholder="各ステップで実行するプロンプト"
+                  className={styles.workflowTextarea}
+                />
+              </div>
+            ))}
+          </div>
+        )}
       </div>
       <div className={styles.formActions}>
         <button type="button" onClick={onCancel} className={styles.btnCancel}>
@@ -826,7 +955,26 @@ export function PromptsPage() {
                     </span>
                   )}
                 </div>
+                <div className={styles.workflowPreviewLabel}>Step 1: プロンプト本文</div>
                 <pre className={styles.promptPre}>{panelMode.version.content}</pre>
+                {panelMode.version.workflow_definition?.steps.length ? (
+                  <div className={styles.workflowPreview}>
+                    <div className={styles.workflowPreviewLabel}>追加ステップ（Step 2 以降）</div>
+                    <div className={styles.workflowPreviewList}>
+                      {panelMode.version.workflow_definition.steps.map((step, index) => (
+                        <div key={step.id} className={styles.workflowPreviewCard}>
+                          <div className={styles.workflowPreviewHeader}>
+                            <span>
+                              {index + 2}. {step.title}
+                            </span>
+                            <span className={styles.workflowPreviewId}>{step.id}</span>
+                          </div>
+                          <pre className={styles.workflowPreviewPrompt}>{step.prompt}</pre>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                ) : null}
               </div>
             </>
           )}

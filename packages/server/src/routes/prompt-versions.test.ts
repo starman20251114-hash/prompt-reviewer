@@ -27,6 +27,7 @@ type MockPromptVersion = {
   name: string | null;
   memo: string | null;
   content: string;
+  workflow_definition: { steps: Array<{ id: string; title: string; prompt: string }> } | null;
   parent_version_id: number | null;
   created_at: number;
 };
@@ -48,6 +49,7 @@ const sampleVersion: MockPromptVersion = {
   name: "初期バージョン",
   memo: null,
   content: "あなたは親切なアシスタントです。",
+  workflow_definition: null,
   parent_version_id: null,
   created_at: 1000000,
 };
@@ -148,7 +150,7 @@ describe("POST /api/projects/:projectId/prompt-versions", () => {
     const res = await app.request("/api/projects/1/prompt-versions", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ content: "新しいプロンプト" }),
+      body: JSON.stringify({ content: "新しいプロンプト", name: "新しいプロンプト" }),
     });
 
     expect(res.status).toBe(201);
@@ -179,10 +181,42 @@ describe("POST /api/projects/:projectId/prompt-versions", () => {
     const res = await app.request("/api/projects/1/prompt-versions", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ content: "初めてのプロンプト", name: "初めてのプロンプト" }),
+    });
+
+    expect(res.status).toBe(201);
+  });
+
+  it("name が未指定のとき自動命名して保存する", async () => {
+    const created = { ...sampleVersion, version: 2, name: "プロンプト 2" };
+
+    const db = {
+      select: () => ({
+        from: () => ({
+          where: () => Promise.resolve([{ maxVersion: 1 }]),
+        }),
+      }),
+      insert: () => ({
+        values: (values: { name: string; version: number }) => ({
+          returning: () => {
+            expect(values.version).toBe(2);
+            expect(values.name).toBe("プロンプト 2");
+            return Promise.resolve([created]);
+          },
+        }),
+      }),
+    };
+
+    const app = buildApp(db);
+    const res = await app.request("/api/projects/1/prompt-versions", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ content: "初めてのプロンプト" }),
     });
 
     expect(res.status).toBe(201);
+    const body = (await res.json()) as MockPromptVersion;
+    expect(body.name).toBe("プロンプト 2");
   });
 
   it("content が空文字列のとき400を返す", async () => {
@@ -210,6 +244,7 @@ describe("POST /api/projects/:projectId/prompt-versions", () => {
 
     expect(res.status).toBe(400);
   });
+
 });
 
 describe("GET /api/projects/:projectId/prompt-versions/:id", () => {
@@ -255,6 +290,39 @@ describe("GET /api/projects/:projectId/prompt-versions/:id", () => {
     const res = await app.request("/api/projects/1/prompt-versions/abc");
 
     expect(res.status).toBe(400);
+  });
+
+  it("非分岐バージョンで name を空にすると自動命名に戻す", async () => {
+    const updated = { ...sampleVersion, name: "プロンプト 1" };
+
+    const db = {
+      select: () => ({
+        from: () => ({
+          where: () => Promise.resolve([sampleVersion]),
+        }),
+      }),
+      update: () => ({
+        set: (values: { name: string }) => ({
+          where: () => ({
+            returning: () => {
+              expect(values.name).toBe("プロンプト 1");
+              return Promise.resolve([updated]);
+            },
+          }),
+        }),
+      }),
+    };
+
+    const app = buildApp(db);
+    const res = await app.request("/api/projects/1/prompt-versions/1", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ name: "" }),
+    });
+
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as MockPromptVersion;
+    expect(body.name).toBe("プロンプト 1");
   });
 });
 

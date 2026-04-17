@@ -14,6 +14,7 @@ export const prompt_versions = sqliteTable("prompt_versions", {
   name: text("name"),
   memo: text("memo"),
   content: text("content").notNull(),
+  workflow_definition: text("workflow_definition"),
   parent_version_id: integer("parent_version_id").references(
     (): AnySQLiteColumn => prompt_versions.id,
   ),
@@ -24,3 +25,13 @@ export const prompt_versions = sqliteTable("prompt_versions", {
 // Drizzle推論型のエクスポート
 export type PromptVersion = typeof prompt_versions.$inferSelect;
 export type NewPromptVersion = typeof prompt_versions.$inferInsert;
+
+export type PromptExecutionStepDefinition = {
+  id: string;
+  title: string;
+  prompt: string;
+};
+
+export type PromptWorkflowDefinition = {
+  steps: PromptExecutionStepDefinition[];
+};

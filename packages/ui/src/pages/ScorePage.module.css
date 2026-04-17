@@ -147,6 +147,91 @@
   line-height: 1.5;
 }
 
+.traceBlock {
+  margin: 0 0 14px;
+  padding: 12px;
+  background: var(--c-overlay);
+  border: 1px solid var(--c-border);
+  border-radius: 8px;
+}
+
+.traceBlockHeader {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+
+.traceBlockTitle {
+  margin: 0;
+  font-size: 13px;
+  color: var(--c-text);
+}
+
+.traceBlockCount {
+  font-size: 12px;
+  color: var(--c-muted);
+}
+
+.traceList {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.traceCard {
+  padding: 10px;
+  background: var(--c-card);
+  border: 1px solid var(--c-border);
+  border-radius: 6px;
+}
+
+.traceHeader {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+.traceIndex {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--c-accent);
+}
+
+.traceTitle {
+  font-size: 13px;
+  color: var(--c-text);
+  font-weight: 600;
+}
+
+.traceSection + .traceSection {
+  margin-top: 8px;
+}
+
+.traceLabel {
+  margin: 0 0 4px;
+  font-size: 12px;
+  color: var(--c-subtext);
+}
+
+.tracePre,
+.traceOutput {
+  margin: 0;
+  padding: 8px 10px;
+  background: var(--c-overlay);
+  border: 1px solid var(--c-border);
+  border-radius: 6px;
+  font-size: 12px;
+  line-height: 1.6;
+  color: var(--c-text);
+  font-family: monospace;
+  white-space: pre-wrap;
+  word-break: break-word;
+  max-height: 180px;
+  overflow-y: auto;
+}
+
 /* ==================== Star rating ==================== */
 .starRow {
   display: flex;
@@ -258,6 +343,11 @@
   min-height: 64px;
   margin-bottom: 10px;
   font-size: 13px;
+}
+
+.traceCommentTextarea {
+  min-height: 84px;
+  margin-bottom: 0;
 }
 
 /* ==================== Individual scoring actions ==================== */

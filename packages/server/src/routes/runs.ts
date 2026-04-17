@@ -2,8 +2,11 @@ import { zValidator } from "@hono/zod-validator";
 import type { DB } from "@prompt-reviewer/core";
 import {
   AnthropicLLMClient,
+  type ExecutionTraceStep,
   LLMAuthenticationError,
   LLMConfigurationError,
+  type PromptExecutionStepDefinition,
+  type PromptWorkflowDefinition,
   project_settings,
   prompt_versions,
   runs,
@@ -23,6 +26,18 @@ const createRunSchema = z.object({
   prompt_version_id: z.number().int().positive("prompt_version_idは正の整数が必要です"),
   test_case_id: z.number().int().positive("test_case_idは正の整数が必要です"),
   conversation: z.array(conversationMessageSchema).min(1, "conversationは1件以上必要です"),
+  execution_trace: z
+    .array(
+      z.object({
+        id: z.string(),
+        title: z.string(),
+        prompt: z.string(),
+        renderedPrompt: z.string(),
+        inputConversation: z.array(conversationMessageSchema),
+        output: z.string(),
+      }),
+    )
+    .optional(),
   model: z.string().min(1, "modelは1文字以上必要です"),
   temperature: z.number().min(0).max(2),
   api_provider: z.string().min(1, "api_providerは1文字以上必要です"),
@@ -49,6 +64,7 @@ type StoredPromptVersion = {
   id: number;
   project_id: number;
   content: string;
+  workflow_definition: string | null;
 };
 
 type StoredTestCase = {
@@ -86,6 +102,22 @@ function parseConversation(json: string): ConversationMessage[] {
   return JSON.parse(json) as ConversationMessage[];
 }
 
+function parseWorkflowDefinition(json: string | null): PromptWorkflowDefinition | null {
+  if (!json) {
+    return null;
+  }
+
+  return JSON.parse(json) as PromptWorkflowDefinition;
+}
+
+function parseExecutionTrace(json: string | null): ExecutionTraceStep[] | null {
+  if (!json) {
+    return null;
+  }
+
+  return JSON.parse(json) as ExecutionTraceStep[];
+}
+
 function buildSystemPrompt(version: StoredPromptVersion, testCase: StoredTestCase): string {
   if (!testCase.context_content) {
     return version.content;
@@ -96,6 +128,58 @@ function buildSystemPrompt(version: StoredPromptVersion, testCase: StoredTestCas
   }
 
   return `${version.content}\n\n${testCase.context_content}`;
+}
+
+function buildWorkflowConversation(messages: ConversationMessage[]): ConversationMessage[] {
+  return [...messages];
+}
+
+function buildWorkflowSteps(
+  version: StoredPromptVersion,
+  workflow: PromptWorkflowDefinition | null,
+): PromptExecutionStepDefinition[] {
+  if (!workflow || workflow.steps.length === 0) {
+    return [];
+  }
+
+  return [
+    {
+      id: "__base_prompt__",
+      title: "プロンプト本文",
+      prompt: version.content,
+    },
+    ...workflow.steps,
+  ];
+}
+
+function renderWorkflowPrompt(params: {
+  step: PromptExecutionStepDefinition;
+  version: StoredPromptVersion;
+  testCase: StoredTestCase;
+  conversation: ConversationMessage[];
+  previousOutput: string | null;
+  stepOutputs: Map<string, string>;
+}): string {
+  const conversationText = params.conversation
+    .map((message) => `${message.role === "user" ? "User" : "Assistant"}: ${message.content}`)
+    .join("\n\n");
+  const effectiveContext = params.previousOutput ?? params.testCase.context_content;
+
+  let rendered = params.step.prompt
+    .replaceAll("{{prompt}}", params.version.content)
+    .replaceAll("{{context}}", effectiveContext)
+    .replaceAll("{{conversation}}", conversationText)
+    .replaceAll("{{previous_output}}", params.previousOutput ?? "");
+
+  rendered = rendered.replace(/\{\{step:([\w-]+)\}\}/g, (_, stepId: string) => {
+    return params.stepOutputs.get(stepId) ?? "";
+  });
+
+  if (effectiveContext && !params.step.prompt.includes("{{context}}")) {
+    rendered = `${rendered}\n\n${effectiveContext}`;
+  }
+
+  return rendered;
 }
 
 function buildExecutionRequest(params: {
@@ -129,6 +213,19 @@ function buildExecutionRequest(params: {
       temperature: params.temperature,
     },
     conversationBase: fallbackMessages,
+  };
+}
+
+function serializeRun(
+  run: typeof runs.$inferSelect,
+): Omit<typeof run, "conversation" | "execution_trace"> & {
+  conversation: ConversationMessage[];
+  execution_trace: ExecutionTraceStep[] | null;
+} {
+  return {
+    ...run,
+    conversation: parseConversation(run.conversation),
+    execution_trace: parseExecutionTrace(run.execution_trace),
   };
 }
 
@@ -190,10 +287,7 @@ export function createRunsRouter(db: DB, options: RunsRouterOptions = {}) {
       .where(and(...conditions));
 
     return c.json(
-      result.map((run) => ({
-        ...run,
-        conversation: parseConversation(run.conversation),
-      })),
+      result.map(serializeRun),
     );
   });
 
@@ -214,6 +308,7 @@ export function createRunsRouter(db: DB, options: RunsRouterOptions = {}) {
         prompt_version_id: body.prompt_version_id,
         test_case_id: body.test_case_id,
         conversation: JSON.stringify(body.conversation),
+        execution_trace: body.execution_trace ? JSON.stringify(body.execution_trace) : null,
         is_best: false,
         is_discarded: false,
         model: body.model,
@@ -228,13 +323,7 @@ export function createRunsRouter(db: DB, options: RunsRouterOptions = {}) {
       return c.json({ error: "Failed to create Run" }, 500);
     }
 
-    return c.json(
-      {
-        ...created,
-        conversation: parseConversation(created.conversation),
-      },
-      201,
-    );
+    return c.json(serializeRun(created), 201);
   });
 
   // POST /api/projects/:projectId/runs/execute - LLMに接続してRunを実行・保存
@@ -291,6 +380,8 @@ export function createRunsRouter(db: DB, options: RunsRouterOptions = {}) {
       systemPrompt: buildSystemPrompt(version, testCase),
       temperature: settings.temperature,
     });
+    const workflow = parseWorkflowDefinition(version.workflow_definition);
+    const workflowSteps = buildWorkflowSteps(version, workflow);
 
     if (!execution) {
       return c.json({ error: "Prompt or test case turns are required" }, 400);
@@ -300,12 +391,83 @@ export function createRunsRouter(db: DB, options: RunsRouterOptions = {}) {
       new ReadableStream({
         async start(controller) {
           let assistantContent = "";
+          const executionTrace: ExecutionTraceStep[] = [];
 
           try {
-            for await (const event of client.stream(execution.request)) {
-              if (event.type === "text-delta") {
-                assistantContent += event.text;
-                controller.enqueue(encodeSse("delta", { text: event.text }));
+            if (workflowSteps.length > 0) {
+              const baseMessages = parseConversation(testCase.turns);
+              const stepOutputs = new Map<string, string>();
+
+              for (const step of workflowSteps) {
+                const inputConversation = buildWorkflowConversation(baseMessages);
+                const renderedPrompt = renderWorkflowPrompt({
+                  step,
+                  version,
+                  testCase,
+                  conversation: inputConversation,
+                  previousOutput:
+                    executionTrace.length > 0
+                      ? executionTrace[executionTrace.length - 1]?.output ?? null
+                      : null,
+                  stepOutputs,
+                });
+                const stepExecution = buildExecutionRequest({
+                  model: settings.model,
+                  messages: inputConversation,
+                  systemPrompt: renderedPrompt,
+                  temperature: settings.temperature,
+                });
+
+                if (!stepExecution) {
+                  controller.enqueue(
+                    encodeSse("error", { status: 400, message: `Step ${step.id} is empty` }),
+                  );
+                  return;
+                }
+
+                controller.enqueue(
+                  encodeSse("step-start", {
+                    id: step.id,
+                    title: step.title,
+                    prompt: step.prompt,
+                    renderedPrompt,
+                    inputConversation,
+                  }),
+                );
+
+                let stepOutput = "";
+                for await (const event of client.stream(stepExecution.request)) {
+                  if (event.type === "text-delta") {
+                    stepOutput += event.text;
+                    controller.enqueue(
+                      encodeSse("step-delta", {
+                        id: step.id,
+                        title: step.title,
+                        text: event.text,
+                      }),
+                    );
+                  }
+                }
+
+                stepOutputs.set(step.id, stepOutput);
+                executionTrace.push({
+                  id: step.id,
+                  title: step.title,
+                  prompt: step.prompt,
+                  renderedPrompt,
+                  inputConversation,
+                  output: stepOutput,
+                });
+
+                controller.enqueue(encodeSse("step-complete", executionTrace[executionTrace.length - 1]));
+              }
+              assistantContent = executionTrace[executionTrace.length - 1]?.output ?? "";
+            } else {
+              for await (const event of client.stream(execution.request)) {
+                if (event.type === "text-delta") {
+                  assistantContent += event.text;
+                  controller.enqueue(encodeSse("delta", { text: event.text }));
+                }
               }
             }
 
@@ -321,6 +483,8 @@ export function createRunsRouter(db: DB, options: RunsRouterOptions = {}) {
                 prompt_version_id: body.prompt_version_id,
                 test_case_id: body.test_case_id,
                 conversation: JSON.stringify(conversation),
+                execution_trace:
+                  executionTrace.length > 0 ? JSON.stringify(executionTrace) : null,
                 is_best: false,
                 is_discarded: false,
                 model: settings.model,
@@ -338,10 +502,7 @@ export function createRunsRouter(db: DB, options: RunsRouterOptions = {}) {
             }
 
             controller.enqueue(
-              encodeSse("run", {
-                ...created,
-                conversation: parseConversation(created.conversation),
-              }),
+              encodeSse("run", serializeRun(created)),
             );
           } catch (error) {
             controller.enqueue(encodeSse("error", normalizeExecuteError(error)));
@@ -378,10 +539,7 @@ export function createRunsRouter(db: DB, options: RunsRouterOptions = {}) {
       return c.json({ error: "Run not found" }, 404);
     }
 
-    return c.json({
-      ...run,
-      conversation: parseConversation(run.conversation),
-    });
+    return c.json(serializeRun(run));
   });
 
   // PATCH /api/projects/:projectId/runs/:id/best - ベスト回答フラグ更新
@@ -415,7 +573,7 @@ export function createRunsRouter(db: DB, options: RunsRouterOptions = {}) {
         .returning();
       const updated = updateResult[0];
       if (!updated) return c.json({ error: "Failed to update Run" }, 500);
-      return c.json({ ...updated, conversation: parseConversation(updated.conversation) });
+      return c.json(serializeRun(updated));
     }
 
     // 同一 prompt_version_id × test_case_id の既存フラグを解除
@@ -442,10 +600,7 @@ export function createRunsRouter(db: DB, options: RunsRouterOptions = {}) {
       return c.json({ error: "Failed to update Run" }, 500);
     }
 
-    return c.json({
-      ...updated,
-      conversation: parseConversation(updated.conversation),
-    });
+    return c.json(serializeRun(updated));
   });
 
   // PATCH /api/projects/:projectId/runs/:id/discard - Run破棄
@@ -477,10 +632,7 @@ export function createRunsRouter(db: DB, options: RunsRouterOptions = {}) {
       return c.json({ error: "Failed to update Run" }, 500);
     }
 
-    return c.json({
-      ...updated,
-      conversation: parseConversation(updated.conversation),
-    });
+    return c.json(serializeRun(updated));
   });
 
   return router;

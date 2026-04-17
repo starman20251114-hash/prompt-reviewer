@@ -141,9 +141,20 @@ export type PromptVersion = {
   name: string | null;
   memo: string | null;
   content: string;
+  workflow_definition: PromptWorkflowDefinition | null;
   parent_version_id: number | null;
   created_at: number;
   is_selected: boolean;
+};
+
+export type PromptExecutionStepDefinition = {
+  id: string;
+  title: string;
+  prompt: string;
+};
+
+export type PromptWorkflowDefinition = {
+  steps: PromptExecutionStepDefinition[];
 };
 
 export function getPromptVersions(projectId: number): Promise<PromptVersion[]> {
@@ -156,7 +167,12 @@ export function getPromptVersion(projectId: number, id: number): Promise<PromptV
 
 export function createPromptVersion(
   projectId: number,
-  data: { content: string; name?: string; memo?: string },
+  data: {
+    content: string;
+    name?: string;
+    memo?: string;
+    workflow_definition?: PromptWorkflowDefinition;
+  },
 ): Promise<PromptVersion> {
   return api.post<PromptVersion>(`/projects/${projectId}/prompt-versions`, data);
 }
@@ -164,7 +180,12 @@ export function createPromptVersion(
 export function updatePromptVersion(
   projectId: number,
   id: number,
-  data: { content?: string; name?: string | null; memo?: string | null },
+  data: {
+    content?: string;
+    name?: string | null;
+    memo?: string | null;
+    workflow_definition?: PromptWorkflowDefinition | null;
+  },
 ): Promise<PromptVersion> {
   return api.patch<PromptVersion>(`/projects/${projectId}/prompt-versions/${id}`, data);
 }
@@ -242,12 +263,22 @@ export type ConversationMessage = {
   content: string;
 };
 
+export type ExecutionTraceStep = {
+  id: string;
+  title: string;
+  prompt: string;
+  renderedPrompt: string;
+  inputConversation: ConversationMessage[];
+  output: string;
+};
+
 export type Run = {
   id: number;
   project_id: number;
   prompt_version_id: number;
   test_case_id: number;
   conversation: ConversationMessage[];
+  execution_trace: ExecutionTraceStep[] | null;
   is_best: boolean;
   is_discarded: boolean;
   model: string;
@@ -282,6 +313,7 @@ export function createRun(
     prompt_version_id: number;
     test_case_id: number;
     conversation: ConversationMessage[];
+    execution_trace?: ExecutionTraceStep[];
     model: string;
     temperature: number;
     api_provider: string;
@@ -295,6 +327,9 @@ type ExecuteRunStreamOptions = {
   test_case_id: number;
   api_key: string;
   onDelta: (text: string) => void;
+  onStepStart?: (step: Omit<ExecutionTraceStep, "output">) => void;
+  onStepDelta?: (input: { id: string; title: string; text: string }) => void;
+  onStepComplete?: (step: ExecutionTraceStep) => void;
 };
 
 type RunExecuteEvent =
@@ -305,6 +340,18 @@ type RunExecuteEvent =
   | {
       event: "run";
       data: Run;
+    }
+  | {
+      event: "step-start";
+      data: Omit<ExecutionTraceStep, "output">;
+    }
+  | {
+      event: "step-delta";
+      data: { id: string; title: string; text: string };
+    }
+  | {
+      event: "step-complete";
+      data: ExecutionTraceStep;
     }
   | {
       event: "error";
@@ -323,7 +370,14 @@ function parseSseEvent(chunk: string): RunExecuteEvent | null {
   const event = eventLine.slice("event: ".length) as RunExecuteEvent["event"];
   const data = JSON.parse(dataLine.slice("data: ".length)) as RunExecuteEvent["data"];
 
-  if (event === "delta" || event === "run" || event === "error") {
+  if (
+    event === "delta" ||
+    event === "run" ||
+    event === "step-start" ||
+    event === "step-delta" ||
+    event === "step-complete" ||
+    event === "error"
+  ) {
     return { event, data } as RunExecuteEvent;
   }
 
@@ -374,6 +428,18 @@ export async function executeRunStream(
 
       if (parsed.event === "delta") {
         options.onDelta(parsed.data.text);
+      }
+
+      if (parsed.event === "step-start") {
+        options.onStepStart?.(parsed.data);
+      }
+
+      if (parsed.event === "step-delta") {
+        options.onStepDelta?.(parsed.data);
+      }
+
+      if (parsed.event === "step-complete") {
+        options.onStepComplete?.(parsed.data);
       }
 
       if (parsed.event === "run") {

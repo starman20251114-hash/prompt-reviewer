@@ -31,6 +31,7 @@ type MockRun = {
   prompt_version_id: number;
   test_case_id: number;
   conversation: string;
+  execution_trace: string | null;
   is_best: boolean;
   is_discarded: boolean;
   created_at: number;
@@ -60,6 +61,7 @@ const sampleRun: MockRun = {
   prompt_version_id: 1,
   test_case_id: 1,
   conversation: JSON.stringify(sampleConversation),
+  execution_trace: null,
   is_best: false,
   is_discarded: false,
   created_at: 1000000,
@@ -328,6 +330,7 @@ describe("POST /api/projects/:projectId/runs/execute", () => {
       id: 1,
       project_id: 1,
       content: "あなたは親切なアシスタントです。\n\n{{context}}",
+      workflow_definition: null,
     };
     const testCase = {
       id: 1,
@@ -451,6 +454,7 @@ describe("POST /api/projects/:projectId/runs/execute", () => {
       id: 1,
       project_id: 1,
       content: "次のルールで回答してください。\n\n{{context}}",
+      workflow_definition: null,
     };
     const testCase = {
       id: 1,
@@ -555,7 +559,7 @@ describe("POST /api/projects/:projectId/runs/execute", () => {
         selectCallCount++;
         const result =
           selectCallCount === 1
-            ? [{ id: 1, project_id: 1, content: "   " }]
+            ? [{ id: 1, project_id: 1, content: "   ", workflow_definition: null }]
             : selectCallCount === 2
               ? [{ id: 1, project_id: 1, turns: JSON.stringify([]), context_content: "" }]
               : [{ model: "claude-sonnet-4-6", temperature: 0.7, api_provider: "anthropic" }];
@@ -590,7 +594,7 @@ describe("POST /api/projects/:projectId/runs/execute", () => {
         selectCallCount++;
         const result =
           selectCallCount === 1
-            ? [{ id: 1, project_id: 1, content: "system" }]
+            ? [{ id: 1, project_id: 1, content: "system", workflow_definition: null }]
             : selectCallCount === 2
               ? [
                   {
@@ -632,7 +636,7 @@ describe("POST /api/projects/:projectId/runs/execute", () => {
         selectCallCount++;
         const result =
           selectCallCount === 1
-            ? [{ id: 1, project_id: 1, content: "system" }]
+            ? [{ id: 1, project_id: 1, content: "system", workflow_definition: null }]
             : selectCallCount === 2
               ? [
                   {
@@ -665,6 +669,138 @@ describe("POST /api/projects/:projectId/runs/execute", () => {
     expect(res.status).toBe(501);
     const body = (await res.json()) as { error: string };
     expect(body.error).toBe("Provider execution is not implemented");
+  });
+
+  it("workflow_definition があるときプロンプト本文をStep 1として追加ステップを順番に実行して保存する", async () => {
+    const version = {
+      id: 1,
+      project_id: 1,
+      content: "判定してください\n\n{{context}}",
+      workflow_definition: JSON.stringify({
+        steps: [
+          {
+            id: "extract_effective",
+            title: "効果発言抽出",
+            prompt:
+              "文脈: {{context}}\n前段: {{step:__base_prompt__}}\n前回: {{previous_output}}",
+          },
+        ],
+      }),
+    };
+    const testCase = {
+      id: 1,
+      project_id: 1,
+      turns: JSON.stringify([{ role: "user", content: "長い相談ログ" }]),
+      context_content: "元の相談コンテキスト",
+    };
+    const settings = {
+      model: "claude-sonnet-4-6",
+      temperature: 0.4,
+      api_provider: "anthropic",
+    };
+    const created = {
+      ...sampleRun,
+      conversation: JSON.stringify([
+        { role: "user", content: "長い相談ログ" },
+        { role: "assistant", content: "効果があった発言は A と B です。" },
+      ]),
+      execution_trace: JSON.stringify([
+        {
+          id: "__base_prompt__",
+          title: "プロンプト本文",
+          prompt: "判定してください\n\n{{context}}",
+          renderedPrompt: "判定してください\n\n元の相談コンテキスト",
+          inputConversation: [{ role: "user", content: "長い相談ログ" }],
+          output: "行動を促せている",
+        },
+        {
+          id: "extract_effective",
+          title: "効果発言抽出",
+          prompt:
+            "文脈: {{context}}\n前段: {{step:__base_prompt__}}\n前回: {{previous_output}}",
+          renderedPrompt:
+            "文脈: 行動を促せている\n前段: 行動を促せている\n前回: 行動を促せている",
+          inputConversation: [{ role: "user", content: "長い相談ログ" }],
+          output: "効果があった発言は A と B です。",
+        },
+      ]),
+      model: settings.model,
+      temperature: settings.temperature,
+      api_provider: settings.api_provider,
+    };
+
+    let selectCallCount = 0;
+    const capturedRequests: LLMRequest[] = [];
+    const capturedInsertValues: Array<{ execution_trace: string | null }> = [];
+    let streamCallCount = 0;
+
+    const db = {
+      select: () => {
+        selectCallCount++;
+        const result =
+          selectCallCount === 1 ? [version] : selectCallCount === 2 ? [testCase] : [settings];
+        return {
+          from: () => ({
+            where: () => Promise.resolve(result),
+          }),
+        };
+      },
+      insert: () => ({
+        values: (values: { execution_trace: string | null }) => {
+          capturedInsertValues.push(values);
+          return {
+            returning: () => Promise.resolve([created]),
+          };
+        },
+      }),
+    };
+
+    const app = new Hono();
+    app.route(
+      "/api/projects/:projectId/runs",
+      createRunsRouter(db as unknown as DB, {
+        llmClientFactory: () => ({
+          async sendMessage() {
+            throw new Error("sendMessage should not be used for streaming execute");
+          },
+          async *stream(request: LLMRequest) {
+            capturedRequests.push(request);
+            if (streamCallCount === 0) {
+              streamCallCount++;
+              yield { type: "text-delta" as const, text: "行動を促せている" };
+              return;
+            }
+
+            yield { type: "text-delta" as const, text: "効果があった発言は A と B です。" };
+          },
+        }),
+      }),
+    );
+
+    const res = await app.request("/api/projects/1/runs/execute", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        prompt_version_id: 1,
+        test_case_id: 1,
+        api_key: "sk-ant-test",
+      }),
+    });
+
+    expect(res.status).toBe(200);
+    const streamText = await res.text();
+    expect(capturedRequests).toHaveLength(2);
+    expect(JSON.parse(capturedInsertValues[0]?.execution_trace ?? "[]")).toHaveLength(2);
+    expect(capturedRequests[0]).toMatchObject({
+      systemPrompt: "判定してください\n\n元の相談コンテキスト",
+    });
+    expect(capturedRequests[1]).toMatchObject({
+      messages: [{ role: "user", content: "長い相談ログ" }],
+      systemPrompt:
+        "文脈: 行動を促せている\n前段: 行動を促せている\n前回: 行動を促せている",
+    });
+    expect(streamText).toContain("event: step-start");
+    expect(streamText).toContain("event: step-complete");
   });
 });
 

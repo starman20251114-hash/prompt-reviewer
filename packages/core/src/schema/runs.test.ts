@@ -17,6 +17,7 @@ describe("runs スキーマ型定義", () => {
         prompt_version_id: number;
         test_case_id: number;
         conversation: string;
+        execution_trace: string | null;
         is_best: boolean;
         created_at: number;
         model: string;
@@ -31,6 +32,7 @@ describe("runs スキーマ型定義", () => {
           | "prompt_version_id"
           | "test_case_id"
           | "conversation"
+          | "execution_trace"
           | "is_best"
           | "created_at"
           | "model"
@@ -42,6 +44,10 @@ describe("runs スキーマ型定義", () => {
 
     it("Run の conversation は string 型（JSONシリアライズ済み）", () => {
       expectTypeOf<Run["conversation"]>().toEqualTypeOf<string>();
+    });
+
+    it("Run の execution_trace は string | null 型", () => {
+      expectTypeOf<Run["execution_trace"]>().toEqualTypeOf<string | null>();
     });
 
     it("Run の is_best は boolean 型", () => {
@@ -83,6 +89,7 @@ describe("runs スキーマ型定義", () => {
           { role: "user", content: "こんにちは" },
           { role: "assistant", content: "こんにちは！" },
         ]),
+        execution_trace: JSON.stringify([]),
         created_at: Date.now(),
         model: "claude-opus-4-5",
         temperature: 0.7,
@@ -104,6 +111,7 @@ describe("runs スキーマ型定義", () => {
           { role: "user", content: "質問です" },
           { role: "assistant", content: "詳細な回答です" },
         ]),
+        execution_trace: JSON.stringify([]),
         is_best: true,
         created_at: Date.now(),
         model: "claude-opus-4-5",

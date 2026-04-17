@@ -5,6 +5,7 @@ import { RunCompareView } from "../components/RunCompareView";
 import { useApiKey } from "../hooks/useApiKey";
 import {
   type ConversationMessage,
+  type ExecutionTraceStep,
   type PromptVersion,
   type Run,
   type TestCase,
@@ -36,6 +37,37 @@ function buildFullPrompt(version: PromptVersion, testCase: TestCase): string {
   return turnsText ? `${systemPrompt}\n\n[Conversation]\n${turnsText}\n[/Conversation]` : systemPrompt;
 }
 
+function buildWorkflowPreview(version: PromptVersion, testCase: TestCase): string {
+  const turnsText = testCase.turns
+    .map((turn) => `${turn.role === "user" ? "User" : "Assistant"}: ${turn.content}`)
+    .join("\n\n");
+  const baseContext = testCase.context_content || "(なし)";
+  const stepsText = [
+    "## Step 1: プロンプト本文\n" +
+      "id: __base_prompt__\n" +
+      "context: テストケースの context_content\n\n" +
+      version.content,
+    ...(version.workflow_definition?.steps ?? []).map(
+      (step, index) =>
+        `## Step ${index + 2}: ${step.title}\n` +
+        `id: ${step.id}\n` +
+        "context: 直前ステップの出力\n\n" +
+        `${step.prompt}`,
+    ),
+  ].join("\n\n");
+
+  return [
+    "[Test Case Context]",
+    baseContext,
+    "",
+    "[Conversation]",
+    turnsText || "(なし)",
+    "",
+    "[Workflow Steps]",
+    stepsText,
+  ].join("\n");
+}
+
 function CopyPromptPanel({
   version,
   testCase,
@@ -45,10 +77,13 @@ function CopyPromptPanel({
 }) {
   const [open, setOpen] = useState(false);
   const [copied, setCopied] = useState(false);
-  const fullPrompt = buildFullPrompt(version, testCase);
+  const hasWorkflow = (version.workflow_definition?.steps.length ?? 0) > 0;
+  const panelText = hasWorkflow
+    ? buildWorkflowPreview(version, testCase)
+    : buildFullPrompt(version, testCase);
 
   function handleCopy() {
-    navigator.clipboard.writeText(fullPrompt).then(() => {
+    navigator.clipboard.writeText(panelText).then(() => {
       setCopied(true);
       setTimeout(() => setCopied(false), 2000);
     });
@@ -63,14 +98,27 @@ function CopyPromptPanel({
           className={styles.btnCopyPromptToggle}
           aria-expanded={open}
         >
-          {open ? "▲ プロンプト全文を閉じる" : "▼ プロンプト全文を表示"}
+          {open
+            ? hasWorkflow
+              ? "▲ ステップ構成を閉じる"
+              : "▲ プロンプト全文を閉じる"
+            : hasWorkflow
+              ? "▼ ステップ構成を表示"
+              : "▼ プロンプト全文を表示"}
         </button>
         <button type="button" onClick={handleCopy} className={styles.btnCopy}>
-          {copied ? "✓ コピー済み" : "コピー"}
+          {copied ? "✓ コピー済み" : hasWorkflow ? "構成をコピー" : "コピー"}
         </button>
       </div>
+      {hasWorkflow && (
+        <div className={styles.workflowSummary}>
+          <p className={styles.workflowSummaryText}>
+            この Run は段階実行です。プロンプト本文が Step 1、追加ステップが Step 2 以降として実行されます。
+          </p>
+        </div>
+      )}
       {open && (
-        <textarea readOnly value={fullPrompt} className={styles.copyPromptTextarea} rows={12} />
+        <textarea readOnly value={panelText} className={styles.copyPromptTextarea} rows={12} />
       )}
     </div>
   );
@@ -88,6 +136,48 @@ function formatDate(timestamp: number): string {
 
 type Step = "select" | "input" | "saved";
 type PageTab = "create" | "list";
+
+function ExecutionTraceView({
+  trace,
+  streamingStepId,
+}: {
+  trace: ExecutionTraceStep[];
+  streamingStepId?: string | null;
+}) {
+  if (trace.length === 0) {
+    return null;
+  }
+
+  return (
+    <div className={styles.traceList}>
+      {trace.map((step, index) => (
+        <div key={step.id} className={styles.traceCard}>
+          <div className={styles.traceHeader}>
+            <div>
+              <span className={styles.traceIndex}>Step {index + 1}</span>
+              <span className={styles.traceTitle}>{step.title}</span>
+            </div>
+            <span className={styles.traceStatus}>
+              {streamingStepId === step.id ? "実行中..." : "完了"}
+            </span>
+          </div>
+          <div className={styles.traceSection}>
+            <p className={styles.traceLabel}>テンプレート</p>
+            <pre className={styles.tracePre}>{step.prompt}</pre>
+          </div>
+          <div className={styles.traceSection}>
+            <p className={styles.traceLabel}>実行時プロンプト</p>
+            <pre className={styles.tracePre}>{step.renderedPrompt}</pre>
+          </div>
+          <div className={styles.traceSection}>
+            <p className={styles.traceLabel}>出力</p>
+            <pre className={styles.traceOutput}>{step.output || " "}</pre>
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
 
 // アコーディオン形式の会話表示コンポーネント
 function RunConversation({ conversation }: { conversation: ConversationMessage[] }) {
@@ -140,6 +230,7 @@ function RunCard({
   isDiscardPending: boolean;
 }) {
   const [expanded, setExpanded] = useState(false);
+  const hasTrace = (run.execution_trace?.length ?? 0) > 0;
 
   return (
     <div
@@ -166,7 +257,7 @@ function RunCard({
             className={styles.btnToggle}
             aria-expanded={expanded}
           >
-            {expanded ? "▲ 折りたたむ" : "▼ 会話を表示"}
+            {expanded ? "▲ 折りたたむ" : hasTrace ? "▼ 会話とステップを表示" : "▼ 会話を表示"}
           </button>
           {onCompare && (
             <button
@@ -206,6 +297,12 @@ function RunCard({
       {expanded && (
         <div className={styles.runConversation}>
           <RunConversation conversation={run.conversation} />
+          {hasTrace && (
+            <div className={styles.traceBlock}>
+              <h4 className={styles.traceBlockTitle}>実行ステップ</h4>
+              <ExecutionTraceView trace={run.execution_trace ?? []} />
+            </div>
+          )}
         </div>
       )}
     </div>
@@ -280,6 +377,8 @@ export function RunsPage() {
   const [selectedVersionId, setSelectedVersionId] = useState<number | "">("");
   const [selectedTestCaseId, setSelectedTestCaseId] = useState<number | "">("");
   const [llmResponse, setLlmResponse] = useState("");
+  const [executionTrace, setExecutionTrace] = useState<ExecutionTraceStep[]>([]);
+  const [streamingStepId, setStreamingStepId] = useState<string | null>(null);
   const [savedRun, setSavedRun] = useState<Run | null>(null);
   const [executeError, setExecuteError] = useState<string | null>(null);
 
@@ -348,6 +447,7 @@ export function RunsPage() {
     }) =>
       createRun(projectId, {
         ...data,
+        execution_trace: executionTrace.length > 0 ? executionTrace : undefined,
         model: "manual",
         temperature: 0,
         api_provider: "manual",
@@ -367,13 +467,37 @@ export function RunsPage() {
         onDelta: (text) => {
           setLlmResponse((prev) => `${prev}${text}`);
         },
+        onStepStart: (stepInfo) => {
+          setStreamingStepId(stepInfo.id);
+          setExecutionTrace((prev) => [...prev, { ...stepInfo, output: "" }]);
+          setLlmResponse("");
+        },
+        onStepDelta: (stepDelta) => {
+          setExecutionTrace((prev) =>
+            prev.map((step) =>
+              step.id === stepDelta.id ? { ...step, output: `${step.output}${stepDelta.text}` } : step,
+            ),
+          );
+          setLlmResponse((prev) => `${prev}${stepDelta.text}`);
+        },
+        onStepComplete: (stepInfo) => {
+          setExecutionTrace((prev) =>
+            prev.map((step) => (step.id === stepInfo.id ? stepInfo : step)),
+          );
+          setStreamingStepId(null);
+          setLlmResponse(stepInfo.output);
+        },
       }),
     onMutate: () => {
       setExecuteError(null);
       setLlmResponse("");
+      setExecutionTrace([]);
+      setStreamingStepId(null);
     },
     onSuccess: (run) => {
       setSavedRun(run);
+      setExecutionTrace(run.execution_trace ?? []);
+      setStreamingStepId(null);
       setStep("saved");
       void queryClient.invalidateQueries({ queryKey: ["runs", projectId] });
     },
@@ -419,6 +543,8 @@ export function RunsPage() {
   function handleStartRun() {
     if (selectedVersionId === "" || selectedTestCaseId === "") return;
     setLlmResponse("");
+    setExecutionTrace([]);
+    setStreamingStepId(null);
     setExecuteError(null);
     setStep("input");
   }
@@ -446,6 +572,8 @@ export function RunsPage() {
     }
     setSavedRun(null);
     setLlmResponse("");
+    setExecutionTrace([]);
+    setStreamingStepId(null);
     setExecuteError(null);
     setStep("select");
   }
@@ -675,7 +803,9 @@ export function RunsPage() {
                 <div className={`${styles.panel} ${styles.panelFlex}`}>
                   <h3 className={styles.panelSubtitle}>LLM 応答</h3>
                   <p className={styles.inputDescription}>
-                    実行すると応答をストリーミング表示し、完了後に Run として保存します。
+                    {selectedVersion.workflow_definition?.steps.length
+                      ? "実行するとプロンプト本文を Step 1 として実行し、その後に追加ステップを順番に走らせます。"
+                      : "実行すると応答をストリーミング表示し、完了後に Run として保存します。"}
                   </p>
 
                   <div className={styles.inputActionsTop}>
@@ -697,6 +827,13 @@ export function RunsPage() {
                     className={styles.responseTextarea}
                     readOnly={executeRunMutation.isPending}
                   />
+
+                  {executionTrace.length > 0 && (
+                    <div className={styles.traceBlock}>
+                      <h4 className={styles.traceBlockTitle}>ステップ実行結果</h4>
+                      <ExecutionTraceView trace={executionTrace} streamingStepId={streamingStepId} />
+                    </div>
+                  )}
 
                   <div className={styles.inputActions}>
                     <button
@@ -755,6 +892,12 @@ export function RunsPage() {
                     </div>
                   ))}
                 </div>
+                {savedRun.execution_trace?.length ? (
+                  <div className={styles.traceBlock}>
+                    <h4 className={styles.traceBlockTitle}>保存されたステップ結果</h4>
+                    <ExecutionTraceView trace={savedRun.execution_trace} />
+                  </div>
+                ) : null}
               </div>
 
               {/* 同一バージョン×ケースの過去Run一覧 */}

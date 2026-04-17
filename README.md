@@ -27,10 +27,13 @@ cp .env.example .env
 初回起動前に、マイグレーションを実行してテーブルを作成してください。
 
 ```bash
-pnpm --filter @prompt-reviewer/core migrate
+pnpm migrate:dev
 ```
 
 DBファイルはモノレポルート直下の `dev.db` に作成されます。
+
+`pnpm dev` を使う場合は `pnpm migrate:dev` を使ってください。  
+ローカル試用版の `data/prompt-reviewer.sqlite` に対して適用する場合は `pnpm migrate:local` を使います。
 
 > **サンプルデータを投入する場合**
 > ```bash
