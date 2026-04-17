@@ -126,6 +126,27 @@
   font-size: 11px;
 }
 
+.btnCopy {
+  padding: 3px 10px;
+  background: transparent;
+  border: 1px solid var(--c-border);
+  border-radius: 4px;
+  color: var(--c-subtext);
+  font-size: 11px;
+  cursor: pointer;
+  transition: color 0.1s, border-color 0.1s;
+}
+
+.btnCopy:hover {
+  color: var(--c-text);
+  border-color: var(--c-subtext);
+}
+
+.btnCopied {
+  color: var(--c-green);
+  border-color: var(--c-green);
+}
+
 .chatList {
   flex: 1;
   overflow: auto;
