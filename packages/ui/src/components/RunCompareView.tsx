@@ -2,6 +2,23 @@ import { useRef, useState } from "react";
 import type { Run } from "../lib/api";
 import styles from "./RunCompareView.module.css";
 
+function CopyButton({ text }: { text: string }) {
+  const [copied, setCopied] = useState(false);
+
+  function handleCopy() {
+    void navigator.clipboard.writeText(text).then(() => {
+      setCopied(true);
+      setTimeout(() => setCopied(false), 1500);
+    });
+  }
+
+  return (
+    <button type="button" onClick={handleCopy} className={`${styles.btnCopy} ${copied ? styles.btnCopied : ""}`}>
+      {copied ? "コピー済み" : "コピー"}
+    </button>
+  );
+}
+
 function getLastAssistantMessage(run: Run): string {
   return [...run.conversation].reverse().find((message) => message.role === "assistant")?.content ?? "";
 }
@@ -153,6 +170,7 @@ export function RunCompareView({ runA, runB, versionLabelA, versionLabelB, onClo
                 <div className={`${styles.panelHeader} ${styles.panelHeaderA}`}>
                   <span>Run #{runA.id}</span>
                   <span className={styles.panelMeta}>{versionLabelA}</span>
+                  <CopyButton text={lastAssistantA} />
                 </div>
                 <div ref={scrollRefA} className={styles.chatList} onScroll={handleScrollA}>
                   <div className={`${styles.bubbleWrapper} ${styles.bubbleWrapperAssistant}`}>
@@ -165,6 +183,7 @@ export function RunCompareView({ runA, runB, versionLabelA, versionLabelB, onClo
                 <div className={`${styles.panelHeader} ${styles.panelHeaderB}`}>
                   <span>Run #{runB.id}</span>
                   <span className={styles.panelMeta}>{versionLabelB}</span>
+                  <CopyButton text={lastAssistantB} />
                 </div>
                 <div ref={scrollRefB} className={styles.chatList} onScroll={handleScrollB}>
                   <div className={`${styles.bubbleWrapper} ${styles.bubbleWrapperAssistant}`}>
