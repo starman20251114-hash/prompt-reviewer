@@ -234,6 +234,10 @@
   font-size: 13px;
   color: var(--c-subtext);
   line-height: 1.5;
+  max-height: 200px;
+  overflow-y: auto;
+  white-space: pre-wrap;
+  word-break: break-word;
 }
 
 /* ==================== LLM response input ==================== */
