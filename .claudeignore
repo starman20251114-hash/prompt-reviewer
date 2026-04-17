@@ -15,3 +15,6 @@ pnpm-lock.yaml
 *.db
 *.db-shm
 *.db-wal
+
+# Server runtime data (context files, DB files)
+packages/server/data/

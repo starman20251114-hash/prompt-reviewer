@@ -13,6 +13,9 @@ data/*.sqlite
 data/*.sqlite-shm
 data/*.sqlite-wal
 
+# Server runtime data (context files, DB files)
+packages/server/data/
+
 # TypeScript build info
 *.tsbuildinfo
 
