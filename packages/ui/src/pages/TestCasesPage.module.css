@@ -150,6 +150,42 @@
   font-family: monospace;
 }
 
+.contextImportRow {
+  margin-bottom: 10px;
+}
+
+.contextImportControls {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 6px;
+}
+
+.contextFileSelect {
+  flex: 1;
+  padding: 9px 12px;
+  background: var(--c-card);
+  border: 1px solid var(--c-border);
+  border-radius: 8px;
+  color: var(--c-text);
+  font-size: 13px;
+}
+
+.contextImportButton {
+  flex-shrink: 0;
+}
+
+.contextImportNotice {
+  margin: 6px 0 0;
+  font-size: 12px;
+  color: var(--c-accent);
+}
+
+.contextImportError {
+  margin: 6px 0 0;
+  font-size: 12px;
+  color: var(--c-danger);
+}
+
 /* ==================== Input mode toggle ==================== */
 .modeLabel {
   font-size: 14px;
