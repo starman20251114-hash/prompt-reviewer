@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { AnthropicLLMClient, DEFAULT_MAX_TOKENS } from "./anthropic.js";
+import { AnthropicLLMClient } from "./anthropic.js";
 import { LLMAuthenticationError, LLMConfigurationError } from "./errors.js";
 
 describe("AnthropicLLMClient", () => {
@@ -120,7 +120,7 @@ describe("AnthropicLLMClient", () => {
       model: "claude-sonnet-4-5",
       system: undefined,
       temperature: undefined,
-      max_tokens: DEFAULT_MAX_TOKENS,
+      max_tokens: 4096,
       messages: [{ role: "user", content: "こんにちは" }],
       stream: true,
     });
