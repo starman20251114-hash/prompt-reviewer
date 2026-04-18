@@ -654,9 +654,10 @@ export function RunsPage() {
         </button>
       </div>
 
-      {/* ============ タブ: Run を作成 ============ */}
-      {activeTab === "create" && (
-        <div>
+      <div className={styles.tabContent}>
+        {/* ============ タブ: Run を作成 ============ */}
+        {activeTab === "create" && (
+          <div>
           {/* Step 1: 選択フォーム */}
           {step === "select" && (
             <div className={styles.selectCard}>
@@ -926,12 +927,12 @@ export function RunsPage() {
               </div>
             </div>
           )}
-        </div>
-      )}
+          </div>
+        )}
 
-      {/* ============ タブ: Run 一覧 ============ */}
-      {activeTab === "list" && (
-        <div>
+        {/* ============ タブ: Run 一覧 ============ */}
+        {activeTab === "list" && (
+          <div>
           <RunCompareBar
             compareRunA={compareRunA}
             compareRunB={compareRunB}
@@ -1043,8 +1044,9 @@ export function RunsPage() {
             }}
             className={styles.compareBarBottom}
           />
-        </div>
-      )}
+          </div>
+        )}
+      </div>
 
       {/* 比較ビュー */}
       {isCompareOpen && compareRunA && compareRunB && (
