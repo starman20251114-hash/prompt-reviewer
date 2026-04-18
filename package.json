@@ -7,7 +7,7 @@
     "setup:local": "node scripts/local.mjs setup",
     "build:local": "node scripts/local.mjs build",
     "migrate:local": "node scripts/local.mjs migrate",
-    "migrate:dev": "pwsh -Command \"$env:DB_PATH='dev.db'; pnpm --filter @prompt-reviewer/core migrate\"",
+    "migrate:dev": "pwsh -Command \"$env:DB_PATH='../../dev.db'; pnpm --filter @prompt-reviewer/core migrate\"",
     "check:db:dev": "pnpm --filter @prompt-reviewer/core exec node ./scripts/check-db-schema.mjs ../../dev.db",
     "check:db:local": "pnpm --filter @prompt-reviewer/core exec node ./scripts/check-db-schema.mjs ../../data/prompt-reviewer.sqlite",
     "seed:local": "node scripts/local.mjs seed",
