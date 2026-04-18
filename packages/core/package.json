@@ -16,6 +16,7 @@
     "build:watch": "tsc --watch --preserveWatchOutput",
     "generate": "drizzle-kit generate",
     "migrate": "drizzle-kit migrate",
+    "migrate:domain-model": "node ./scripts/migrate-domain-model.mjs",
     "seed": "tsx src/seed.ts"
   },
   "dependencies": {

@@ -48,6 +48,23 @@ pnpm migrate:local
 > pnpm --filter @prompt-reviewer/core seed
 > ```
 
+### 既存データの新スキーマ移行
+
+Issue #108 対応として、旧 `project_settings` / `prompt_versions.project_id` / `test_cases.project_id` と
+`data/context-files/<projectId>/...` を新ドメインモデルへ移すスクリプトを追加しています。
+
+```bash
+pnpm --filter @prompt-reviewer/core migrate:domain-model -- ../../dev.db ../../data/context-files
+```
+
+- 第1引数は移行対象 DB のパスです。省略時は `../../dev.db` を使います
+- 第2引数は旧 `context-files` ディレクトリです。省略時は `../../data/context-files` を使います
+- 既存 `projects` はそのまま分類ラベルとして流用します
+- `prompt_versions` は project ごとに 1 つの `prompt_family` へ束ねます
+- `project_settings` は project ごとの既定 `execution_profile` に変換します
+- 既存 Run の設定スナップショットが `project_settings` と一致しない場合は、Run の実値から追加の `execution_profile` を作って `execution_profile_id` を補完します
+- `context-files` は project ごとの `path` をキーとして `context_assets` へ upsert します。同じ project / path で再実行した場合は重複作成せず内容を更新します
+
 ### 開発サーバーの起動
 
 ```bash
