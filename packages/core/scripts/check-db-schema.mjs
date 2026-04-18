@@ -1,11 +1,12 @@
-import Database from "better-sqlite3";
 import path from "node:path";
+import Database from "better-sqlite3";
 
 const configuredPath = process.argv[2] ?? process.env.DB_PATH ?? "../../dev.db";
 const resolvedPath = path.resolve(process.cwd(), configuredPath);
 
 const expectedSchema = {
   projects: ["id", "name", "description", "created_at", "updated_at"],
+  prompt_families: ["id", "name", "description", "created_at", "updated_at"],
   project_settings: [
     "id",
     "project_id",
@@ -15,6 +16,30 @@ const expectedSchema = {
     "created_at",
     "updated_at",
   ],
+  execution_profiles: [
+    "id",
+    "name",
+    "description",
+    "model",
+    "temperature",
+    "api_provider",
+    "created_at",
+    "updated_at",
+  ],
+  context_assets: [
+    "id",
+    "name",
+    "path",
+    "content",
+    "mime_type",
+    "content_hash",
+    "created_at",
+    "updated_at",
+  ],
+  test_case_projects: ["test_case_id", "project_id", "created_at"],
+  prompt_version_projects: ["prompt_version_id", "project_id", "created_at"],
+  test_case_context_assets: ["test_case_id", "context_asset_id", "created_at"],
+  prompt_family_context_assets: ["prompt_family_id", "context_asset_id", "created_at"],
   test_cases: [
     "id",
     "project_id",
@@ -28,6 +53,7 @@ const expectedSchema = {
   ],
   prompt_versions: [
     "id",
+    "prompt_family_id",
     "project_id",
     "version",
     "name",
@@ -40,6 +66,7 @@ const expectedSchema = {
   ],
   runs: [
     "id",
+    "execution_profile_id",
     "project_id",
     "prompt_version_id",
     "test_case_id",
@@ -66,7 +93,10 @@ const expectedSchema = {
 };
 
 function getColumns(db, tableName) {
-  return db.prepare(`PRAGMA table_info(${tableName})`).all().map((column) => column.name);
+  return db
+    .prepare(`PRAGMA table_info(${tableName})`)
+    .all()
+    .map((column) => column.name);
 }
 
 function formatList(values) {

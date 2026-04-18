@@ -13,13 +13,17 @@ describe("prompt_versions スキーマ型定義", () => {
     it("PromptVersion 型は必須フィールドを持つ", () => {
       type RequiredFields = {
         id: number;
+        prompt_family_id: number | null;
         project_id: number;
         version: number;
         content: string;
         created_at: number;
       };
       expectTypeOf<
-        Pick<PromptVersion, "id" | "project_id" | "version" | "content" | "created_at">
+        Pick<
+          PromptVersion,
+          "id" | "prompt_family_id" | "project_id" | "version" | "content" | "created_at"
+        >
       >().toMatchTypeOf<RequiredFields>();
     });
 
@@ -96,4 +100,11 @@ describe("prompt_versions スキーマ型定義", () => {
       expectTypeOf(namedVersion).toMatchTypeOf<NewPromptVersion>();
     });
   });
+});
+it("PromptVersion の prompt_family_id は移行期間中 number | null 型", () => {
+  expectTypeOf<PromptVersion["prompt_family_id"]>().toEqualTypeOf<number | null>();
+});
+
+it("NewPromptVersion の prompt_family_id は移行期間中オプショナル", () => {
+  expectTypeOf<NewPromptVersion["prompt_family_id"]>().toEqualTypeOf<number | null | undefined>();
 });
