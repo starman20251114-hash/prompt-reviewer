@@ -245,6 +245,65 @@ describe("POST /api/projects/:projectId/prompt-versions", () => {
     expect(res.status).toBe(400);
   });
 
+  it("workflow_definition の step.id に使用不可の文字があるとき400を返す", async () => {
+    const db = {};
+
+    const app = buildApp(db);
+    const res = await app.request("/api/projects/1/prompt-versions", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        content: "プロンプト本文",
+        workflow_definition: {
+          steps: [{ id: "step.1", title: "抽出", prompt: "内容を抽出してください" }],
+        },
+      }),
+    });
+
+    expect(res.status).toBe(400);
+  });
+
+  it("workflow_definition の step.id が重複すると400を返す", async () => {
+    const db = {};
+
+    const app = buildApp(db);
+    const res = await app.request("/api/projects/1/prompt-versions", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        content: "プロンプト本文",
+        workflow_definition: {
+          steps: [
+            { id: "extract", title: "抽出1", prompt: "内容を抽出してください" },
+            { id: "extract", title: "抽出2", prompt: "要約してください" },
+          ],
+        },
+      }),
+    });
+
+    expect(res.status).toBe(400);
+  });
+
+  it("workflow_definition の step.id に予約済みIDを使うと400を返す", async () => {
+    const db = {};
+
+    const app = buildApp(db);
+    const res = await app.request("/api/projects/1/prompt-versions", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        content: "プロンプト本文",
+        workflow_definition: {
+          steps: [
+            { id: "__base_prompt__", title: "抽出", prompt: "内容を抽出してください" },
+          ],
+        },
+      }),
+    });
+
+    expect(res.status).toBe(400);
+  });
+
 });
 
 describe("GET /api/projects/:projectId/prompt-versions/:id", () => {
@@ -400,6 +459,26 @@ describe("PATCH /api/projects/:projectId/prompt-versions/:id", () => {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ content: "更新" }),
+    });
+
+    expect(res.status).toBe(400);
+  });
+
+  it("PATCH で workflow_definition の step.id が重複すると400を返す", async () => {
+    const db = {};
+
+    const app = buildApp(db);
+    const res = await app.request("/api/projects/1/prompt-versions/1", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        workflow_definition: {
+          steps: [
+            { id: "extract", title: "抽出1", prompt: "内容を抽出してください" },
+            { id: "extract", title: "抽出2", prompt: "要約してください" },
+          ],
+        },
+      }),
     });
 
     expect(res.status).toBe(400);

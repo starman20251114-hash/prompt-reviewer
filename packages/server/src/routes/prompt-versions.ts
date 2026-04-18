@@ -5,15 +5,46 @@ import { and, eq, max } from "drizzle-orm";
 import { Hono } from "hono";
 import { z } from "zod";
 
+const workflowStepIdPattern = /^[A-Za-z0-9_-]+$/;
+const reservedWorkflowStepIds = new Set(["__base_prompt__"]);
+
 const workflowStepSchema = z.object({
-  id: z.string().min(1, "step.idは1文字以上必要です"),
+  id: z
+    .string()
+    .min(1, "step.idは1文字以上必要です")
+    .regex(workflowStepIdPattern, "step.idは半角英数字、_、- のみ使用できます"),
   title: z.string().min(1, "step.titleは1文字以上必要です"),
   prompt: z.string().min(1, "step.promptは1文字以上必要です"),
 });
 
-const workflowDefinitionSchema = z.object({
-  steps: z.array(workflowStepSchema),
-});
+const workflowDefinitionSchema = z
+  .object({
+    steps: z.array(workflowStepSchema),
+  })
+  .superRefine((value, ctx) => {
+    const seenIds = new Set<string>();
+
+    value.steps.forEach((step, index) => {
+      if (reservedWorkflowStepIds.has(step.id)) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: "step.idに __base_prompt__ は使用できません",
+          path: ["steps", index, "id"],
+        });
+      }
+
+      if (seenIds.has(step.id)) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: "step.idは重複できません",
+          path: ["steps", index, "id"],
+        });
+        return;
+      }
+
+      seenIds.add(step.id);
+    });
+  });
 
 const createPromptVersionSchema = z.object({
   content: z.string().min(1, "contentは1文字以上必要です"),
@@ -162,8 +193,6 @@ export function createPromptVersionsRouter(db: DB) {
     }
 
     const body = c.req.valid("json");
-    const normalizedName =
-      body.name !== undefined ? normalizeOptionalString(body.name) : undefined;
 
     const updateData: {
       content?: string;
@@ -174,6 +203,7 @@ export function createPromptVersionsRouter(db: DB) {
 
     if (body.content !== undefined) updateData.content = body.content;
     if (body.name !== undefined) {
+      const normalizedName = normalizeOptionalString(body.name);
       updateData.name =
         existing.parent_version_id === null
           ? normalizedName ?? buildDefaultPromptName(existing.version)

@@ -57,13 +57,6 @@
       "when": 1776409200000,
       "tag": "0007_prompt_workflow_and_run_trace",
       "breakpoints": true
-    },
-    {
-      "idx": 8,
-      "version": "6",
-      "when": 1776412800000,
-      "tag": "0008_runs_execution_trace_fix",
-      "breakpoints": true
     }
   ]
 }

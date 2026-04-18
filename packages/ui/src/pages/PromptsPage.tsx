@@ -13,6 +13,9 @@ import {
 } from "../lib/api";
 import styles from "./PromptsPage.module.css";
 
+const workflowStepIdPattern = /^[A-Za-z0-9_-]+$/;
+const reservedWorkflowStepId = "__base_prompt__";
+
 function formatDate(timestamp: number): string {
   return new Date(timestamp).toLocaleDateString("ja-JP", {
     year: "numeric",
@@ -102,6 +105,33 @@ function createWorkflowStep(): PromptExecutionStepDefinition {
     title: "",
     prompt: "",
   };
+}
+
+function getWorkflowValidationMessage(steps: PromptExecutionStepDefinition[]): string | null {
+  const seenIds = new Set<string>();
+
+  for (const step of steps) {
+    const trimmedId = step.id.trim();
+    if (!trimmedId || !step.prompt.trim()) {
+      return "各ステップのIDとプロンプトを入力してください。";
+    }
+
+    if (!workflowStepIdPattern.test(trimmedId)) {
+      return "ステップIDは半角英数字、_、- のみ使用できます。";
+    }
+
+    if (trimmedId === reservedWorkflowStepId) {
+      return "__base_prompt__ は予約済みのため使用できません。";
+    }
+
+    if (seenIds.has(trimmedId)) {
+      return "ステップIDは重複できません。";
+    }
+
+    seenIds.add(trimmedId);
+  }
+
+  return null;
 }
 
 // Determine whether to draw a vertical line at depth d for each node
@@ -264,10 +294,8 @@ function PromptEditor({ version, projectId, isNew = false, onSave, onCancel }: P
   });
 
   const isPending = createMutation.isPending || updateMutation.isPending;
-  const hasInvalidWorkflowStep = workflowSteps.some(
-    (step) => !step.id.trim() || !step.prompt.trim(),
-  );
-  const isDisabled = !content.trim() || isPending || hasInvalidWorkflowStep;
+  const workflowValidationMessage = getWorkflowValidationMessage(workflowSteps);
+  const isDisabled = !content.trim() || isPending || workflowValidationMessage !== null;
 
   function buildWorkflowDefinition() {
     const steps = workflowSteps
@@ -433,6 +461,7 @@ function PromptEditor({ version, projectId, isNew = false, onSave, onCancel }: P
           </div>
         )}
       </div>
+      {workflowValidationMessage && <p className={styles.errorMsg}>{workflowValidationMessage}</p>}
       <div className={styles.formActions}>
         <button type="button" onClick={onCancel} className={styles.btnCancel}>
           キャンセル
