@@ -318,9 +318,10 @@
 .panelEditorBody {
   flex: 1;
   padding: 16px;
-  overflow: hidden;
+  overflow: auto;
   display: flex;
   flex-direction: column;
+  min-height: 0;
 }
 
 .panelHeaderRight {
@@ -417,14 +418,60 @@
   overflow-wrap: break-word;
 }
 
+.workflowPreview {
+  margin-top: 14px;
+}
+
+.workflowPreviewLabel {
+  margin-bottom: 8px;
+  color: var(--c-accent);
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.workflowPreviewList {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.workflowPreviewCard {
+  padding: 12px;
+  background: var(--c-overlay);
+  border: 1px solid var(--c-border);
+  border-radius: 6px;
+}
+
+.workflowPreviewHeader {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 8px;
+  color: var(--c-subtext);
+  font-size: 12px;
+}
+
+.workflowPreviewId {
+  color: var(--c-muted);
+  font-family: monospace;
+}
+
+.workflowPreviewPrompt {
+  margin: 0;
+  color: var(--c-text);
+  font-size: 12px;
+  line-height: 1.6;
+  font-family: monospace;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
 /* ==================== Editor form ==================== */
 .editorForm {
   display: flex;
   flex-direction: column;
   gap: 14px;
-  flex: 1;
-  min-height: 0;
-  overflow: hidden;
+  min-height: min-content;
 }
 
 .fieldLabel {
@@ -444,7 +491,7 @@
 }
 
 .fieldTextareaWrapper {
-  flex: 1;
+  flex: 0 0 auto;
   display: flex;
   flex-direction: column;
   min-height: 0;
@@ -454,12 +501,111 @@
   composes: fieldTextarea from '../styles/shared.module.css';
   padding: 8px 12px;
   border-radius: 6px;
-  resize: none;
+  resize: vertical;
   line-height: 1.6;
   font-family: monospace;
-  flex: 1;
-  min-height: 0;
+  min-height: 160px;
+  max-height: 280px;
   overflow: auto;
+}
+
+.workflowSection {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.workflowHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 12px;
+}
+
+.workflowHint {
+  margin: 4px 0 0;
+  color: var(--c-muted);
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.btnWorkflowAdd {
+  padding: 6px 12px;
+  background: transparent;
+  border: 1px solid var(--c-blue);
+  border-radius: 6px;
+  color: var(--c-blue);
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.workflowEmpty {
+  padding: 10px 12px;
+  background: var(--c-overlay);
+  border: 1px dashed var(--c-border);
+  border-radius: 6px;
+  color: var(--c-muted);
+  font-size: 12px;
+}
+
+.workflowList {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  max-height: 320px;
+  overflow: auto;
+}
+
+.workflowCard {
+  padding: 12px;
+  background: var(--c-overlay);
+  border: 1px solid var(--c-border);
+  border-radius: 6px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.workflowCardHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+}
+
+.workflowCardTitle {
+  font-size: 12px;
+  color: var(--c-yellow);
+  font-weight: 600;
+}
+
+.btnWorkflowRemove {
+  padding: 4px 8px;
+  background: transparent;
+  border: 1px solid rgba(243, 139, 168, 0.45);
+  border-radius: 6px;
+  color: var(--c-danger);
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.workflowFields {
+  display: grid;
+  grid-template-columns: 180px 1fr;
+  gap: 8px;
+}
+
+.workflowTextarea {
+  min-height: 120px;
+  padding: 8px 12px;
+  background: var(--c-card);
+  border: 1px solid var(--c-border);
+  border-radius: 6px;
+  color: var(--c-text);
+  font-size: 13px;
+  line-height: 1.6;
+  font-family: monospace;
+  resize: vertical;
 }
 
 .formActions {

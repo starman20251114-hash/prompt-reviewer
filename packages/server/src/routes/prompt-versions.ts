@@ -5,16 +5,59 @@ import { and, eq, max } from "drizzle-orm";
 import { Hono } from "hono";
 import { z } from "zod";
 
+const workflowStepIdPattern = /^[A-Za-z0-9_-]+$/;
+const reservedWorkflowStepIds = new Set(["__base_prompt__"]);
+
+const workflowStepSchema = z.object({
+  id: z
+    .string()
+    .min(1, "step.idは1文字以上必要です")
+    .regex(workflowStepIdPattern, "step.idは半角英数字、_、- のみ使用できます"),
+  title: z.string().min(1, "step.titleは1文字以上必要です"),
+  prompt: z.string().min(1, "step.promptは1文字以上必要です"),
+});
+
+const workflowDefinitionSchema = z
+  .object({
+    steps: z.array(workflowStepSchema),
+  })
+  .superRefine((value, ctx) => {
+    const seenIds = new Set<string>();
+
+    value.steps.forEach((step, index) => {
+      if (reservedWorkflowStepIds.has(step.id)) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: "step.idに __base_prompt__ は使用できません",
+          path: ["steps", index, "id"],
+        });
+      }
+
+      if (seenIds.has(step.id)) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: "step.idは重複できません",
+          path: ["steps", index, "id"],
+        });
+        return;
+      }
+
+      seenIds.add(step.id);
+    });
+  });
+
 const createPromptVersionSchema = z.object({
   content: z.string().min(1, "contentは1文字以上必要です"),
   name: z.string().optional(),
   memo: z.string().optional(),
+  workflow_definition: workflowDefinitionSchema.optional(),
 });
 
 const updatePromptVersionSchema = z.object({
   content: z.string().min(1, "contentは1文字以上必要です").optional(),
   name: z.string().nullable().optional(),
   memo: z.string().nullable().optional(),
+  workflow_definition: workflowDefinitionSchema.nullable().optional(),
 });
 
 const branchPromptVersionSchema = z.object({
@@ -22,8 +65,34 @@ const branchPromptVersionSchema = z.object({
   memo: z.string().optional(),
 });
 
+function normalizeOptionalString(value: string | null | undefined): string | null {
+  if (value === undefined || value === null) {
+    return null;
+  }
+
+  const trimmed = value.trim();
+  return trimmed.length > 0 ? trimmed : null;
+}
+
+function buildDefaultPromptName(version: number): string {
+  return `プロンプト ${version}`;
+}
+
 export function createPromptVersionsRouter(db: DB) {
   const router = new Hono();
+
+  function serializePromptVersion(
+    version: typeof prompt_versions.$inferSelect,
+  ): Omit<typeof version, "workflow_definition"> & {
+    workflow_definition: z.infer<typeof workflowDefinitionSchema> | null;
+  } {
+    return {
+      ...version,
+      workflow_definition: version.workflow_definition
+        ? (JSON.parse(version.workflow_definition) as z.infer<typeof workflowDefinitionSchema>)
+        : null,
+    };
+  }
 
   // GET /api/projects/:projectId/prompt-versions - バージョン一覧取得
   router.get("/", async (c) => {
@@ -38,7 +107,7 @@ export function createPromptVersionsRouter(db: DB) {
       .from(prompt_versions)
       .where(eq(prompt_versions.project_id, projectId));
 
-    return c.json(result);
+    return c.json(result.map(serializePromptVersion));
   });
 
   // POST /api/projects/:projectId/prompt-versions - 新規バージョン作成
@@ -58,6 +127,7 @@ export function createPromptVersionsRouter(db: DB) {
       .where(eq(prompt_versions.project_id, projectId));
 
     const nextVersion = (maxResult?.maxVersion ?? 0) + 1;
+    const normalizedName = normalizeOptionalString(body.name) ?? buildDefaultPromptName(nextVersion);
 
     const result = await db
       .insert(prompt_versions)
@@ -65,8 +135,11 @@ export function createPromptVersionsRouter(db: DB) {
         project_id: projectId,
         version: nextVersion,
         content: body.content,
-        name: body.name ?? null,
+        name: normalizedName,
         memo: body.memo ?? null,
+        workflow_definition: body.workflow_definition
+          ? JSON.stringify(body.workflow_definition)
+          : null,
         parent_version_id: null,
         created_at: Date.now(),
       })
@@ -77,7 +150,7 @@ export function createPromptVersionsRouter(db: DB) {
       return c.json({ error: "Failed to create PromptVersion" }, 500);
     }
 
-    return c.json(created, 201);
+    return c.json(serializePromptVersion(created), 201);
   });
 
   // GET /api/projects/:projectId/prompt-versions/:id - 特定バージョン取得
@@ -98,7 +171,7 @@ export function createPromptVersionsRouter(db: DB) {
       return c.json({ error: "PromptVersion not found" }, 404);
     }
 
-    return c.json(version);
+    return c.json(serializePromptVersion(version));
   });
 
   // PATCH /api/projects/:projectId/prompt-versions/:id - バージョン更新
@@ -120,15 +193,28 @@ export function createPromptVersionsRouter(db: DB) {
     }
 
     const body = c.req.valid("json");
+
     const updateData: {
       content?: string;
       name?: string | null;
       memo?: string | null;
+      workflow_definition?: string | null;
     } = {};
 
     if (body.content !== undefined) updateData.content = body.content;
-    if (body.name !== undefined) updateData.name = body.name;
+    if (body.name !== undefined) {
+      const normalizedName = normalizeOptionalString(body.name);
+      updateData.name =
+        existing.parent_version_id === null
+          ? normalizedName ?? buildDefaultPromptName(existing.version)
+          : normalizedName;
+    }
     if (body.memo !== undefined) updateData.memo = body.memo;
+    if (body.workflow_definition !== undefined) {
+      updateData.workflow_definition = body.workflow_definition
+        ? JSON.stringify(body.workflow_definition)
+        : null;
+    }
 
     const updateResult = await db
       .update(prompt_versions)
@@ -141,7 +227,7 @@ export function createPromptVersionsRouter(db: DB) {
       return c.json({ error: "Failed to update PromptVersion" }, 500);
     }
 
-    return c.json(updated);
+    return c.json(serializePromptVersion(updated));
   });
 
   // POST /api/projects/:projectId/prompt-versions/:id/branch - 分岐バージョン作成
@@ -180,6 +266,7 @@ export function createPromptVersionsRouter(db: DB) {
         content: parent.content,
         name: body.name ?? null,
         memo: body.memo ?? null,
+        workflow_definition: parent.workflow_definition,
         parent_version_id: parent.id,
         created_at: Date.now(),
       })
@@ -190,7 +277,7 @@ export function createPromptVersionsRouter(db: DB) {
       return c.json({ error: "Failed to create branch PromptVersion" }, 500);
     }
 
-    return c.json(created, 201);
+    return c.json(serializePromptVersion(created), 201);
   });
 
   // PATCH /api/projects/:projectId/prompt-versions/:id/selected - Selected フラグ設定
@@ -230,7 +317,7 @@ export function createPromptVersionsRouter(db: DB) {
       return c.json({ error: "Failed to update PromptVersion" }, 500);
     }
 
-    return c.json(updated);
+    return c.json(serializePromptVersion(updated));
   });
 
   return router;

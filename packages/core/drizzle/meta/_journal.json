@@ -50,6 +50,13 @@
       "when": 1776319200000,
       "tag": "0006_runs_is_discarded",
       "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "6",
+      "when": 1776409200000,
+      "tag": "0007_prompt_workflow_and_run_trace",
+      "breakpoints": true
     }
   ]
 }

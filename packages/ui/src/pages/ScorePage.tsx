@@ -29,6 +29,165 @@ function getLastAssistantMessage(run: Run): string {
   return msgs[msgs.length - 1]?.content ?? "";
 }
 
+type StructuredComment = {
+  generalComment: string;
+  stepComments: Record<string, string>;
+};
+
+function createEmptyStepComments(run: Run): Record<string, string> {
+  return Object.fromEntries((run.execution_trace ?? []).map((step) => [step.id, ""]));
+}
+
+function parseStructuredComment(run: Run, comment: string | null): StructuredComment {
+  const raw = comment ?? "";
+  const stepComments = createEmptyStepComments(run);
+
+  if (!run.execution_trace?.length || !raw.includes("[[[") || !raw.includes("]]]")) {
+    return { generalComment: raw, stepComments };
+  }
+
+  const lines = raw.split("\n");
+  const sections: Array<{ key: string; body: string }> = [];
+  let currentKey: string | null = null;
+  let currentLines: string[] = [];
+
+  function flushCurrent() {
+    if (currentKey === null) {
+      return;
+    }
+
+    sections.push({
+      key: currentKey,
+      body: currentLines.join("\n").trim(),
+    });
+  }
+
+  for (const line of lines) {
+    const match = line.match(/^\[\[\[(overall|step:[^\]]+)\]\]\]$/);
+    if (match) {
+      const matchedKey = match[1];
+      if (!matchedKey) {
+        continue;
+      }
+
+      flushCurrent();
+      currentKey = matchedKey;
+      currentLines = [];
+      continue;
+    }
+
+    currentLines.push(line);
+  }
+
+  flushCurrent();
+
+  if (sections.length === 0) {
+    return { generalComment: raw, stepComments };
+  }
+
+  let generalComment = "";
+  for (const section of sections) {
+    if (section.key === "overall") {
+      generalComment = section.body;
+      continue;
+    }
+
+    if (section.key.startsWith("step:")) {
+      const stepId = section.key.slice("step:".length);
+      if (stepId in stepComments) {
+        stepComments[stepId] = section.body;
+      }
+    }
+  }
+
+  return { generalComment, stepComments };
+}
+
+function serializeStructuredComment(run: Run, comment: StructuredComment): string {
+  if (!run.execution_trace?.length) {
+    return comment.generalComment.trim();
+  }
+
+  const sections: string[] = [];
+  const general = comment.generalComment.trim();
+
+  if (general) {
+    sections.push(`[[[overall]]]\n${general}`);
+  }
+
+  for (const step of run.execution_trace) {
+    const stepComment = comment.stepComments[step.id]?.trim() ?? "";
+    if (!stepComment) {
+      continue;
+    }
+
+    sections.push(`[[[step:${step.id}]]]\n${stepComment}`);
+  }
+
+  if (sections.length === 0) {
+    return "";
+  }
+
+  return sections.join("\n\n");
+}
+
+function ExecutionTraceSection({
+  run,
+  stepComments,
+  onStepCommentChange,
+}: {
+  run: Run;
+  stepComments?: Record<string, string>;
+  onStepCommentChange?: (stepId: string, value: string) => void;
+}) {
+  if (!run.execution_trace?.length) {
+    return null;
+  }
+
+  return (
+    <div className={styles.traceBlock}>
+      <div className={styles.traceBlockHeader}>
+        <h4 className={styles.traceBlockTitle}>実行ステップ</h4>
+        <span className={styles.traceBlockCount}>{run.execution_trace.length} ステップ</span>
+      </div>
+      <div className={styles.traceList}>
+        {run.execution_trace.map((step, index) => (
+          <div key={step.id} className={styles.traceCard}>
+            <div className={styles.traceHeader}>
+              <span className={styles.traceIndex}>Step {index + 1}</span>
+              <span className={styles.traceTitle}>{step.title}</span>
+            </div>
+            <div className={styles.traceSection}>
+              <p className={styles.traceLabel}>テンプレート</p>
+              <pre className={styles.tracePre}>{step.prompt}</pre>
+            </div>
+            <div className={styles.traceSection}>
+              <p className={styles.traceLabel}>実行時プロンプト</p>
+              <pre className={styles.tracePre}>{step.renderedPrompt}</pre>
+            </div>
+            <div className={styles.traceSection}>
+              <p className={styles.traceLabel}>出力</p>
+              <pre className={styles.traceOutput}>{step.output}</pre>
+            </div>
+            {stepComments && onStepCommentChange ? (
+              <div className={styles.traceSection}>
+                <p className={styles.traceLabel}>このステップへのコメント</p>
+                <textarea
+                  className={`${styles.commentTextarea} ${styles.traceCommentTextarea}`}
+                  value={stepComments[step.id] ?? ""}
+                  onChange={(e) => onStepCommentChange(step.id, e.target.value)}
+                  placeholder="例: ここで抽出してほしかった点、判定の過不足など"
+                  rows={3}
+                />
+              </div>
+            ) : null}
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 // --------------- Types ---------------
 type ScoreMode = "star" | "numeric";
 
@@ -180,7 +339,10 @@ function IndividualRunRow({
     }
   }, [autoFocus]);
   const [starValue, setStarValue] = useState<number | null>(null);
-  const [comment, setComment] = useState("");
+  const [generalComment, setGeneralComment] = useState("");
+  const [stepComments, setStepComments] = useState<Record<string, string>>(() =>
+    createEmptyStepComments(run),
+  );
   const [saved, setSaved] = useState(false);
 
   const { data: score } = useRunScore(run.id);
@@ -191,18 +353,27 @@ function IndividualRunRow({
     setInitialized(true);
     if (score) {
       setStarValue(score.human_score);
-      setComment(score.human_comment ?? "");
+      const parsed = parseStructuredComment(run, score.human_comment);
+      setGeneralComment(parsed.generalComment);
+      setStepComments(parsed.stepComments);
+    } else {
+      setGeneralComment("");
+      setStepComments(createEmptyStepComments(run));
     }
   }
 
   const saveMutation = useMutation({
     mutationFn: async () => {
+      const humanComment = serializeStructuredComment(run, { generalComment, stepComments });
       if (score) {
-        return updateScore(run.id, { human_score: starValue, human_comment: comment || null });
+        return updateScore(run.id, {
+          human_score: starValue,
+          human_comment: humanComment || null,
+        });
       }
       return createScore(run.id, {
         human_score: starValue ?? undefined,
-        human_comment: comment || undefined,
+        human_comment: humanComment || undefined,
       });
     },
     onSuccess: () => {
@@ -247,6 +418,13 @@ function IndividualRunRow({
       {expanded && (
         <div className={styles.runCardBody}>
           {lastResponse && <p className={styles.responsePreview}>{lastResponse}</p>}
+          <ExecutionTraceSection
+            run={run}
+            stepComments={stepComments}
+            onStepCommentChange={(stepId, value) =>
+              setStepComments((prev) => ({ ...prev, [stepId]: value }))
+            }
+          />
 
           {isDiscarded ? (
             <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
@@ -267,9 +445,11 @@ function IndividualRunRow({
               <ScoreInput mode={scoreMode} value={starValue} onChange={setStarValue} />
               <textarea
                 className={styles.commentTextarea}
-                value={comment}
-                onChange={(e) => setComment(e.target.value)}
-                placeholder="コメント（任意）"
+                value={generalComment}
+                onChange={(e) => setGeneralComment(e.target.value)}
+                placeholder={
+                  run.execution_trace?.length ? "全体コメント（任意）" : "コメント（任意）"
+                }
                 rows={2}
               />
               <div className={styles.scoreActions}>
@@ -303,7 +483,8 @@ function IndividualRunRow({
 // --------------- BulkScoreState ---------------
 type BulkState = {
   starValue: number | null;
-  comment: string;
+  generalComment: string;
+  stepComments: Record<string, string>;
   isDiscarded: boolean;
   dirty: boolean;
 };
@@ -369,6 +550,15 @@ function BulkRunRow({
 
       <div className={styles.runCardBody}>
         {lastResponse && <p className={styles.responsePreview}>{lastResponse}</p>}
+        <ExecutionTraceSection
+          run={run}
+          stepComments={bulkState.stepComments}
+          onStepCommentChange={(stepId, value) =>
+            onBulkChange({
+              stepComments: { ...bulkState.stepComments, [stepId]: value },
+            })
+          }
+        />
 
         {bulkState.isDiscarded ? (
           <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
@@ -392,9 +582,11 @@ function BulkRunRow({
             />
             <textarea
               className={styles.commentTextarea}
-              value={bulkState.comment}
-              onChange={(e) => onBulkChange({ comment: e.target.value })}
-              placeholder="コメント（任意）"
+              value={bulkState.generalComment}
+              onChange={(e) => onBulkChange({ generalComment: e.target.value })}
+              placeholder={
+                run.execution_trace?.length ? "全体コメント（任意）" : "コメント（任意）"
+              }
               rows={2}
             />
             <button
@@ -487,9 +679,14 @@ export function ScorePage() {
   function getBulkState(runId: number): BulkState {
     if (bulkEdits.has(runId)) return bulkEdits.get(runId) as BulkState;
     const score = scoresMap.get(runId) ?? null;
+    const run = runs.find((current) => current.id === runId);
+    const parsed = run
+      ? parseStructuredComment(run, score?.human_comment ?? "")
+      : { generalComment: score?.human_comment ?? "", stepComments: {} };
     return {
       starValue: score?.human_score ?? null,
-      comment: score?.human_comment ?? "",
+      generalComment: parsed.generalComment,
+      stepComments: parsed.stepComments,
       isDiscarded: score?.is_discarded ?? false,
       dirty: false,
     };
@@ -511,16 +708,20 @@ export function ScorePage() {
       dirty.map(async (run) => {
         const edit = getBulkState(run.id);
         const existingScore = scoresMap.get(run.id) ?? null;
+        const humanComment = serializeStructuredComment(run, {
+          generalComment: edit.generalComment,
+          stepComments: edit.stepComments,
+        });
         if (existingScore) {
           await updateScore(run.id, {
             human_score: edit.isDiscarded ? null : (edit.starValue ?? null),
-            human_comment: edit.isDiscarded ? null : edit.comment || null,
+            human_comment: edit.isDiscarded ? null : humanComment || null,
             is_discarded: edit.isDiscarded,
           });
         } else {
           await createScore(run.id, {
             human_score: edit.isDiscarded ? undefined : (edit.starValue ?? undefined),
-            human_comment: edit.isDiscarded ? undefined : edit.comment || undefined,
+            human_comment: edit.isDiscarded ? undefined : humanComment || undefined,
           });
           if (edit.isDiscarded) {
             const created = await getScore(run.id);

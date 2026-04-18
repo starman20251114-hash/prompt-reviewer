@@ -22,6 +22,7 @@ export const runs = sqliteTable("runs", {
     .notNull()
     .references(() => test_cases.id),
   conversation: text("conversation").notNull(),
+  execution_trace: text("execution_trace"),
   is_best: integer("is_best", { mode: "boolean" }).notNull().default(false),
   is_discarded: integer("is_discarded", { mode: "boolean" }).notNull().default(false),
   created_at: integer("created_at").notNull(),
@@ -42,4 +43,13 @@ export type NewRun = typeof runs.$inferInsert;
 export type ConversationMessage = {
   role: "user" | "assistant";
   content: string;
+};
+
+export type ExecutionTraceStep = {
+  id: string;
+  title: string;
+  prompt: string;
+  renderedPrompt: string;
+  inputConversation: ConversationMessage[];
+  output: string;
 };
