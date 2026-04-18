@@ -873,7 +873,7 @@ export function RunsPage() {
                   {selectedVersion.name ? ` - ${selectedVersion.name}` : ""} ×{" "}
                   {selectedTestCase.title} · {formatDate(savedRun.created_at)}
                 </p>
-                <div className={styles.chatList}>
+                <div className={`${styles.chatList} ${styles.chatListStatic}`}>
                   {savedRun.conversation.map((msg, index) => (
                     <div
                       key={`msg-${

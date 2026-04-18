@@ -171,6 +171,13 @@
   padding-right: 4px;
 }
 
+.chatListStatic {
+  max-height: none;
+  overflow: visible;
+  scrollbar-gutter: auto;
+  padding-right: 0;
+}
+
 .bubbleWrapper {
   display: flex;
   flex-direction: column;
