@@ -216,9 +216,10 @@ function buildExecutionRequest(params: {
   };
 }
 
-function serializeRun(
-  run: typeof runs.$inferSelect,
-): Omit<typeof run, "conversation" | "execution_trace"> & {
+function serializeRun(run: typeof runs.$inferSelect): Omit<
+  typeof run,
+  "conversation" | "execution_trace"
+> & {
   conversation: ConversationMessage[];
   execution_trace: ExecutionTraceStep[] | null;
 } {
@@ -286,9 +287,7 @@ export function createRunsRouter(db: DB, options: RunsRouterOptions = {}) {
       .from(runs)
       .where(and(...conditions));
 
-    return c.json(
-      result.map(serializeRun),
-    );
+    return c.json(result.map(serializeRun));
   });
 
   // POST /api/projects/:projectId/runs - 新規Run作成
@@ -407,7 +406,7 @@ export function createRunsRouter(db: DB, options: RunsRouterOptions = {}) {
                   conversation: inputConversation,
                   previousOutput:
                     executionTrace.length > 0
-                      ? executionTrace[executionTrace.length - 1]?.output ?? null
+                      ? (executionTrace[executionTrace.length - 1]?.output ?? null)
                       : null,
                   stepOutputs,
                 });
@@ -463,7 +462,9 @@ export function createRunsRouter(db: DB, options: RunsRouterOptions = {}) {
                   output: stepOutput,
                 });
 
-                controller.enqueue(encodeSse("step-complete", executionTrace[executionTrace.length - 1]));
+                controller.enqueue(
+                  encodeSse("step-complete", executionTrace[executionTrace.length - 1]),
+                );
               }
               assistantContent = executionTrace[executionTrace.length - 1]?.output ?? "";
             } else {
@@ -491,8 +492,7 @@ export function createRunsRouter(db: DB, options: RunsRouterOptions = {}) {
                 prompt_version_id: body.prompt_version_id,
                 test_case_id: body.test_case_id,
                 conversation: JSON.stringify(conversation),
-                execution_trace:
-                  executionTrace.length > 0 ? JSON.stringify(executionTrace) : null,
+                execution_trace: executionTrace.length > 0 ? JSON.stringify(executionTrace) : null,
                 is_best: false,
                 is_discarded: false,
                 model: settings.model,
@@ -509,9 +509,7 @@ export function createRunsRouter(db: DB, options: RunsRouterOptions = {}) {
               return;
             }
 
-            controller.enqueue(
-              encodeSse("run", serializeRun(created)),
-            );
+            controller.enqueue(encodeSse("run", serializeRun(created)));
           } catch (error) {
             controller.enqueue(encodeSse("error", normalizeExecuteError(error)));
           } finally {

@@ -187,7 +187,6 @@ describe("GET /api/projects/:projectId/runs", () => {
     const body = (await res.json()) as { error: string };
     expect(body.error).toBe("Invalid test_case_id");
   });
-
 });
 
 describe("POST /api/projects/:projectId/runs", () => {
@@ -775,8 +774,7 @@ describe("POST /api/projects/:projectId/runs/execute", () => {
           {
             id: "extract_effective",
             title: "効果発言抽出",
-            prompt:
-              "文脈: {{context}}\n前段: {{step:__base_prompt__}}\n前回: {{previous_output}}",
+            prompt: "文脈: {{context}}\n前段: {{step:__base_prompt__}}\n前回: {{previous_output}}",
           },
         ],
       }),
@@ -810,10 +808,8 @@ describe("POST /api/projects/:projectId/runs/execute", () => {
         {
           id: "extract_effective",
           title: "効果発言抽出",
-          prompt:
-            "文脈: {{context}}\n前段: {{step:__base_prompt__}}\n前回: {{previous_output}}",
-          renderedPrompt:
-            "文脈: 行動を促せている\n前段: 行動を促せている\n前回: 行動を促せている",
+          prompt: "文脈: {{context}}\n前段: {{step:__base_prompt__}}\n前回: {{previous_output}}",
+          renderedPrompt: "文脈: 行動を促せている\n前段: 行動を促せている\n前回: 行動を促せている",
           inputConversation: [{ role: "user", content: "長い相談ログ" }],
           output: "効果があった発言は A と B です。",
         },
@@ -890,8 +886,7 @@ describe("POST /api/projects/:projectId/runs/execute", () => {
     });
     expect(capturedRequests[1]).toMatchObject({
       messages: [{ role: "user", content: "長い相談ログ" }],
-      systemPrompt:
-        "文脈: 行動を促せている\n前段: 行動を促せている\n前回: 行動を促せている",
+      systemPrompt: "文脈: 行動を促せている\n前段: 行動を促せている\n前回: 行動を促せている",
     });
     expect(streamText).toContain("event: step-start");
     expect(streamText).toContain("event: step-complete");
@@ -953,7 +948,8 @@ describe("POST /api/projects/:projectId/runs/execute", () => {
       api_provider: settings.api_provider,
     };
 
-    const capturedInsertValues: Array<{ execution_trace: string | null; conversation: string }> = [];
+    const capturedInsertValues: Array<{ execution_trace: string | null; conversation: string }> =
+      [];
     let selectCallCount = 0;
     let streamCallCount = 0;
 

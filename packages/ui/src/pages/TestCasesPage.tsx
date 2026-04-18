@@ -2,12 +2,12 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useState } from "react";
 import { useParams } from "react-router";
 import {
-  getContextFile,
-  getContextFiles,
   type TestCase,
   type Turn,
   createTestCase,
   deleteTestCase,
+  getContextFile,
+  getContextFiles,
   getTestCases,
   updateTestCase,
 } from "../lib/api";
@@ -161,9 +161,7 @@ type TestCaseModalProps = {
 };
 
 function TestCaseModal({ projectId, testCase, onClose, onSubmit, isLoading }: TestCaseModalProps) {
-  const [formData, setFormData] = useState<TestCaseFormData>(() =>
-    getInitialFormData(testCase),
-  );
+  const [formData, setFormData] = useState<TestCaseFormData>(() => getInitialFormData(testCase));
   const [selectedContextFilePath, setSelectedContextFilePath] = useState("");
   const [importNotice, setImportNotice] = useState<string | null>(null);
   const isEdit = !!testCase;
@@ -254,7 +252,9 @@ function TestCaseModal({ projectId, testCase, onClose, onSubmit, isLoading }: Te
                     setImportNotice(null);
                     setSelectedContextFilePath(e.target.value);
                   }}
-                  disabled={(contextFilesQuery.data?.length ?? 0) === 0 || importContextMutation.isPending}
+                  disabled={
+                    (contextFilesQuery.data?.length ?? 0) === 0 || importContextMutation.isPending
+                  }
                   className={styles.contextFileSelect}
                 >
                   {(contextFilesQuery.data?.length ?? 0) === 0 ? (
@@ -283,10 +283,14 @@ function TestCaseModal({ projectId, testCase, onClose, onSubmit, isLoading }: Te
                 コンテキスト管理で取り込んだファイルをここへコピーします。取り込み後に編集して保存できます。
               </p>
               {contextFilesQuery.isError && (
-                <p className={styles.contextImportError}>コンテキストファイル一覧の取得に失敗しました。</p>
+                <p className={styles.contextImportError}>
+                  コンテキストファイル一覧の取得に失敗しました。
+                </p>
               )}
               {importContextMutation.isError && (
-                <p className={styles.contextImportError}>選択したコンテキストファイルの取り込みに失敗しました。</p>
+                <p className={styles.contextImportError}>
+                  選択したコンテキストファイルの取り込みに失敗しました。
+                </p>
               )}
               {importNotice && <p className={styles.contextImportNotice}>{importNotice}</p>}
             </div>
@@ -406,18 +410,10 @@ function TestCaseCard({ testCase, onEdit, onDelete }: TestCaseCardProps) {
       <div className={styles.cardHeader}>
         <h3 className={styles.cardTitle}>{testCase.title}</h3>
         <div className={styles.cardActions}>
-          <button
-            type="button"
-            onClick={() => onEdit(testCase)}
-            className={styles.btnCardEdit}
-          >
+          <button type="button" onClick={() => onEdit(testCase)} className={styles.btnCardEdit}>
             編集
           </button>
-          <button
-            type="button"
-            onClick={() => onDelete(testCase)}
-            className={styles.btnCardDelete}
-          >
+          <button type="button" onClick={() => onDelete(testCase)} className={styles.btnCardDelete}>
             削除
           </button>
         </div>
@@ -515,11 +511,7 @@ export function TestCasesPage() {
     <div className={styles.root}>
       <div className={styles.pageHeader}>
         <h2 className={styles.pageTitle}>テストケース管理</h2>
-        <button
-          type="button"
-          onClick={() => setIsCreateOpen(true)}
-          className={styles.btnPrimary}
-        >
+        <button type="button" onClick={() => setIsCreateOpen(true)} className={styles.btnPrimary}>
           + 新規作成
         </button>
       </div>
@@ -528,9 +520,7 @@ export function TestCasesPage() {
         プロジェクトのテストケース一覧です。会話ターン、コンテキスト、期待記述をまとめて管理します。
       </p>
 
-      {isLoading && (
-        <p className={`${styles.statusText} ${styles.loading}`}>読み込み中...</p>
-      )}
+      {isLoading && <p className={`${styles.statusText} ${styles.loading}`}>読み込み中...</p>}
 
       {isError && (
         <p className={`${styles.statusText} ${styles.error}`}>

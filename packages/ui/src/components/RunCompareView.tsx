@@ -13,14 +13,20 @@ function CopyButton({ text }: { text: string }) {
   }
 
   return (
-    <button type="button" onClick={handleCopy} className={`${styles.btnCopy} ${copied ? styles.btnCopied : ""}`}>
+    <button
+      type="button"
+      onClick={handleCopy}
+      className={`${styles.btnCopy} ${copied ? styles.btnCopied : ""}`}
+    >
       {copied ? "コピー済み" : "コピー"}
     </button>
   );
 }
 
 function getLastAssistantMessage(run: Run): string {
-  return [...run.conversation].reverse().find((message) => message.role === "assistant")?.content ?? "";
+  return (
+    [...run.conversation].reverse().find((message) => message.role === "assistant")?.content ?? ""
+  );
 }
 
 export function diffLines(
@@ -175,7 +181,9 @@ export function RunCompareView({ runA, runB, versionLabelA, versionLabelB, onClo
                 <div ref={scrollRefA} className={styles.chatList} onScroll={handleScrollA}>
                   <div className={`${styles.bubbleWrapper} ${styles.bubbleWrapperAssistant}`}>
                     <span className={styles.bubbleRole}>Assistant</span>
-                    <div className={`${styles.bubble} ${styles.bubbleAssistant}`}>{lastAssistantA}</div>
+                    <div className={`${styles.bubble} ${styles.bubbleAssistant}`}>
+                      {lastAssistantA}
+                    </div>
                   </div>
                 </div>
               </div>
@@ -188,7 +196,9 @@ export function RunCompareView({ runA, runB, versionLabelA, versionLabelB, onClo
                 <div ref={scrollRefB} className={styles.chatList} onScroll={handleScrollB}>
                   <div className={`${styles.bubbleWrapper} ${styles.bubbleWrapperAssistant}`}>
                     <span className={styles.bubbleRole}>Assistant</span>
-                    <div className={`${styles.bubble} ${styles.bubbleAssistant}`}>{lastAssistantB}</div>
+                    <div className={`${styles.bubble} ${styles.bubbleAssistant}`}>
+                      {lastAssistantB}
+                    </div>
                   </div>
                 </div>
               </div>

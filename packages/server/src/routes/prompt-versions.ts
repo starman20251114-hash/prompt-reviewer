@@ -81,9 +81,10 @@ function buildDefaultPromptName(version: number): string {
 export function createPromptVersionsRouter(db: DB) {
   const router = new Hono();
 
-  function serializePromptVersion(
-    version: typeof prompt_versions.$inferSelect,
-  ): Omit<typeof version, "workflow_definition"> & {
+  function serializePromptVersion(version: typeof prompt_versions.$inferSelect): Omit<
+    typeof version,
+    "workflow_definition"
+  > & {
     workflow_definition: z.infer<typeof workflowDefinitionSchema> | null;
   } {
     return {
@@ -127,7 +128,8 @@ export function createPromptVersionsRouter(db: DB) {
       .where(eq(prompt_versions.project_id, projectId));
 
     const nextVersion = (maxResult?.maxVersion ?? 0) + 1;
-    const normalizedName = normalizeOptionalString(body.name) ?? buildDefaultPromptName(nextVersion);
+    const normalizedName =
+      normalizeOptionalString(body.name) ?? buildDefaultPromptName(nextVersion);
 
     const result = await db
       .insert(prompt_versions)
@@ -206,7 +208,7 @@ export function createPromptVersionsRouter(db: DB) {
       const normalizedName = normalizeOptionalString(body.name);
       updateData.name =
         existing.parent_version_id === null
-          ? normalizedName ?? buildDefaultPromptName(existing.version)
+          ? (normalizedName ?? buildDefaultPromptName(existing.version))
           : normalizedName;
     }
     if (body.memo !== undefined) updateData.memo = body.memo;

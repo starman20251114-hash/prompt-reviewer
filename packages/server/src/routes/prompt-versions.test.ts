@@ -294,16 +294,13 @@ describe("POST /api/projects/:projectId/prompt-versions", () => {
       body: JSON.stringify({
         content: "プロンプト本文",
         workflow_definition: {
-          steps: [
-            { id: "__base_prompt__", title: "抽出", prompt: "内容を抽出してください" },
-          ],
+          steps: [{ id: "__base_prompt__", title: "抽出", prompt: "内容を抽出してください" }],
         },
       }),
     });
 
     expect(res.status).toBe(400);
   });
-
 });
 
 describe("GET /api/projects/:projectId/prompt-versions/:id", () => {
