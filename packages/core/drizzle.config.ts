@@ -17,6 +17,10 @@ export default defineConfig({
   dialect: "sqlite",
   schema: [
     "./src/schema/projects.ts",
+    "./src/schema/prompt-families.ts",
+    "./src/schema/execution-profiles.ts",
+    "./src/schema/context-assets.ts",
+    "./src/schema/project-links.ts",
     "./src/schema/test-cases.ts",
     "./src/schema/prompt-versions.ts",
     "./src/schema/runs.ts",

@@ -13,6 +13,7 @@ describe("runs スキーマ型定義", () => {
     it("Run 型は必須フィールドを持つ", () => {
       type RequiredFields = {
         id: number;
+        execution_profile_id: number | null;
         project_id: number;
         prompt_version_id: number;
         test_case_id: number;
@@ -28,6 +29,7 @@ describe("runs スキーマ型定義", () => {
         Pick<
           Run,
           | "id"
+          | "execution_profile_id"
           | "project_id"
           | "prompt_version_id"
           | "test_case_id"
@@ -40,6 +42,10 @@ describe("runs スキーマ型定義", () => {
           | "api_provider"
         >
       >().toMatchTypeOf<RequiredFields>();
+    });
+
+    it("Run の execution_profile_id は移行期間中 number | null 型", () => {
+      expectTypeOf<Run["execution_profile_id"]>().toEqualTypeOf<number | null>();
     });
 
     it("Run の conversation は string 型（JSONシリアライズ済み）", () => {
@@ -100,6 +106,10 @@ describe("runs スキーマ型定義", () => {
 
     it("NewRun の is_best はデフォルト値があるためオプショナル", () => {
       expectTypeOf<NewRun["is_best"]>().toEqualTypeOf<boolean | undefined>();
+    });
+
+    it("NewRun の execution_profile_id は移行期間中オプショナル", () => {
+      expectTypeOf<NewRun["execution_profile_id"]>().toEqualTypeOf<number | null | undefined>();
     });
 
     it("ベスト回答フラグを立てた NewRun を作成できる", () => {

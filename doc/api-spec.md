@@ -1,18 +1,20 @@
 # API仕様
 
-prompt-reviewer の REST API（Hono / Node.js）
+prompt-reviewer の REST API 案（Hono / Node.js）
 
-ベースURL: `http://localhost:3001`
+ベースURL: `http://localhost:3001/api`
 
----
+この仕様は、`project` を所有単位ではなく分類ラベルとして扱う新データモデルに基づく。
 
 ## 共通仕様
 
 ### レスポンス形式
+
 すべてのレスポンスは `application/json`。
 
 ### タイムスタンプ
-`created_at` / `updated_at` は **Unix タイムスタンプ（ミリ秒）**。
+
+`created_at` / `updated_at` は Unix タイムスタンプ（ミリ秒）。
 
 ### エラーレスポンス
 
@@ -24,33 +26,34 @@ prompt-reviewer の REST API（Hono / Node.js）
 
 | ステータス | 説明 |
 |---|---|
-| `400` | バリデーションエラー（必須項目不足・型不一致など） |
+| `400` | バリデーションエラー |
 | `404` | リソースが見つからない |
+| `409` | 一意制約違反や競合 |
 | `500` | サーバー内部エラー |
 
----
+### 分類ラベルの考え方
+
+- `projects` は Gmail のラベルのような分類用途で使う
+- `test_cases` / `prompt_versions` / `context_assets` は `project` に所属しなくても存在できる
+- `未分類` は `project` レコードではなく、ラベルが 1 件も付いていない状態を指す
 
 ## ヘルスチェック
 
-```
-GET /health
-```
+### `GET /health`
 
-**レスポンス**
+**レスポンス `200`**
 
 ```json
 { "status": "ok" }
 ```
 
----
-
 ## Projects
 
-### プロジェクト一覧取得
+分類ラベルを管理する API。
 
-```
-GET /projects
-```
+### `GET /projects`
+
+ラベル一覧を返す。
 
 **レスポンス `200`**
 
@@ -58,162 +61,166 @@ GET /projects
 [
   {
     "id": 1,
-    "name": "カスタマーサポートBot改善",
-    "description": "問い合わせ対応精度を上げるプロジェクト",
+    "name": "返金対応",
+    "description": "返金問い合わせ系の分類",
     "created_at": 1744281600000,
     "updated_at": 1744281600000
   }
 ]
 ```
 
----
+### `POST /projects`
 
-### プロジェクト作成
-
-```
-POST /projects
-```
+ラベルを作成する。
 
 **リクエストボディ**
 
 ```json
 {
-  "name": "カスタマーサポートBot改善",
-  "description": "問い合わせ対応精度を上げるプロジェクト"
+  "name": "返金対応",
+  "description": "返金問い合わせ系の分類"
 }
 ```
 
 | フィールド | 型 | 必須 | 説明 |
 |---|---|---|---|
-| `name` | string | ✅ | プロジェクト名 |
-| `description` | string | | プロジェクト説明 |
+| `name` | string | ✅ | ラベル名 |
+| `description` | string | | 説明 |
 
-**レスポンス `201`**
+### `GET /projects/:id`
 
-```json
-{
-  "id": 1,
-  "name": "カスタマーサポートBot改善",
-  "description": "問い合わせ対応精度を上げるプロジェクト",
-  "created_at": 1744281600000,
-  "updated_at": 1744281600000
-}
-```
+ラベル詳細を返す。
 
----
+### `PATCH /projects/:id`
 
-### プロジェクト取得
+ラベル名または説明を更新する。
 
-```
-GET /projects/:id
-```
+### `DELETE /projects/:id`
 
-**レスポンス `200`**
+ラベルを削除する。資産本体は削除せず、中間テーブルの関連付けのみ解除される。
 
-```json
-{
-  "id": 1,
-  "name": "カスタマーサポートBot改善",
-  "description": "問い合わせ対応精度を上げるプロジェクト",
-  "created_at": 1744281600000,
-  "updated_at": 1744281600000,
-  "settings": {
-    "id": 1,
-    "model": "claude-opus-4-5",
-    "temperature": 0.7,
-    "api_provider": "anthropic"
-  }
-}
-```
+**レスポンス `204`**
 
----
+## Context Assets
 
-### プロジェクト更新
+再利用可能なコンテキスト素材を管理する API。
 
-```
-PUT /projects/:id
-```
+### `GET /context-assets`
 
-**リクエストボディ**（変更するフィールドのみ）
+コンテキスト素材一覧を返す。
 
-```json
-{
-  "name": "新しいプロジェクト名",
-  "description": "更新された説明"
-}
-```
+クエリパラメータ:
 
-**レスポンス `200`**: 更新後のプロジェクトオブジェクト
-
----
-
-### プロジェクト削除
-
-```
-DELETE /projects/:id
-```
-
-**レスポンス `204`**: ボディなし
-
----
-
-## Project Settings
-
-### 設定取得
-
-```
-GET /projects/:id/settings
-```
-
-**レスポンス `200`**
-
-```json
-{
-  "id": 1,
-  "project_id": 1,
-  "model": "claude-opus-4-5",
-  "temperature": 0.7,
-  "api_provider": "anthropic",
-  "created_at": 1744281600000,
-  "updated_at": 1744281600000
-}
-```
-
----
-
-### 設定更新
-
-```
-PUT /projects/:id/settings
-```
-
-**リクエストボディ**（変更するフィールドのみ）
-
-```json
-{
-  "model": "claude-sonnet-4-6",
-  "temperature": 0.5,
-  "api_provider": "anthropic"
-}
-```
-
-| フィールド | 型 | 説明 |
+| パラメータ | 型 | 説明 |
 |---|---|---|
-| `model` | string | 使用するLLMモデルID |
-| `temperature` | number | 0.0〜2.0 |
-| `api_provider` | `"anthropic"` \| `"openai"` | APIプロバイダー |
+| `project_id` | number | 指定ラベルが付いた素材に絞り込む |
+| `unclassified` | boolean | 未分類のみ返す |
+| `linked_to` | string | `test_case:12` / `prompt_family:4` のような関連先で絞り込む |
+| `q` | string | `name` / `path` に対する検索文字列 |
 
-**レスポンス `200`**: 更新後の設定オブジェクト
+**レスポンス `200`**
 
----
+```json
+[
+  {
+    "id": 10,
+    "name": "refund-policy.md",
+    "path": "policies/refund-policy.md",
+    "mime_type": "text/markdown",
+    "content_hash": "sha256:...",
+    "created_at": 1744281600000,
+    "updated_at": 1744281600000
+  }
+]
+```
+
+### `POST /context-assets`
+
+素材を作成する。
+
+**リクエストボディ**
+
+```json
+{
+  "name": "refund-policy.md",
+  "path": "policies/refund-policy.md",
+  "content": "購入から30日以内であれば返金可能です。",
+  "mime_type": "text/markdown"
+}
+```
+
+| フィールド | 型 | 必須 | 説明 |
+|---|---|---|---|
+| `name` | string | ✅ | 表示名 |
+| `path` | string | ✅ | 論理パスまたは元ファイル名 |
+| `content` | string | ✅ | 素材本文 |
+| `mime_type` | string | ✅ | MIME タイプ |
+
+### `GET /context-assets/:id`
+
+素材詳細を返す。
+
+**レスポンス `200`**
+
+```json
+{
+  "id": 10,
+  "name": "refund-policy.md",
+  "path": "policies/refund-policy.md",
+  "content": "購入から30日以内であれば返金可能です。",
+  "mime_type": "text/markdown",
+  "content_hash": "sha256:...",
+  "created_at": 1744281600000,
+  "updated_at": 1744281600000
+}
+```
+
+### `PATCH /context-assets/:id`
+
+素材の表示名、パス、本文、MIME タイプを更新する。
+
+**リクエストボディ例**
+
+```json
+{
+  "name": "refund-policy-v2.md",
+  "content": "購入から45日以内であれば返金可能です。"
+}
+```
+
+### `DELETE /context-assets/:id`
+
+素材を削除する。
+
+**レスポンス `204`**
+
+### `PUT /context-assets/:id/projects`
+
+素材に付与するラベル一覧を全置換する。
+
+**リクエストボディ**
+
+```json
+{
+  "project_ids": [1, 5]
+}
+```
 
 ## Test Cases
 
-### テストケース一覧取得
+テストケース本体を管理する API。
 
-```
-GET /projects/:projectId/test-cases
-```
+### `GET /test-cases`
+
+テストケース一覧を返す。
+
+クエリパラメータ:
+
+| パラメータ | 型 | 説明 |
+|---|---|---|
+| `project_id` | number | 指定ラベルが付いたテストケースに絞り込む |
+| `unclassified` | boolean | 未分類のみ返す |
+| `q` | string | タイトル検索 |
 
 **レスポンス `200`**
 
@@ -221,13 +228,12 @@ GET /projects/:projectId/test-cases
 [
   {
     "id": 1,
-    "project_id": 1,
     "title": "返金手続きの問い合わせ",
     "turns": [
       { "role": "user", "content": "返金の手続きを教えてください" }
     ],
     "context_content": "【返金ポリシー】購入から30日以内であれば返金可能です。",
-    "expected_description": "丁寧に返金手続きのステップを案内すること",
+    "expected_description": "丁寧に返金手続きを案内すること",
     "display_order": 0,
     "created_at": 1744281600000,
     "updated_at": 1744281600000
@@ -235,13 +241,9 @@ GET /projects/:projectId/test-cases
 ]
 ```
 
----
+### `POST /test-cases`
 
-### テストケース作成
-
-```
-POST /projects/:projectId/test-cases
-```
+テストケースを作成する。
 
 **リクエストボディ**
 
@@ -252,7 +254,7 @@ POST /projects/:projectId/test-cases
     { "role": "user", "content": "返金の手続きを教えてください" }
   ],
   "context_content": "【返金ポリシー】購入から30日以内であれば返金可能です。",
-  "expected_description": "丁寧に返金手続きのステップを案内すること",
+  "expected_description": "丁寧に返金手続きを案内すること",
   "display_order": 0
 }
 ```
@@ -260,331 +262,548 @@ POST /projects/:projectId/test-cases
 | フィールド | 型 | 必須 | 説明 |
 |---|---|---|---|
 | `title` | string | ✅ | テストケース名 |
-| `turns` | `{role, content}[]` | | マルチターンの会話履歴（未指定時は空配列） |
-| `context_content` | string | | `{{context}}` に挿入するテキスト |
+| `turns` | `{role, content}[]` | | マルチターン会話履歴 |
+| `context_content` | string | | 実行時に埋め込む最終コンテキスト |
 | `expected_description` | string | | 期待する出力の自由記述 |
-| `display_order` | number | | 一覧の並び順（デフォルト: 0） |
+| `display_order` | number | | 一覧表示順 |
 
-**レスポンス `201`**: 作成されたテストケースオブジェクト
+### `GET /test-cases/:id`
 
----
+テストケース詳細を返す。
 
-### テストケース取得
+### `PATCH /test-cases/:id`
 
-```
-GET /projects/:projectId/test-cases/:id
-```
+テストケースを更新する。
 
-**レスポンス `200`**: テストケースオブジェクト
+### `DELETE /test-cases/:id`
 
----
+テストケースを削除する。
 
-### テストケース更新
+**レスポンス `204`**
 
-```
-PUT /projects/:projectId/test-cases/:id
-```
+### `PUT /test-cases/:id/projects`
 
-**レスポンス `200`**: 更新後のテストケースオブジェクト
-
----
-
-### テストケース削除
-
-```
-DELETE /projects/:projectId/test-cases/:id
-```
-
-**レスポンス `204`**: ボディなし
-
----
-
-## Prompt Versions
-
-### バージョン一覧取得
-
-```
-GET /projects/:projectId/prompt-versions
-```
-
-**レスポンス `200`**
-
-```json
-[
-  {
-    "id": 1,
-    "project_id": 1,
-    "version": 1,
-    "name": "初期バージョン",
-    "memo": "ベースラインとして作成",
-    "content": "あなたはカスタマーサポートの担当者です...",
-    "parent_version_id": null,
-    "created_at": 1744281600000
-  }
-]
-```
-
----
-
-### バージョン作成
-
-```
-POST /projects/:projectId/prompt-versions
-```
+テストケースに付与するラベル一覧を全置換する。
 
 **リクエストボディ**
 
 ```json
 {
-  "name": "改善版v2",
-  "memo": "返金フローの説明を追加",
-  "content": "あなたはカスタマーサポートの担当者です...",
-  "parent_version_id": 1
+  "project_ids": [1, 5]
 }
 ```
 
-| フィールド | 型 | 必須 | 説明 |
-|---|---|---|---|
-| `name` | string | | バージョン名 |
-| `memo` | string | | 変更メモ |
-| `content` | string | ✅ | システムプロンプト本文 |
-| `parent_version_id` | number | | 分岐元バージョンID |
+### `PUT /test-cases/:id/context-assets`
 
-`version` はサーバー側でプロジェクト内の連番として自動採番。
+テストケースに関連付ける素材一覧を全置換する。
 
-**レスポンス `201`**: 作成されたバージョンオブジェクト
+**リクエストボディ**
 
----
-
-### バージョン取得
-
-```
-GET /projects/:projectId/prompt-versions/:id
+```json
+{
+  "context_asset_ids": [10, 12, 18]
+}
 ```
 
-**レスポンス `200`**: バージョンオブジェクト
+補足:
+- これは「関連素材」の管理用 API
+- 実行時に使う最終文面は引き続き `context_content` に保存する
 
----
+## Prompt Families
 
-## Runs
+同一系統のプロンプト群を管理する API。
 
-### Run一覧取得
+### `GET /prompt-families`
 
-```
-GET /projects/:projectId/runs
-```
+プロンプト系統一覧を返す。
 
 クエリパラメータ:
 
 | パラメータ | 型 | 説明 |
 |---|---|---|
-| `prompt_version_id` | number | バージョンで絞り込み |
-| `test_case_id` | number | テストケースで絞り込み |
-
-破棄済みRun（`is_discarded = 1`）は既定で一覧に含めない。
+| `q` | string | 系統名検索 |
 
 **レスポンス `200`**
 
 ```json
 [
   {
-    "id": 1,
-    "project_id": 1,
-    "prompt_version_id": 1,
-    "test_case_id": 1,
-    "conversation": [
-      { "role": "user", "content": "返金の手続きを教えてください" },
-      { "role": "assistant", "content": "ご不便をおかけして..." }
-    ],
-    "model": "claude-opus-4-5",
-    "temperature": 0.7,
-    "api_provider": "anthropic",
-    "is_best": 0,
-    "is_discarded": 0,
-    "created_at": 1744281600000
-  }
-]
-```
-
----
-
-### Run作成
-
-```
-POST /projects/:projectId/runs
-```
-
-**リクエストボディ**
-
-```json
-{
-  "prompt_version_id": 1,
-  "test_case_id": 1,
-  "conversation": [
-    { "role": "user", "content": "返金の手続きを教えてください" },
-    { "role": "assistant", "content": "ご不便をおかけして..." }
-  ],
-  "model": "claude-opus-4-5",
-  "temperature": 0.7,
-  "api_provider": "anthropic"
-}
-```
-
-| フィールド | 型 | 必須 | 説明 |
-|---|---|---|---|
-| `prompt_version_id` | number | ✅ | 使用したプロンプトバージョンID |
-| `test_case_id` | number | ✅ | 対象テストケースID |
-| `conversation` | `{role, content}[]` | ✅ | 実行時の全会話履歴 |
-| `model` | string | ✅ | 実行時のモデルID（`project_settings` からコピー） |
-| `temperature` | number | ✅ | 実行時のtemperature（`project_settings` からコピー） |
-| `api_provider` | `"anthropic"` \| `"openai"` | ✅ | 実行時のAPIプロバイダー（`project_settings` からコピー） |
-
-> `model` / `temperature` / `api_provider` はサーバー側で `project_settings` から自動取得することも可能だが、クライアントが明示的に渡すことで「表示中の設定と実行時の設定のズレ」を防ぐ。
-
-**レスポンス `201`**: 作成されたRunオブジェクト（スコアフィールドは含まない）
-
----
-
-### Run取得
-
-```
-GET /projects/:projectId/runs/:id
-```
-
-**レスポンス `200`**: Runオブジェクト
-
----
-
-### ベスト回答フラグ設定
-
-```
-PATCH /projects/:projectId/runs/:id/best
-```
-
-バージョン×テストケースの組み合わせで他のRunの `is_best` を `0` にリセットし、対象Runを `1` に設定する。
-
-**レスポンス `200`**: 更新後のRunオブジェクト
-
----
-
-### Run破棄
-
-```
-PATCH /projects/:projectId/runs/:id/discard
-```
-
-対象Runの `is_discarded` を `1` に設定する。
-
-**レスポンス `200`**: 更新後のRunオブジェクト（`is_discarded: 1`）
-
----
-
-## Scores
-
-Run に対する評価スコアを管理する。`runs` テーブルとは分離され、1つの Run に対して複数のスコアレコードを保持できる。
-
-### スコア一覧取得
-
-```
-GET /projects/:projectId/runs/:runId/scores
-```
-
-**レスポンス `200`**
-
-```json
-[
-  {
-    "id": 1,
-    "run_id": 1,
-    "human_score": 4,
-    "human_comment": "手順が明確で良い",
-    "judge_score": null,
-    "judge_reason": null,
-    "is_discarded": 0,
+    "id": 4,
+    "name": "返金対応プロンプト",
+    "description": "返金問い合わせに対応するプロンプト系列",
     "created_at": 1744281600000,
     "updated_at": 1744281600000
   }
 ]
 ```
 
----
+### `POST /prompt-families`
 
-### スコア作成
-
-```
-POST /projects/:projectId/runs/:runId/scores
-```
+プロンプト系統を作成する。
 
 **リクエストボディ**
 
 ```json
 {
-  "human_score": 4,
-  "human_comment": "手順が明確で良い"
+  "name": "返金対応プロンプト",
+  "description": "返金問い合わせに対応するプロンプト系列"
 }
 ```
 
-| フィールド | 型 | 必須 | 説明 |
-|---|---|---|---|
-| `human_score` | number | | 1〜5点（NULL=未採点） |
-| `human_comment` | string | | フリーテキストコメント |
+### `GET /prompt-families/:id`
 
-**レスポンス `201`**: 作成されたScoreオブジェクト
+プロンプト系統詳細を返す。
 
----
+### `PATCH /prompt-families/:id`
 
-### スコア更新
+プロンプト系統を更新する。
 
-```
-PATCH /projects/:projectId/runs/:runId/scores/:id
-```
+### `DELETE /prompt-families/:id`
 
-**リクエストボディ**（変更するフィールドのみ）
+プロンプト系統を削除する。
+
+**レスポンス `204`**
+
+### `PUT /prompt-families/:id/context-assets`
+
+プロンプト系統に関連付ける素材一覧を全置換する。
+
+**リクエストボディ**
 
 ```json
 {
-  "human_score": 5,
-  "human_comment": "完璧な回答"
+  "context_asset_ids": [4, 7]
 }
 ```
 
-**レスポンス `200`**: 更新後のScoreオブジェクト
+## Prompt Versions
 
----
+プロンプトバージョンを管理する API。
 
-### スコア破棄
+### `GET /prompt-versions`
 
-```
-PATCH /projects/:projectId/runs/:runId/scores/:id/discard
-```
+プロンプトバージョン一覧を返す。
 
-`is_discarded` を `1` に設定する。不正データや再採点後の古いスコアを無効化する際に使用。
+クエリパラメータ:
 
-**レスポンス `200`**: 更新後のScoreオブジェクト（`is_discarded: 1`）
-
----
-
-## 集計
-
-### バージョン別平均スコア
-
-`scores` テーブルの `human_score`（`is_discarded = 0` のもの）を集計する。
-
-```
-GET /projects/:projectId/stats/scores
-```
+| パラメータ | 型 | 説明 |
+|---|---|---|
+| `prompt_family_id` | number | 系統で絞り込む |
+| `project_id` | number | 指定ラベルが付いたバージョンに絞り込む |
+| `selected_only` | boolean | `is_selected = true` のみ返す |
 
 **レスポンス `200`**
 
 ```json
 [
   {
-    "prompt_version_id": 1,
-    "version": 1,
-    "name": "初期バージョン",
-    "avg_score": 3.5,
-    "run_count": 4,
-    "scored_count": 2
+    "id": 10,
+    "prompt_family_id": 4,
+    "version": 3,
+    "name": "返金対応 v3",
+    "memo": "確認質問を先に入れる",
+    "content": "あなたは返金問い合わせ対応ボットです。",
+    "workflow_definition": null,
+    "parent_version_id": 8,
+    "is_selected": true,
+    "created_at": 1744281600000
   }
 ]
 ```
+
+### `POST /prompt-versions`
+
+プロンプトバージョンを作成する。
+
+**リクエストボディ**
+
+```json
+{
+  "prompt_family_id": 4,
+  "name": "返金対応 v3",
+  "memo": "確認質問を先に入れる",
+  "content": "あなたは返金問い合わせ対応ボットです。",
+  "workflow_definition": null,
+  "parent_version_id": 8
+}
+```
+
+| フィールド | 型 | 必須 | 説明 |
+|---|---|---|---|
+| `prompt_family_id` | number | ✅ | 所属する系列 ID |
+| `name` | string | | バージョン名 |
+| `memo` | string | | 変更メモ |
+| `content` | string | ✅ | システムプロンプト本文 |
+| `workflow_definition` | object | | 将来のステップ定義 |
+| `parent_version_id` | number | | 分岐元バージョン ID |
+
+`version` は `prompt_family` 内の連番としてサーバー側で自動採番する。
+
+### `GET /prompt-versions/:id`
+
+プロンプトバージョン詳細を返す。
+
+### `PATCH /prompt-versions/:id`
+
+プロンプトバージョンを更新する。
+
+### `POST /prompt-versions/:id/branch`
+
+既存バージョンを分岐元にして新しいバージョンを作る。
+
+### `PATCH /prompt-versions/:id/selected`
+
+対象バージョンを `is_selected = true` にする。
+
+### `PUT /prompt-versions/:id/projects`
+
+プロンプトバージョンに付与するラベル一覧を全置換する。
+
+**リクエストボディ**
+
+```json
+{
+  "project_ids": [1, 5]
+}
+```
+
+## Execution Profiles
+
+Run 実行時の設定テンプレートを管理する API。
+
+### `GET /execution-profiles`
+
+設定一覧を返す。
+
+**レスポンス `200`**
+
+```json
+[
+  {
+    "id": 2,
+    "name": "Claude Sonnet 低温度",
+    "description": "比較用の低温度設定",
+    "model": "claude-sonnet-4-6",
+    "temperature": 0.2,
+    "api_provider": "anthropic",
+    "created_at": 1744281600000,
+    "updated_at": 1744281600000
+  }
+]
+```
+
+### `POST /execution-profiles`
+
+設定を作成する。
+
+**リクエストボディ**
+
+```json
+{
+  "name": "Claude Sonnet 低温度",
+  "description": "比較用の低温度設定",
+  "model": "claude-sonnet-4-6",
+  "temperature": 0.2,
+  "api_provider": "anthropic"
+}
+```
+
+### `GET /execution-profiles/:id`
+
+設定詳細を返す。
+
+### `PATCH /execution-profiles/:id`
+
+設定を更新する。
+
+### `DELETE /execution-profiles/:id`
+
+設定を削除する。過去の Run はスナップショット値を持つため参照可能。
+
+**レスポンス `204`**
+
+### `POST /execution-profiles/models`
+
+指定プロバイダ・API キーで利用可能なモデル一覧を取得する。
+
+**リクエストボディ**
+
+```json
+{
+  "api_provider": "anthropic",
+  "api_key": "..."
+}
+```
+
+## Runs
+
+プロンプトバージョン × テストケース × 実行設定の実行結果を管理する API。
+
+### `GET /runs`
+
+Run 一覧を返す。
+
+クエリパラメータ:
+
+| パラメータ | 型 | 説明 |
+|---|---|---|
+| `prompt_version_id` | number | プロンプトバージョンで絞り込む |
+| `test_case_id` | number | テストケースで絞り込む |
+| `execution_profile_id` | number | 実行設定で絞り込む |
+| `project_id` | number | プロンプト側ラベル基準で絞り込む |
+| `include_discarded` | boolean | 破棄済み Run も含める |
+
+補足:
+- `project_id` は `prompt_version_projects` に指定ラベルが付いた `prompt_version` の Run を返す
+- `test_case_projects` は `runs` のラベル絞り込みには使わない
+- 破棄済み Run は既定で含めない
+
+**レスポンス `200`**
+
+```json
+[
+  {
+    "id": 100,
+    "prompt_version_id": 10,
+    "test_case_id": 1,
+    "execution_profile_id": 2,
+    "conversation": [
+      { "role": "user", "content": "返金の手続きを教えてください" },
+      { "role": "assistant", "content": "購入日を確認させてください。" }
+    ],
+    "execution_trace": null,
+    "model": "claude-sonnet-4-6",
+    "temperature": 0.2,
+    "api_provider": "anthropic",
+    "is_best": false,
+    "is_discarded": false,
+    "created_at": 1744281600000
+  }
+]
+```
+
+### `POST /runs`
+
+Run を手動保存する。
+
+**リクエストボディ**
+
+```json
+{
+  "prompt_version_id": 10,
+  "test_case_id": 1,
+  "execution_profile_id": 2,
+  "conversation": [
+    { "role": "user", "content": "返金の手続きを教えてください" },
+    { "role": "assistant", "content": "購入日を確認させてください。" }
+  ],
+  "execution_trace": null
+}
+```
+
+| フィールド | 型 | 必須 | 説明 |
+|---|---|---|---|
+| `prompt_version_id` | number | ✅ | 使用したプロンプトバージョン |
+| `test_case_id` | number | ✅ | 対象テストケース |
+| `execution_profile_id` | number | ✅ | 実行設定 |
+| `conversation` | `{role, content}[]` | ✅ | 実行時の全会話履歴 |
+| `execution_trace` | object[] \| null | | ステップ実行ログ |
+
+補足:
+- `model` / `temperature` / `api_provider` はサーバー側で `execution_profile` から取得してスナップショット保存する
+
+### `POST /runs/execute`
+
+LLM を使って Run を実行し、SSE で進捗を返す。
+
+**リクエストボディ**
+
+```json
+{
+  "prompt_version_id": 10,
+  "test_case_id": 1,
+  "execution_profile_id": 2,
+  "api_key": "..."
+}
+```
+
+SSE イベント:
+- `delta`
+- `step-start`
+- `step-delta`
+- `step-complete`
+- `run`
+- `error`
+
+### `GET /runs/:id`
+
+Run 詳細を返す。
+
+### `PATCH /runs/:id/best`
+
+対象 Run の `is_best` を更新する。
+
+**リクエストボディ**
+
+```json
+{
+  "unset": false
+}
+```
+
+補足:
+- `unset = false` の場合、同一 `prompt_version_id × test_case_id` の他 Run の `is_best` は `false` にリセットする
+
+### `PATCH /runs/:id/discard`
+
+対象 Run の `is_discarded` を更新する。
+
+**リクエストボディ**
+
+```json
+{
+  "is_discarded": true
+}
+```
+
+## Scores
+
+Run に対する評価スコアを管理する API。
+
+現行 UI は 1 Run = 1 Score の使い方に寄っているが、データモデル上は複数保持できる。
+
+### `GET /runs/:runId/scores`
+
+指定 Run のスコア一覧を返す。
+
+**レスポンス `200`**
+
+```json
+[
+  {
+    "id": 1,
+    "run_id": 100,
+    "human_score": 4,
+    "human_comment": "確認質問が適切",
+    "judge_score": null,
+    "judge_reason": null,
+    "is_discarded": false,
+    "created_at": 1744281600000,
+    "updated_at": 1744281600000
+  }
+]
+```
+
+### `POST /runs/:runId/scores`
+
+スコアを作成する。
+
+**リクエストボディ**
+
+```json
+{
+  "human_score": 4,
+  "human_comment": "確認質問が適切"
+}
+```
+
+### `GET /runs/:runId/score`
+
+現行 UI 互換のため、非破棄スコア 1 件を返す簡易エンドポイント。
+
+補足:
+- 複数存在する場合の選択ルールは別途固定する
+- 新規 UI では `GET /runs/:runId/scores` を優先する
+
+### `PATCH /runs/:runId/score`
+
+現行 UI 互換の簡易更新エンドポイント。
+
+### `PATCH /runs/:runId/scores/:id`
+
+スコアを更新する。
+
+**リクエストボディ例**
+
+```json
+{
+  "human_score": 5,
+  "human_comment": "完璧な回答",
+  "is_discarded": false
+}
+```
+
+### `PATCH /runs/:runId/scores/:id/discard`
+
+対象スコアの `is_discarded` を `true` にする。
+
+## Score Progression
+
+スコア推移を返す API。
+
+### `GET /score-progression`
+
+クエリパラメータ:
+
+| パラメータ | 型 | 説明 |
+|---|---|---|
+| `project_id` | number | プロンプト側ラベル基準で絞り込む |
+| `prompt_family_id` | number | 系列単位で絞り込む |
+| `score_type` | string | `human` または `judge` |
+
+補足:
+- `project_id` は `runs` と同様に `prompt_version_projects` 基準で解釈する
+
+**レスポンス `200`**
+
+```json
+{
+  "versionSummaries": [
+    {
+      "versionId": 10,
+      "versionNumber": 3,
+      "versionName": "返金対応 v3",
+      "avgHumanScore": 4.2,
+      "avgJudgeScore": null,
+      "runCount": 5,
+      "scoredCount": 4
+    }
+  ],
+  "testCaseBreakdown": [
+    {
+      "testCaseId": 1,
+      "testCaseTitle": "返金手続きの問い合わせ",
+      "versions": [
+        {
+          "versionId": 10,
+          "versionNumber": 3,
+          "versionName": "返金対応 v3",
+          "humanScore": 4,
+          "judgeScore": null,
+          "runId": 100
+        }
+      ]
+    }
+  ]
+}
+```
+
+## 互換レイヤの扱い
+
+旧 API との互換が必要な場合は、当面次のパスを互換レイヤとして残せる。
+
+- `/projects/:projectId/test-cases`
+- `/projects/:projectId/prompt-versions`
+- `/projects/:projectId/runs`
+- `/projects/:projectId/context-files`
+- `/projects/:projectId/settings`
+
+ただし新規実装は、以下を正とする。
+
+- `/test-cases`
+- `/prompt-families`
+- `/prompt-versions`
+- `/context-assets`
+- `/execution-profiles`
+- `/runs`
+

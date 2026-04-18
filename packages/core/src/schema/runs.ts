@@ -1,4 +1,5 @@
 import { integer, real, sqliteTable, text } from "drizzle-orm/sqlite-core";
+import { execution_profiles } from "./execution-profiles";
 import { projects } from "./projects";
 import { prompt_versions } from "./prompt-versions";
 import { test_cases } from "./test-cases";
@@ -12,6 +13,8 @@ import { test_cases } from "./test-cases";
  */
 export const runs = sqliteTable("runs", {
   id: integer("id").primaryKey({ autoIncrement: true }),
+  // 互換期間中は nullable で追加し、後続 Issue で必須化する。
+  execution_profile_id: integer("execution_profile_id").references(() => execution_profiles.id),
   project_id: integer("project_id")
     .notNull()
     .references(() => projects.id),
