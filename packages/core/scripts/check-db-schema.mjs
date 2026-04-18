@@ -36,6 +36,7 @@ const expectedSchema = {
     "created_at",
     "updated_at",
   ],
+  context_asset_projects: ["context_asset_id", "project_id", "created_at"],
   test_case_projects: ["test_case_id", "project_id", "created_at"],
   prompt_version_projects: ["prompt_version_id", "project_id", "created_at"],
   test_case_context_assets: ["test_case_id", "context_asset_id", "created_at"],

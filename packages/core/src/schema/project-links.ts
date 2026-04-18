@@ -40,6 +40,23 @@ export const prompt_version_projects = sqliteTable(
 );
 
 /**
+ * コンテキスト素材とラベルの関連
+ */
+export const context_asset_projects = sqliteTable(
+  "context_asset_projects",
+  {
+    context_asset_id: integer("context_asset_id")
+      .notNull()
+      .references(() => context_assets.id),
+    project_id: integer("project_id")
+      .notNull()
+      .references(() => projects.id),
+    created_at: integer("created_at").notNull(),
+  },
+  (table) => [primaryKey({ columns: [table.context_asset_id, table.project_id] })],
+);
+
+/**
  * テストケースとコンテキスト素材の関連
  */
 export const test_case_context_assets = sqliteTable(
@@ -77,6 +94,8 @@ export type TestCaseProject = typeof test_case_projects.$inferSelect;
 export type NewTestCaseProject = typeof test_case_projects.$inferInsert;
 export type PromptVersionProject = typeof prompt_version_projects.$inferSelect;
 export type NewPromptVersionProject = typeof prompt_version_projects.$inferInsert;
+export type ContextAssetProject = typeof context_asset_projects.$inferSelect;
+export type NewContextAssetProject = typeof context_asset_projects.$inferInsert;
 export type TestCaseContextAsset = typeof test_case_context_assets.$inferSelect;
 export type NewTestCaseContextAsset = typeof test_case_context_assets.$inferInsert;
 export type PromptFamilyContextAsset = typeof prompt_family_context_assets.$inferSelect;

@@ -1,5 +1,7 @@
 import { describe, expectTypeOf, it } from "vitest";
 import type {
+  ContextAssetProject,
+  NewContextAssetProject,
   NewPromptFamilyContextAsset,
   NewPromptVersionProject,
   NewTestCaseContextAsset,
@@ -27,6 +29,11 @@ describe("project_links スキーマ型定義", () => {
     expectTypeOf<TestCaseContextAsset["context_asset_id"]>().toEqualTypeOf<number>();
   });
 
+  it("ContextAssetProject は複合キーの構成要素を持つ", () => {
+    expectTypeOf<ContextAssetProject["context_asset_id"]>().toEqualTypeOf<number>();
+    expectTypeOf<ContextAssetProject["project_id"]>().toEqualTypeOf<number>();
+  });
+
   it("PromptFamilyContextAsset は複合キーの構成要素を持つ", () => {
     expectTypeOf<PromptFamilyContextAsset["prompt_family_id"]>().toEqualTypeOf<number>();
     expectTypeOf<PromptFamilyContextAsset["context_asset_id"]>().toEqualTypeOf<number>();
@@ -48,6 +55,11 @@ describe("project_links スキーマ型定義", () => {
       context_asset_id: 3,
       created_at: Date.now(),
     };
+    const contextAssetProject: NewContextAssetProject = {
+      context_asset_id: 3,
+      project_id: 2,
+      created_at: Date.now(),
+    };
     const promptFamilyContextAsset: NewPromptFamilyContextAsset = {
       prompt_family_id: 1,
       context_asset_id: 3,
@@ -57,6 +69,7 @@ describe("project_links スキーマ型定義", () => {
     expectTypeOf(testCaseProject).toMatchTypeOf<NewTestCaseProject>();
     expectTypeOf(promptVersionProject).toMatchTypeOf<NewPromptVersionProject>();
     expectTypeOf(testCaseContextAsset).toMatchTypeOf<NewTestCaseContextAsset>();
+    expectTypeOf(contextAssetProject).toMatchTypeOf<NewContextAssetProject>();
     expectTypeOf(promptFamilyContextAsset).toMatchTypeOf<NewPromptFamilyContextAsset>();
   });
 });
