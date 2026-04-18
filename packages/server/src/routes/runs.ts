@@ -447,6 +447,10 @@ export function createRunsRouter(db: DB, options: RunsRouterOptions = {}) {
                       }),
                     );
                   }
+
+                  if (event.type === "response") {
+                    stepOutput = event.response.content;
+                  }
                 }
 
                 stepOutputs.set(step.id, stepOutput);
@@ -467,6 +471,10 @@ export function createRunsRouter(db: DB, options: RunsRouterOptions = {}) {
                 if (event.type === "text-delta") {
                   assistantContent += event.text;
                   controller.enqueue(encodeSse("delta", { text: event.text }));
+                }
+
+                if (event.type === "response") {
+                  assistantContent = event.response.content;
                 }
               }
             }
