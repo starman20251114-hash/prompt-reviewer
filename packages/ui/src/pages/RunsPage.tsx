@@ -10,12 +10,12 @@ import {
   type Run,
   type TestCase,
   createRun,
+  discardRun,
   executeRunStream,
   getProject,
   getPromptVersions,
   getRuns,
   getTestCases,
-  discardRun,
   setBestRun,
 } from "../lib/api";
 import styles from "./RunsPage.module.css";
@@ -34,7 +34,9 @@ function buildFullPrompt(version: PromptVersion, testCase: TestCase): string {
     .map((t) => `${t.role === "user" ? "User" : "Assistant"}: ${t.content}`)
     .join("\n\n");
 
-  return turnsText ? `${systemPrompt}\n\n[Conversation]\n${turnsText}\n[/Conversation]` : systemPrompt;
+  return turnsText
+    ? `${systemPrompt}\n\n[Conversation]\n${turnsText}\n[/Conversation]`
+    : systemPrompt;
 }
 
 function buildWorkflowPreview(version: PromptVersion, testCase: TestCase): string {
@@ -43,16 +45,10 @@ function buildWorkflowPreview(version: PromptVersion, testCase: TestCase): strin
     .join("\n\n");
   const baseContext = testCase.context_content || "(なし)";
   const stepsText = [
-    "## Step 1: プロンプト本文\n" +
-      "id: __base_prompt__\n" +
-      "context: テストケースの context_content\n\n" +
-      version.content,
+    `## Step 1: プロンプト本文\nid: __base_prompt__\ncontext: テストケースの context_content\n\n${version.content}`,
     ...(version.workflow_definition?.steps ?? []).map(
       (step, index) =>
-        `## Step ${index + 2}: ${step.title}\n` +
-        `id: ${step.id}\n` +
-        "context: 直前ステップの出力\n\n" +
-        `${step.prompt}`,
+        `## Step ${index + 2}: ${step.title}\nid: ${step.id}\ncontext: 直前ステップの出力\n\n${step.prompt}`,
     ),
   ].join("\n\n");
 
@@ -113,7 +109,8 @@ function CopyPromptPanel({
       {hasWorkflow && (
         <div className={styles.workflowSummary}>
           <p className={styles.workflowSummaryText}>
-            この Run は段階実行です。プロンプト本文が Step 1、追加ステップが Step 2 以降として実行されます。
+            この Run は段階実行です。プロンプト本文が Step 1、追加ステップが Step 2
+            以降として実行されます。
           </p>
         </div>
       )}
@@ -475,7 +472,9 @@ export function RunsPage() {
         onStepDelta: (stepDelta) => {
           setExecutionTrace((prev) =>
             prev.map((step) =>
-              step.id === stepDelta.id ? { ...step, output: `${step.output}${stepDelta.text}` } : step,
+              step.id === stepDelta.id
+                ? { ...step, output: `${step.output}${stepDelta.text}` }
+                : step,
             ),
           );
           setLlmResponse((prev) => `${prev}${stepDelta.text}`);
@@ -658,24 +657,317 @@ export function RunsPage() {
         {/* ============ タブ: Run を作成 ============ */}
         {activeTab === "create" && (
           <div>
-          {/* Step 1: 選択フォーム */}
-          {step === "select" && (
-            <div className={styles.selectCard}>
-              <h3 className={styles.selectCardTitle}>Run を取得する</h3>
+            {/* Step 1: 選択フォーム */}
+            {step === "select" && (
+              <div className={styles.selectCard}>
+                <h3 className={styles.selectCardTitle}>Run を取得する</h3>
 
-              <div className={styles.fieldGroup}>
-                <label htmlFor="select-version" className={styles.fieldLabel}>
-                  プロンプトバージョン
+                <div className={styles.fieldGroup}>
+                  <label htmlFor="select-version" className={styles.fieldLabel}>
+                    プロンプトバージョン
+                  </label>
+                  <select
+                    id="select-version"
+                    value={selectedVersionId}
+                    onChange={(e) =>
+                      setSelectedVersionId(e.target.value === "" ? "" : Number(e.target.value))
+                    }
+                    className={styles.fieldSelect}
+                  >
+                    <option value="">-- 選択してください --</option>
+                    {promptVersions.map((v) => (
+                      <option key={v.id} value={v.id}>
+                        v{v.version}
+                        {v.name ? ` - ${v.name}` : ""}
+                      </option>
+                    ))}
+                  </select>
+                  {promptVersions.length === 0 && (
+                    <p className={styles.fieldHint}>
+                      プロンプトバージョンがありません。先にバージョンを作成してください。
+                    </p>
+                  )}
+                </div>
+
+                <div className={styles.fieldGroupLg}>
+                  <label htmlFor="select-test-case" className={styles.fieldLabel}>
+                    テストケース
+                  </label>
+                  <select
+                    id="select-test-case"
+                    value={selectedTestCaseId}
+                    onChange={(e) =>
+                      setSelectedTestCaseId(e.target.value === "" ? "" : Number(e.target.value))
+                    }
+                    className={styles.fieldSelect}
+                  >
+                    <option value="">-- 選択してください --</option>
+                    {testCases.map((tc) => (
+                      <option key={tc.id} value={tc.id}>
+                        {tc.title}
+                      </option>
+                    ))}
+                  </select>
+                  {testCases.length === 0 && (
+                    <p className={styles.fieldHint}>
+                      テストケースがありません。先にテストケースを作成してください。
+                    </p>
+                  )}
+                </div>
+
+                <button
+                  type="button"
+                  onClick={handleStartRun}
+                  disabled={isStartDisabled}
+                  title={
+                    !hasApiKey ? "APIキーが未設定です（設定画面で入力してください）" : undefined
+                  }
+                  className={`${styles.btnStart} ${isStartDisabled ? styles.btnStartDisabled : ""}`}
+                >
+                  Run の取得
+                </button>
+                {!hasApiKey && (
+                  <p className={styles.fieldHint}>
+                    APIキーが未設定です。
+                    <Link to={`/projects/${projectId}/settings`} className={styles.settingsLink}>
+                      設定画面
+                    </Link>
+                    で入力してください。
+                  </p>
+                )}
+              </div>
+            )}
+
+            {/* Step 2: Run 実行UI */}
+            {step === "input" && selectedVersion && selectedTestCase && (
+              <div>
+                <div className={styles.stepHeader}>
+                  <button
+                    type="button"
+                    onClick={() => setStep("select")}
+                    className={styles.btnSecondary}
+                  >
+                    ← 戻る
+                  </button>
+                  <span className={styles.stepLabel}>
+                    v{selectedVersion.version}
+                    {selectedVersion.name ? ` - ${selectedVersion.name}` : ""} ×{" "}
+                    {selectedTestCase.title}
+                  </span>
+                </div>
+
+                <CopyPromptPanel version={selectedVersion} testCase={selectedTestCase} />
+
+                <div className={styles.twoColumns}>
+                  {/* 左カラム: テストケース表示 */}
+                  <div className={styles.panel}>
+                    <h3 className={styles.panelTitle}>テストケース: {selectedTestCase.title}</h3>
+
+                    {/* 会話ターン表示 */}
+                    <div className={styles.chatList}>
+                      {selectedTestCase.turns.map((turn, index) => (
+                        <div
+                          key={`turn-${
+                            // biome-ignore lint/suspicious/noArrayIndexKey: ターン配列は順序で管理するため index をキーとして使用
+                            index
+                          }`}
+                          className={`${styles.bubbleWrapper} ${turn.role === "user" ? styles.bubbleWrapperUser : styles.bubbleWrapperAssistant}`}
+                        >
+                          <span className={styles.bubbleRole}>
+                            {turn.role === "user" ? "User" : "Assistant"}
+                          </span>
+                          <div
+                            className={`${styles.bubble} ${turn.role === "user" ? styles.bubbleUser : styles.bubbleAssistant}`}
+                          >
+                            {turn.content}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+
+                    {selectedTestCase.context_content && (
+                      <div className={styles.expectedBox}>
+                        <p className={styles.expectedLabel}>コンテキスト</p>
+                        <p className={styles.expectedText}>{selectedTestCase.context_content}</p>
+                      </div>
+                    )}
+
+                    {/* 期待される説明 */}
+                    {selectedTestCase.expected_description && (
+                      <div className={styles.expectedBox}>
+                        <p className={styles.expectedLabel}>期待される応答の説明</p>
+                        <p className={styles.expectedText}>
+                          {selectedTestCase.expected_description}
+                        </p>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* 右カラム: LLM実行・手動入力エリア */}
+                  <div className={`${styles.panel} ${styles.panelFlex}`}>
+                    <h3 className={styles.panelSubtitle}>LLM 応答</h3>
+                    <p className={styles.inputDescription}>
+                      {selectedVersion.workflow_definition?.steps.length
+                        ? "実行するとプロンプト本文を Step 1 として実行し、その後に追加ステップを順番に走らせます。"
+                        : "実行すると応答をストリーミング表示し、完了後に Run として保存します。"}
+                    </p>
+
+                    <div className={styles.inputActionsTop}>
+                      <button
+                        type="button"
+                        onClick={handleExecuteRun}
+                        disabled={isExecuteDisabled}
+                        className={`${styles.btnLlmRun} ${isExecuteDisabled ? styles.btnLlmRunDisabled : ""}`}
+                      >
+                        {executeRunMutation.isPending ? "実行中..." : "実行"}
+                      </button>
+                      {executeError && <p className={styles.errorMsgTop}>{executeError}</p>}
+                    </div>
+
+                    <textarea
+                      value={llmResponse}
+                      onChange={(e) => setLlmResponse(e.target.value)}
+                      placeholder="実行結果がここに表示されます。手動入力して保存することもできます。"
+                      className={styles.responseTextarea}
+                      readOnly={executeRunMutation.isPending}
+                    />
+
+                    {executionTrace.length > 0 && (
+                      <div className={styles.traceBlock}>
+                        <h4 className={styles.traceBlockTitle}>ステップ実行結果</h4>
+                        <ExecutionTraceView
+                          trace={executionTrace}
+                          streamingStepId={streamingStepId}
+                        />
+                      </div>
+                    )}
+
+                    <div className={styles.inputActions}>
+                      <button
+                        type="button"
+                        onClick={handleSaveRun}
+                        disabled={isSaveDisabled}
+                        className={`${styles.btnSave} ${isSaveDisabled ? styles.btnSaveDisabled : ""}`}
+                      >
+                        {createRunMutation.isPending ? "保存中..." : "Run を保存"}
+                      </button>
+                    </div>
+                    {createRunMutation.isError && (
+                      <p className={styles.errorMsg}>
+                        保存に失敗しました。もう一度お試しください。
+                      </p>
+                    )}
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Step 3: 保存後の表示 */}
+            {step === "saved" && savedRun && selectedVersion && selectedTestCase && (
+              <div>
+                <div className={styles.successBanner}>Run を保存しました（ID: {savedRun.id}）</div>
+
+                <div className={styles.savedActions}>
+                  <button type="button" onClick={handleNewRun} className={styles.btnPrimary}>
+                    新しい Run を作成
+                  </button>
+                </div>
+
+                {/* 保存したRunの内容 */}
+                <div className={styles.savedPanel}>
+                  <h3 className={styles.panelTitle}>保存した Run の内容</h3>
+                  <p className={styles.savedMeta}>
+                    v{selectedVersion.version}
+                    {selectedVersion.name ? ` - ${selectedVersion.name}` : ""} ×{" "}
+                    {selectedTestCase.title} · {formatDate(savedRun.created_at)}
+                  </p>
+                  <div className={`${styles.chatList} ${styles.chatListStatic}`}>
+                    {savedRun.conversation.map((msg, index) => (
+                      <div
+                        key={`msg-${
+                          // biome-ignore lint/suspicious/noArrayIndexKey: 会話配列は順序で管理するため index をキーとして使用
+                          index
+                        }`}
+                        className={`${styles.bubbleWrapper} ${msg.role === "user" ? styles.bubbleWrapperUser : styles.bubbleWrapperAssistant}`}
+                      >
+                        <span className={styles.bubbleRole}>
+                          {msg.role === "user" ? "User" : "Assistant"}
+                        </span>
+                        <div
+                          className={`${styles.bubble} ${msg.role === "user" ? styles.bubbleUser : styles.bubbleAssistant}`}
+                        >
+                          {msg.content}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                  {savedRun.execution_trace?.length ? (
+                    <div className={styles.traceBlock}>
+                      <h4 className={styles.traceBlockTitle}>保存されたステップ結果</h4>
+                      <ExecutionTraceView trace={savedRun.execution_trace} />
+                    </div>
+                  ) : null}
+                </div>
+
+                {/* 同一バージョン×ケースの過去Run一覧 */}
+                <div className={styles.savedPanel}>
+                  <h3 className={styles.panelTitle}>過去の Run 一覧</h3>
+                  {relatedRuns.length === 0 ? (
+                    <p className={styles.emptyRuns}>まだ Run がありません。</p>
+                  ) : (
+                    <div className={styles.runList}>
+                      {relatedRuns.map((run) => (
+                        <RunCard
+                          key={run.id}
+                          run={run}
+                          projectId={projectId}
+                          versionLabel={getVersionLabel(run.prompt_version_id)}
+                          versionNumber={getVersionNumber(run.prompt_version_id)}
+                          testCaseLabel={getTestCaseLabel(run.test_case_id)}
+                          onSetBest={(unset) => setBestMutation.mutate({ id: run.id, unset })}
+                          isBestPending={setBestMutation.isPending}
+                          onDiscard={() => handleDiscardRun(run)}
+                          isDiscardPending={discardMutation.isPending}
+                        />
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* ============ タブ: Run 一覧 ============ */}
+        {activeTab === "list" && (
+          <div>
+            <RunCompareBar
+              compareRunA={compareRunA}
+              compareRunB={compareRunB}
+              getVersionLabel={getVersionLabel}
+              onOpenCompare={() => setIsCompareOpen(true)}
+              onClearFirst={() => setCompareRunA(null)}
+              onClearAll={() => {
+                setCompareRunA(null);
+                setCompareRunB(null);
+              }}
+            />
+
+            {/* フィルターバー */}
+            <div className={styles.filterBar}>
+              <div className={styles.filterField}>
+                <label htmlFor="filter-version" className={styles.filterLabel}>
+                  バージョン
                 </label>
                 <select
-                  id="select-version"
-                  value={selectedVersionId}
+                  id="filter-version"
+                  value={filterVersionId}
                   onChange={(e) =>
-                    setSelectedVersionId(e.target.value === "" ? "" : Number(e.target.value))
+                    setFilterVersionId(e.target.value === "" ? "" : Number(e.target.value))
                   }
-                  className={styles.fieldSelect}
+                  className={styles.filterSelect}
                 >
-                  <option value="">-- 選択してください --</option>
+                  <option value="">すべて</option>
                   {promptVersions.map((v) => (
                     <option key={v.id} value={v.id}>
                       v{v.version}
@@ -683,367 +975,83 @@ export function RunsPage() {
                     </option>
                   ))}
                 </select>
-                {promptVersions.length === 0 && (
-                  <p className={styles.fieldHint}>
-                    プロンプトバージョンがありません。先にバージョンを作成してください。
-                  </p>
-                )}
               </div>
 
-              <div className={styles.fieldGroupLg}>
-                <label htmlFor="select-test-case" className={styles.fieldLabel}>
+              <div className={styles.filterField}>
+                <label htmlFor="filter-test-case" className={styles.filterLabel}>
                   テストケース
                 </label>
                 <select
-                  id="select-test-case"
-                  value={selectedTestCaseId}
+                  id="filter-test-case"
+                  value={filterTestCaseId}
                   onChange={(e) =>
-                    setSelectedTestCaseId(e.target.value === "" ? "" : Number(e.target.value))
+                    setFilterTestCaseId(e.target.value === "" ? "" : Number(e.target.value))
                   }
-                  className={styles.fieldSelect}
+                  className={styles.filterSelect}
                 >
-                  <option value="">-- 選択してください --</option>
+                  <option value="">すべて</option>
                   {testCases.map((tc) => (
                     <option key={tc.id} value={tc.id}>
                       {tc.title}
                     </option>
                   ))}
                 </select>
-                {testCases.length === 0 && (
-                  <p className={styles.fieldHint}>
-                    テストケースがありません。先にテストケースを作成してください。
-                  </p>
-                )}
               </div>
 
               <button
                 type="button"
-                onClick={handleStartRun}
-                disabled={isStartDisabled}
-                title={!hasApiKey ? "APIキーが未設定です（設定画面で入力してください）" : undefined}
-                className={`${styles.btnStart} ${isStartDisabled ? styles.btnStartDisabled : ""}`}
+                onClick={() => {
+                  setFilterVersionId("");
+                  setFilterTestCaseId("");
+                }}
+                className={styles.btnClearFilter}
               >
-                Run の取得
+                クリア
               </button>
-              {!hasApiKey && (
-                <p className={styles.fieldHint}>
-                  APIキーが未設定です。
-                  <Link to={`/projects/${projectId}/settings`} className={styles.settingsLink}>
-                    設定画面
-                  </Link>
-                  で入力してください。
-                </p>
-              )}
             </div>
-          )}
 
-          {/* Step 2: Run 実行UI */}
-          {step === "input" && selectedVersion && selectedTestCase && (
-            <div>
-              <div className={styles.stepHeader}>
-                <button
-                  type="button"
-                  onClick={() => setStep("select")}
-                  className={styles.btnSecondary}
-                >
-                  ← 戻る
-                </button>
-                <span className={styles.stepLabel}>
-                  v{selectedVersion.version}
-                  {selectedVersion.name ? ` - ${selectedVersion.name}` : ""} ×{" "}
-                  {selectedTestCase.title}
-                </span>
-              </div>
-
-              <CopyPromptPanel version={selectedVersion} testCase={selectedTestCase} />
-
-              <div className={styles.twoColumns}>
-                {/* 左カラム: テストケース表示 */}
-                <div className={styles.panel}>
-                  <h3 className={styles.panelTitle}>テストケース: {selectedTestCase.title}</h3>
-
-                  {/* 会話ターン表示 */}
-                  <div className={styles.chatList}>
-                    {selectedTestCase.turns.map((turn, index) => (
-                      <div
-                        key={`turn-${
-                          // biome-ignore lint/suspicious/noArrayIndexKey: ターン配列は順序で管理するため index をキーとして使用
-                          index
-                        }`}
-                        className={`${styles.bubbleWrapper} ${turn.role === "user" ? styles.bubbleWrapperUser : styles.bubbleWrapperAssistant}`}
-                      >
-                        <span className={styles.bubbleRole}>
-                          {turn.role === "user" ? "User" : "Assistant"}
-                        </span>
-                        <div
-                          className={`${styles.bubble} ${turn.role === "user" ? styles.bubbleUser : styles.bubbleAssistant}`}
-                        >
-                          {turn.content}
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-
-                  {selectedTestCase.context_content && (
-                    <div className={styles.expectedBox}>
-                      <p className={styles.expectedLabel}>コンテキスト</p>
-                      <p className={styles.expectedText}>{selectedTestCase.context_content}</p>
-                    </div>
-                  )}
-
-                  {/* 期待される説明 */}
-                  {selectedTestCase.expected_description && (
-                    <div className={styles.expectedBox}>
-                      <p className={styles.expectedLabel}>期待される応答の説明</p>
-                      <p className={styles.expectedText}>{selectedTestCase.expected_description}</p>
-                    </div>
-                  )}
-                </div>
-
-                {/* 右カラム: LLM実行・手動入力エリア */}
-                <div className={`${styles.panel} ${styles.panelFlex}`}>
-                  <h3 className={styles.panelSubtitle}>LLM 応答</h3>
-                  <p className={styles.inputDescription}>
-                    {selectedVersion.workflow_definition?.steps.length
-                      ? "実行するとプロンプト本文を Step 1 として実行し、その後に追加ステップを順番に走らせます。"
-                      : "実行すると応答をストリーミング表示し、完了後に Run として保存します。"}
-                  </p>
-
-                  <div className={styles.inputActionsTop}>
-                    <button
-                      type="button"
-                      onClick={handleExecuteRun}
-                      disabled={isExecuteDisabled}
-                      className={`${styles.btnLlmRun} ${isExecuteDisabled ? styles.btnLlmRunDisabled : ""}`}
-                    >
-                      {executeRunMutation.isPending ? "実行中..." : "実行"}
-                    </button>
-                    {executeError && <p className={styles.errorMsgTop}>{executeError}</p>}
-                  </div>
-
-                  <textarea
-                    value={llmResponse}
-                    onChange={(e) => setLlmResponse(e.target.value)}
-                    placeholder="実行結果がここに表示されます。手動入力して保存することもできます。"
-                    className={styles.responseTextarea}
-                    readOnly={executeRunMutation.isPending}
+            {/* Run 一覧 */}
+            {isRunsLoading ? (
+              <p className={styles.loadingMsg}>読み込み中...</p>
+            ) : allRuns.length === 0 ? (
+              <p className={styles.emptyRuns}>
+                {filterVersionId !== "" || filterTestCaseId !== ""
+                  ? "条件に一致する Run がありません。"
+                  : "まだ Run がありません。「Run を作成」タブから実行してください。"}
+              </p>
+            ) : (
+              <div className={styles.runList}>
+                {allRuns.map((run) => (
+                  <RunCard
+                    key={run.id}
+                    run={run}
+                    projectId={projectId}
+                    versionLabel={getVersionLabel(run.prompt_version_id)}
+                    versionNumber={getVersionNumber(run.prompt_version_id)}
+                    testCaseLabel={getTestCaseLabel(run.test_case_id)}
+                    onSetBest={(unset) => setBestMutation.mutate({ id: run.id, unset })}
+                    isBestPending={setBestMutation.isPending}
+                    onDiscard={() => handleDiscardRun(run)}
+                    isDiscardPending={discardMutation.isPending}
+                    onCompare={() => handleCompareRun(run)}
+                    isCompareSelected={compareRunA?.id === run.id || compareRunB?.id === run.id}
                   />
-
-                  {executionTrace.length > 0 && (
-                    <div className={styles.traceBlock}>
-                      <h4 className={styles.traceBlockTitle}>ステップ実行結果</h4>
-                      <ExecutionTraceView trace={executionTrace} streamingStepId={streamingStepId} />
-                    </div>
-                  )}
-
-                  <div className={styles.inputActions}>
-                    <button
-                      type="button"
-                      onClick={handleSaveRun}
-                      disabled={isSaveDisabled}
-                      className={`${styles.btnSave} ${isSaveDisabled ? styles.btnSaveDisabled : ""}`}
-                    >
-                      {createRunMutation.isPending ? "保存中..." : "Run を保存"}
-                    </button>
-                  </div>
-                  {createRunMutation.isError && (
-                    <p className={styles.errorMsg}>保存に失敗しました。もう一度お試しください。</p>
-                  )}
-                </div>
-              </div>
-            </div>
-          )}
-
-          {/* Step 3: 保存後の表示 */}
-          {step === "saved" && savedRun && selectedVersion && selectedTestCase && (
-            <div>
-              <div className={styles.successBanner}>Run を保存しました（ID: {savedRun.id}）</div>
-
-              <div className={styles.savedActions}>
-                <button type="button" onClick={handleNewRun} className={styles.btnPrimary}>
-                  新しい Run を作成
-                </button>
-              </div>
-
-              {/* 保存したRunの内容 */}
-              <div className={styles.savedPanel}>
-                <h3 className={styles.panelTitle}>保存した Run の内容</h3>
-                <p className={styles.savedMeta}>
-                  v{selectedVersion.version}
-                  {selectedVersion.name ? ` - ${selectedVersion.name}` : ""} ×{" "}
-                  {selectedTestCase.title} · {formatDate(savedRun.created_at)}
-                </p>
-                <div className={`${styles.chatList} ${styles.chatListStatic}`}>
-                  {savedRun.conversation.map((msg, index) => (
-                    <div
-                      key={`msg-${
-                        // biome-ignore lint/suspicious/noArrayIndexKey: 会話配列は順序で管理するため index をキーとして使用
-                        index
-                      }`}
-                      className={`${styles.bubbleWrapper} ${msg.role === "user" ? styles.bubbleWrapperUser : styles.bubbleWrapperAssistant}`}
-                    >
-                      <span className={styles.bubbleRole}>
-                        {msg.role === "user" ? "User" : "Assistant"}
-                      </span>
-                      <div
-                        className={`${styles.bubble} ${msg.role === "user" ? styles.bubbleUser : styles.bubbleAssistant}`}
-                      >
-                        {msg.content}
-                      </div>
-                    </div>
-                  ))}
-                </div>
-                {savedRun.execution_trace?.length ? (
-                  <div className={styles.traceBlock}>
-                    <h4 className={styles.traceBlockTitle}>保存されたステップ結果</h4>
-                    <ExecutionTraceView trace={savedRun.execution_trace} />
-                  </div>
-                ) : null}
-              </div>
-
-              {/* 同一バージョン×ケースの過去Run一覧 */}
-              <div className={styles.savedPanel}>
-                <h3 className={styles.panelTitle}>過去の Run 一覧</h3>
-                {relatedRuns.length === 0 ? (
-                  <p className={styles.emptyRuns}>まだ Run がありません。</p>
-                ) : (
-                  <div className={styles.runList}>
-                    {relatedRuns.map((run) => (
-                      <RunCard
-                        key={run.id}
-                        run={run}
-                        projectId={projectId}
-                        versionLabel={getVersionLabel(run.prompt_version_id)}
-                        versionNumber={getVersionNumber(run.prompt_version_id)}
-                        testCaseLabel={getTestCaseLabel(run.test_case_id)}
-                        onSetBest={(unset) => setBestMutation.mutate({ id: run.id, unset })}
-                        isBestPending={setBestMutation.isPending}
-                        onDiscard={() => handleDiscardRun(run)}
-                        isDiscardPending={discardMutation.isPending}
-                      />
-                    ))}
-                  </div>
-                )}
-              </div>
-            </div>
-          )}
-          </div>
-        )}
-
-        {/* ============ タブ: Run 一覧 ============ */}
-        {activeTab === "list" && (
-          <div>
-          <RunCompareBar
-            compareRunA={compareRunA}
-            compareRunB={compareRunB}
-            getVersionLabel={getVersionLabel}
-            onOpenCompare={() => setIsCompareOpen(true)}
-            onClearFirst={() => setCompareRunA(null)}
-            onClearAll={() => {
-              setCompareRunA(null);
-              setCompareRunB(null);
-            }}
-          />
-
-          {/* フィルターバー */}
-          <div className={styles.filterBar}>
-            <div className={styles.filterField}>
-              <label htmlFor="filter-version" className={styles.filterLabel}>
-                バージョン
-              </label>
-              <select
-                id="filter-version"
-                value={filterVersionId}
-                onChange={(e) =>
-                  setFilterVersionId(e.target.value === "" ? "" : Number(e.target.value))
-                }
-                className={styles.filterSelect}
-              >
-                <option value="">すべて</option>
-                {promptVersions.map((v) => (
-                  <option key={v.id} value={v.id}>
-                    v{v.version}
-                    {v.name ? ` - ${v.name}` : ""}
-                  </option>
                 ))}
-              </select>
-            </div>
+              </div>
+            )}
 
-            <div className={styles.filterField}>
-              <label htmlFor="filter-test-case" className={styles.filterLabel}>
-                テストケース
-              </label>
-              <select
-                id="filter-test-case"
-                value={filterTestCaseId}
-                onChange={(e) =>
-                  setFilterTestCaseId(e.target.value === "" ? "" : Number(e.target.value))
-                }
-                className={styles.filterSelect}
-              >
-                <option value="">すべて</option>
-                {testCases.map((tc) => (
-                  <option key={tc.id} value={tc.id}>
-                    {tc.title}
-                  </option>
-                ))}
-              </select>
-            </div>
-
-            <button
-              type="button"
-              onClick={() => {
-                setFilterVersionId("");
-                setFilterTestCaseId("");
+            <RunCompareBar
+              compareRunA={compareRunA}
+              compareRunB={compareRunB}
+              getVersionLabel={getVersionLabel}
+              onOpenCompare={() => setIsCompareOpen(true)}
+              onClearFirst={() => setCompareRunA(null)}
+              onClearAll={() => {
+                setCompareRunA(null);
+                setCompareRunB(null);
               }}
-              className={styles.btnClearFilter}
-            >
-              クリア
-            </button>
-          </div>
-
-          {/* Run 一覧 */}
-          {isRunsLoading ? (
-            <p className={styles.loadingMsg}>読み込み中...</p>
-          ) : allRuns.length === 0 ? (
-            <p className={styles.emptyRuns}>
-              {filterVersionId !== "" || filterTestCaseId !== ""
-                ? "条件に一致する Run がありません。"
-                : "まだ Run がありません。「Run を作成」タブから実行してください。"}
-            </p>
-          ) : (
-            <div className={styles.runList}>
-              {allRuns.map((run) => (
-                <RunCard
-                  key={run.id}
-                  run={run}
-                  projectId={projectId}
-                  versionLabel={getVersionLabel(run.prompt_version_id)}
-                  versionNumber={getVersionNumber(run.prompt_version_id)}
-                  testCaseLabel={getTestCaseLabel(run.test_case_id)}
-                  onSetBest={(unset) => setBestMutation.mutate({ id: run.id, unset })}
-                  isBestPending={setBestMutation.isPending}
-                  onDiscard={() => handleDiscardRun(run)}
-                  isDiscardPending={discardMutation.isPending}
-                  onCompare={() => handleCompareRun(run)}
-                  isCompareSelected={compareRunA?.id === run.id || compareRunB?.id === run.id}
-                />
-              ))}
-            </div>
-          )}
-
-          <RunCompareBar
-            compareRunA={compareRunA}
-            compareRunB={compareRunB}
-            getVersionLabel={getVersionLabel}
-            onOpenCompare={() => setIsCompareOpen(true)}
-            onClearFirst={() => setCompareRunA(null)}
-            onClearAll={() => {
-              setCompareRunA(null);
-              setCompareRunB(null);
-            }}
-            className={styles.compareBarBottom}
-          />
+              className={styles.compareBarBottom}
+            />
           </div>
         )}
       </div>

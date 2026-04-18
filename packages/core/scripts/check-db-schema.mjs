@@ -1,5 +1,5 @@
-import Database from "better-sqlite3";
 import path from "node:path";
+import Database from "better-sqlite3";
 
 const configuredPath = process.argv[2] ?? process.env.DB_PATH ?? "../../dev.db";
 const resolvedPath = path.resolve(process.cwd(), configuredPath);
@@ -66,7 +66,10 @@ const expectedSchema = {
 };
 
 function getColumns(db, tableName) {
-  return db.prepare(`PRAGMA table_info(${tableName})`).all().map((column) => column.name);
+  return db
+    .prepare(`PRAGMA table_info(${tableName})`)
+    .all()
+    .map((column) => column.name);
 }
 
 function formatList(values) {

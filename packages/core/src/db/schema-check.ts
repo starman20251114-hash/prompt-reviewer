@@ -1,5 +1,5 @@
-import Database from "better-sqlite3";
 import path from "node:path";
+import Database from "better-sqlite3";
 
 const expectedSchema = {
   prompt_versions: ["workflow_definition"],
@@ -43,7 +43,9 @@ export function assertRequiredSchema(dbPath: string): void {
   }
 
   const migrateCommand =
-    dbPath.includes("data/") || dbPath.includes("data\\") ? "pnpm migrate:local" : "pnpm migrate:dev";
+    dbPath.includes("data/") || dbPath.includes("data\\")
+      ? "pnpm migrate:local"
+      : "pnpm migrate:dev";
 
   throw new Error(
     `DB schema is outdated: missing ${missingColumns.join(", ")}. Run \`${migrateCommand}\` before starting the server.`,

@@ -269,8 +269,7 @@ function PromptEditor({ version, projectId, isNew = false, onSave, onCancel }: P
       name?: string;
       memo?: string;
       workflow_definition?: { steps: PromptExecutionStepDefinition[] };
-    }) =>
-      createPromptVersion(projectId, data),
+    }) => createPromptVersion(projectId, data),
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: ["promptVersions", projectId] });
       onSave();
@@ -334,7 +333,9 @@ function PromptEditor({ version, projectId, isNew = false, onSave, onCancel }: P
     <form onSubmit={handleSubmit} className={styles.editorForm}>
       <div>
         <label htmlFor="editor-name" className={styles.fieldLabel}>
-          {isNew || version?.parent_version_id === null ? "プロンプト名（任意）" : "バージョン名（任意）"}
+          {isNew || version?.parent_version_id === null
+            ? "プロンプト名（任意）"
+            : "バージョン名（任意）"}
         </label>
         <input
           id="editor-name"
@@ -378,10 +379,10 @@ function PromptEditor({ version, projectId, isNew = false, onSave, onCancel }: P
       <div className={styles.workflowSection}>
         <div className={styles.workflowHeader}>
           <div>
-            <label className={styles.fieldLabel}>追加ステップ（Step 2 以降）</label>
+            <p className={styles.fieldLabel}>追加ステップ（Step 2 以降）</p>
             <p className={styles.workflowHint}>
-              各ステップで `{"{{conversation}}"}`、`{"{{context}}"}`、`{"{{previous_output}}"}`、
-              `{"{{step:step_id}}"}` を利用できます。
+              各ステップで `{"{{conversation}}"}`、`{"{{context}}"}`、`{"{{previous_output}}"}`、 `
+              {"{{step:step_id}}"}` を利用できます。
             </p>
           </div>
           <button
@@ -432,9 +433,7 @@ function PromptEditor({ version, projectId, isNew = false, onSave, onCancel }: P
                     onChange={(e) =>
                       setWorkflowSteps((prev) =>
                         prev.map((current, currentIndex) =>
-                          currentIndex === index
-                            ? { ...current, title: e.target.value }
-                            : current,
+                          currentIndex === index ? { ...current, title: e.target.value } : current,
                         ),
                       )
                     }
@@ -447,9 +446,7 @@ function PromptEditor({ version, projectId, isNew = false, onSave, onCancel }: P
                   onChange={(e) =>
                     setWorkflowSteps((prev) =>
                       prev.map((current, currentIndex) =>
-                        currentIndex === index
-                          ? { ...current, prompt: e.target.value }
-                          : current,
+                        currentIndex === index ? { ...current, prompt: e.target.value } : current,
                       ),
                     )
                   }
