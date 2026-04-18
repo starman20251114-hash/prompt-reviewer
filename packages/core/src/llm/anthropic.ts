@@ -71,7 +71,7 @@ export type AnthropicLLMClientOptions = {
 };
 
 const DEFAULT_ANTHROPIC_API_KEY_ENV = "ANTHROPIC_API_KEY";
-const DEFAULT_MAX_TOKENS = 4096;
+export const DEFAULT_MAX_TOKENS = 4096;
 
 export class AnthropicLLMClient implements LLMClient, LLMModelClient {
   private readonly apiKey: string | undefined;
