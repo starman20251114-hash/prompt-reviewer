@@ -1,7 +1,7 @@
 import { readFile } from "node:fs/promises";
 import path from "node:path";
 import { serve } from "@hono/node-server";
-import { db } from "@prompt-reviewer/core";
+import { assertRequiredSchema, db } from "@prompt-reviewer/core";
 import { Hono } from "hono";
 import { cors } from "hono/cors";
 import { createContextFilesRouter } from "./routes/context-files.js";
@@ -12,6 +12,9 @@ import { createRunsRouter } from "./routes/runs.js";
 import { createScoreProgressionRouter } from "./routes/score-progression.js";
 import { createScoresRouter, createVersionSummaryRouter } from "./routes/scores.js";
 import { createTestCasesRouter } from "./routes/test-cases.js";
+
+const dbPath = process.env.DB_PATH ?? "../../dev.db";
+assertRequiredSchema(dbPath);
 
 const app = new Hono();
 const uiDistDir = process.env.UI_DIST_DIR
