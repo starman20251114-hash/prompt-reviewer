@@ -120,7 +120,7 @@ describe("AnthropicLLMClient", () => {
       model: "claude-sonnet-4-5",
       system: undefined,
       temperature: undefined,
-      max_tokens: 1024,
+      max_tokens: 4096,
       messages: [{ role: "user", content: "こんにちは" }],
       stream: true,
     });

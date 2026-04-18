@@ -449,6 +449,100 @@ describe("POST /api/projects/:projectId/runs/execute", () => {
     expect(capturedInsertValues[0]?.api_provider).toBe("anthropic");
   });
 
+  it("text-delta より完全な最終 response があるときは response.content を保存する", async () => {
+    const version = {
+      id: 1,
+      project_id: 1,
+      content: "あなたは親切なアシスタントです。",
+      workflow_definition: null,
+    };
+    const testCase = {
+      id: 1,
+      project_id: 1,
+      turns: JSON.stringify([{ role: "user", content: "詳しく説明してください" }]),
+      context_content: "",
+    };
+    const settings = {
+      model: "claude-sonnet-4-6",
+      temperature: 0.4,
+      api_provider: "anthropic",
+    };
+    const fullResponse = "冒頭だけでなく、最後まで含んだ完全な応答です。";
+    const created = {
+      ...sampleRun,
+      conversation: JSON.stringify([
+        { role: "user", content: "詳しく説明してください" },
+        { role: "assistant", content: fullResponse },
+      ]),
+      model: settings.model,
+      temperature: settings.temperature,
+      api_provider: settings.api_provider,
+    };
+
+    const capturedInsertValues: Array<{ conversation: string }> = [];
+    let selectCallCount = 0;
+
+    const db = {
+      select: () => {
+        selectCallCount++;
+        const result =
+          selectCallCount === 1 ? [version] : selectCallCount === 2 ? [testCase] : [settings];
+        return {
+          from: () => ({
+            where: () => Promise.resolve(result),
+          }),
+        };
+      },
+      insert: () => ({
+        values: (values: { conversation: string }) => {
+          capturedInsertValues.push(values);
+          return {
+            returning: () => Promise.resolve([created]),
+          };
+        },
+      }),
+    };
+
+    const app = new Hono();
+    app.route(
+      "/api/projects/:projectId/runs",
+      createRunsRouter(db as unknown as DB, {
+        llmClientFactory: () => ({
+          async sendMessage() {
+            throw new Error("sendMessage should not be used for streaming execute");
+          },
+          async *stream() {
+            yield { type: "text-delta" as const, text: "冒頭だけ" };
+            yield {
+              type: "response" as const,
+              response: {
+                content: fullResponse,
+                stopReason: "end_turn",
+                raw: {},
+              },
+            };
+          },
+        }),
+      }),
+    );
+
+    const res = await app.request("/api/projects/1/runs/execute", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        prompt_version_id: 1,
+        test_case_id: 1,
+        api_key: "sk-ant-test",
+      }),
+    });
+
+    expect(res.status).toBe(200);
+    expect(JSON.parse(capturedInsertValues[0]?.conversation ?? "[]")).toEqual([
+      { role: "user", content: "詳しく説明してください" },
+      { role: "assistant", content: fullResponse },
+    ]);
+  });
+
   it("turnsが空のときプロンプトをuser messageとして送信してRunを保存する", async () => {
     const version = {
       id: 1,
@@ -801,6 +895,146 @@ describe("POST /api/projects/:projectId/runs/execute", () => {
     });
     expect(streamText).toContain("event: step-start");
     expect(streamText).toContain("event: step-complete");
+  });
+
+  it("workflow 実行でも最終 response があれば step 出力として保存する", async () => {
+    const version = {
+      id: 1,
+      project_id: 1,
+      content: "判定してください",
+      workflow_definition: JSON.stringify({
+        steps: [
+          {
+            id: "summarize",
+            title: "要約",
+            prompt: "要約してください",
+          },
+        ],
+      }),
+    };
+    const testCase = {
+      id: 1,
+      project_id: 1,
+      turns: JSON.stringify([{ role: "user", content: "長い入力" }]),
+      context_content: "",
+    };
+    const settings = {
+      model: "claude-sonnet-4-6",
+      temperature: 0.4,
+      api_provider: "anthropic",
+    };
+    const fullStepResponse = "途中までではなく、最後まで含んだ完全な要約です。";
+    const created = {
+      ...sampleRun,
+      conversation: JSON.stringify([
+        { role: "user", content: "長い入力" },
+        { role: "assistant", content: fullStepResponse },
+      ]),
+      execution_trace: JSON.stringify([
+        {
+          id: "__base_prompt__",
+          title: "プロンプト本文",
+          prompt: "判定してください",
+          renderedPrompt: "判定してください",
+          inputConversation: [{ role: "user", content: "長い入力" }],
+          output: "途中出力",
+        },
+        {
+          id: "summarize",
+          title: "要約",
+          prompt: "要約してください",
+          renderedPrompt: "要約してください",
+          inputConversation: [{ role: "user", content: "長い入力" }],
+          output: fullStepResponse,
+        },
+      ]),
+      model: settings.model,
+      temperature: settings.temperature,
+      api_provider: settings.api_provider,
+    };
+
+    const capturedInsertValues: Array<{ execution_trace: string | null; conversation: string }> = [];
+    let selectCallCount = 0;
+    let streamCallCount = 0;
+
+    const db = {
+      select: () => {
+        selectCallCount++;
+        const result =
+          selectCallCount === 1 ? [version] : selectCallCount === 2 ? [testCase] : [settings];
+        return {
+          from: () => ({
+            where: () => Promise.resolve(result),
+          }),
+        };
+      },
+      insert: () => ({
+        values: (values: { execution_trace: string | null; conversation: string }) => {
+          capturedInsertValues.push(values);
+          return {
+            returning: () => Promise.resolve([created]),
+          };
+        },
+      }),
+    };
+
+    const app = new Hono();
+    app.route(
+      "/api/projects/:projectId/runs",
+      createRunsRouter(db as unknown as DB, {
+        llmClientFactory: () => ({
+          async sendMessage() {
+            throw new Error("sendMessage should not be used for streaming execute");
+          },
+          async *stream() {
+            if (streamCallCount === 0) {
+              streamCallCount++;
+              yield { type: "text-delta" as const, text: "途中出力" };
+              yield {
+                type: "response" as const,
+                response: {
+                  content: "途中出力",
+                  stopReason: "end_turn",
+                  raw: {},
+                },
+              };
+              return;
+            }
+
+            yield { type: "text-delta" as const, text: "途中まで" };
+            yield {
+              type: "response" as const,
+              response: {
+                content: fullStepResponse,
+                stopReason: "end_turn",
+                raw: {},
+              },
+            };
+          },
+        }),
+      }),
+    );
+
+    const res = await app.request("/api/projects/1/runs/execute", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        prompt_version_id: 1,
+        test_case_id: 1,
+        api_key: "sk-ant-test",
+      }),
+    });
+
+    expect(res.status).toBe(200);
+    await res.text();
+    expect(JSON.parse(capturedInsertValues[0]?.conversation ?? "[]")).toEqual([
+      { role: "user", content: "長い入力" },
+      { role: "assistant", content: fullStepResponse },
+    ]);
+    expect(JSON.parse(capturedInsertValues[0]?.execution_trace ?? "[]")).toMatchObject([
+      { id: "__base_prompt__", output: "途中出力" },
+      { id: "summarize", output: fullStepResponse },
+    ]);
   });
 });
 
