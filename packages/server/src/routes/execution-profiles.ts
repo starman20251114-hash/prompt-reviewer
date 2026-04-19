@@ -1,6 +1,6 @@
 import { zValidator } from "@hono/zod-validator";
 import type { DB } from "@prompt-reviewer/core";
-import { execution_profiles } from "@prompt-reviewer/core";
+import { execution_profiles, runs } from "@prompt-reviewer/core";
 import { eq } from "drizzle-orm";
 import { Hono } from "hono";
 import { z } from "zod";
@@ -136,6 +136,10 @@ export function createExecutionProfilesRouter(
       return c.json({ error: "Execution profile not found" }, 404);
     }
 
+    await db
+      .update(runs)
+      .set({ execution_profile_id: null })
+      .where(eq(runs.execution_profile_id, id));
     await db.delete(execution_profiles).where(eq(execution_profiles.id, id));
     return c.body(null, 204);
   });

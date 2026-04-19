@@ -239,13 +239,24 @@ describe("PATCH /api/execution-profiles/:id", () => {
 });
 
 describe("DELETE /api/execution-profiles/:id", () => {
-  it("削除して 204 を返す", async () => {
+  it("参照中の Run を切り離してから削除し 204 を返す", async () => {
     let deleteCalled = false;
+    let updateRunsCalled = false;
+    let clearedExecutionProfileId: number | null | undefined;
     const db = {
       select: () => ({
         from: () => ({
           where: () => Promise.resolve([sampleProfile]),
         }),
+      }),
+      update: () => ({
+        set: (values: { execution_profile_id: number | null }) => {
+          updateRunsCalled = true;
+          clearedExecutionProfileId = values.execution_profile_id;
+          return {
+            where: () => Promise.resolve(),
+          };
+        },
       }),
       delete: () => ({
         where: () => {
@@ -260,6 +271,8 @@ describe("DELETE /api/execution-profiles/:id", () => {
     });
 
     expect(res.status).toBe(204);
+    expect(updateRunsCalled).toBe(true);
+    expect(clearedExecutionProfileId).toBeNull();
     expect(deleteCalled).toBe(true);
   });
 
