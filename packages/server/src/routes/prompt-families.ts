@@ -1,18 +1,18 @@
 import { zValidator } from "@hono/zod-validator";
 import type { DB } from "@prompt-reviewer/core";
-import { prompt_families } from "@prompt-reviewer/core";
+import { prompt_families, prompt_versions } from "@prompt-reviewer/core";
 import { desc, eq } from "drizzle-orm";
 import { Hono } from "hono";
 import { z } from "zod";
 
 const createPromptFamilySchema = z.object({
-  name: z.string().min(1, "nameは1文字以上必要です").nullable().optional(),
+  name: z.string().min(1, "nameは1文字以上必要です"),
   description: z.string().nullable().optional(),
 });
 
 const updatePromptFamilySchema = z
   .object({
-    name: z.string().min(1, "nameは1文字以上必要です").nullable().optional(),
+    name: z.string().min(1, "nameは1文字以上必要です").optional(),
     description: z.string().nullable().optional(),
   })
   .refine((value) => Object.keys(value).length > 0, {
@@ -96,6 +96,10 @@ export function createPromptFamiliesRouter(db: DB) {
       return c.json({ error: "Prompt family not found" }, 404);
     }
 
+    await db
+      .update(prompt_versions)
+      .set({ prompt_family_id: null })
+      .where(eq(prompt_versions.prompt_family_id, id));
     await db.delete(prompt_families).where(eq(prompt_families.id, id));
     return c.body(null, 204);
   });
@@ -105,7 +109,7 @@ export function createPromptFamiliesRouter(db: DB) {
 
 function buildCreateValues(body: CreatePromptFamilyBody, now: number) {
   return {
-    name: body.name ?? null,
+    name: body.name,
     description: body.description ?? null,
     created_at: now,
     updated_at: now,

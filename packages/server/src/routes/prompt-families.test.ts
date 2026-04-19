@@ -87,31 +87,14 @@ describe("POST /api/prompt-families", () => {
     await expect(res.json()).resolves.toEqual(created);
   });
 
-  it("name と description が省略された場合も作成できる", async () => {
-    const created: MockPromptFamily = {
-      id: 3,
-      name: null,
-      description: null,
-      created_at: 3000000,
-      updated_at: 3000000,
-    };
-
-    const db = {
-      insert: () => ({
-        values: () => ({
-          returning: () => Promise.resolve([created]),
-        }),
-      }),
-    };
-
-    const res = await buildApp(db).request("/api/prompt-families", {
+  it("name が未指定なら 400 を返す", async () => {
+    const res = await buildApp({}).request("/api/prompt-families", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({}),
     });
 
-    expect(res.status).toBe(201);
-    await expect(res.json()).resolves.toEqual(created);
+    expect(res.status).toBe(400);
   });
 
   it("name が空文字なら 400 を返す", async () => {
@@ -119,6 +102,16 @@ describe("POST /api/prompt-families", () => {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ name: "" }),
+    });
+
+    expect(res.status).toBe(400);
+  });
+
+  it("name が null なら 400 を返す", async () => {
+    const res = await buildApp({}).request("/api/prompt-families", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ name: null }),
     });
 
     expect(res.status).toBe(400);
@@ -231,6 +224,16 @@ describe("PATCH /api/prompt-families/:id", () => {
     expect(res.status).toBe(400);
   });
 
+  it("name を null に更新しようとすると 400 を返す", async () => {
+    const res = await buildApp({}).request("/api/prompt-families/1", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ name: null }),
+    });
+
+    expect(res.status).toBe(400);
+  });
+
   it("数値以外の ID なら 400 を返す", async () => {
     const res = await buildApp({}).request("/api/prompt-families/abc", {
       method: "PATCH",
@@ -244,7 +247,8 @@ describe("PATCH /api/prompt-families/:id", () => {
 });
 
 describe("DELETE /api/prompt-families/:id", () => {
-  it("削除して 204 を返す", async () => {
+  it("関連する prompt_versions の参照を外してから削除し 204 を返す", async () => {
+    let clearedPromptFamilyId: number | undefined;
     let deleteCalled = false;
 
     const db = {
@@ -252,6 +256,18 @@ describe("DELETE /api/prompt-families/:id", () => {
         from: () => ({
           where: () => Promise.resolve([sampleFamily]),
         }),
+      }),
+      update: (target: unknown) => ({
+        set: (values: Record<string, unknown>) => {
+          expect(target).toBeDefined();
+          expect(values).toEqual({ prompt_family_id: null });
+          return {
+            where: (_condition: unknown) => {
+              clearedPromptFamilyId = sampleFamily.id;
+              return Promise.resolve();
+            },
+          };
+        },
       }),
       delete: () => ({
         where: () => {
@@ -266,6 +282,7 @@ describe("DELETE /api/prompt-families/:id", () => {
     });
 
     expect(res.status).toBe(204);
+    expect(clearedPromptFamilyId).toBe(sampleFamily.id);
     expect(deleteCalled).toBe(true);
   });
 
