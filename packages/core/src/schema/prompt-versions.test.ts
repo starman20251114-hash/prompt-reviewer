@@ -10,21 +10,20 @@ import type { NewPromptVersion, PromptVersion } from "./prompt-versions.js";
 
 describe("prompt_versions スキーマ型定義", () => {
   describe("PromptVersion 型", () => {
-    it("PromptVersion 型は必須フィールドを持つ", () => {
-      type RequiredFields = {
-        id: number;
-        prompt_family_id: number | null;
-        project_id: number;
-        version: number;
-        content: string;
-        created_at: number;
-      };
-      expectTypeOf<
-        Pick<
-          PromptVersion,
-          "id" | "prompt_family_id" | "project_id" | "version" | "content" | "created_at"
-        >
-      >().toMatchTypeOf<RequiredFields>();
+    it("PromptVersion の prompt_family_id は必須（number 型）", () => {
+      expectTypeOf<PromptVersion["prompt_family_id"]>().toEqualTypeOf<number>();
+    });
+
+    it("PromptVersion の project_id は nullable（後方互換）", () => {
+      expectTypeOf<PromptVersion["project_id"]>().toEqualTypeOf<number | null>();
+    });
+
+    it("PromptVersion の version は number 型（family 内連番）", () => {
+      expectTypeOf<PromptVersion["version"]>().toEqualTypeOf<number>();
+    });
+
+    it("PromptVersion の content は string 型", () => {
+      expectTypeOf<PromptVersion["content"]>().toEqualTypeOf<string>();
     });
 
     it("PromptVersion の name はオプショナル（null許容）", () => {
@@ -39,28 +38,28 @@ describe("prompt_versions スキーマ型定義", () => {
       expectTypeOf<PromptVersion["parent_version_id"]>().toEqualTypeOf<number | null>();
     });
 
-    it("PromptVersion の version は number 型（プロジェクト内連番）", () => {
-      expectTypeOf<PromptVersion["version"]>().toEqualTypeOf<number>();
-    });
-
-    it("PromptVersion の content は string 型", () => {
-      expectTypeOf<PromptVersion["content"]>().toEqualTypeOf<string>();
-    });
-
-    it("PromptVersion の project_id は number 型", () => {
-      expectTypeOf<PromptVersion["project_id"]>().toEqualTypeOf<number>();
+    it("PromptVersion の is_selected は boolean 型", () => {
+      expectTypeOf<PromptVersion["is_selected"]>().toEqualTypeOf<boolean>();
     });
   });
 
   describe("NewPromptVersion 型", () => {
-    it("NewPromptVersion は id なしで作成できる（AutoIncrement）", () => {
+    it("NewPromptVersion は prompt_family_id を必須として作成できる", () => {
       const newPromptVersion: NewPromptVersion = {
-        project_id: 1,
+        prompt_family_id: 1,
         version: 1,
         content: "あなたは親切なアシスタントです。",
         created_at: Date.now(),
       };
       expectTypeOf(newPromptVersion).toMatchTypeOf<NewPromptVersion>();
+    });
+
+    it("NewPromptVersion の prompt_family_id は number 型（必須）", () => {
+      expectTypeOf<NewPromptVersion["prompt_family_id"]>().toEqualTypeOf<number>();
+    });
+
+    it("NewPromptVersion の project_id はオプショナル（後方互換）", () => {
+      expectTypeOf<NewPromptVersion["project_id"]>().toEqualTypeOf<number | null | undefined>();
     });
 
     it("NewPromptVersion の name はオプショナル", () => {
@@ -79,7 +78,7 @@ describe("prompt_versions スキーマ型定義", () => {
 
     it("分岐バージョンは parent_version_id を指定して作成できる", () => {
       const branchedVersion: NewPromptVersion = {
-        project_id: 1,
+        prompt_family_id: 1,
         version: 2,
         content: "あなたは丁寧なアシスタントです。",
         parent_version_id: 1,
@@ -90,7 +89,7 @@ describe("prompt_versions スキーマ型定義", () => {
 
     it("名前付きバージョンは name を指定して作成できる", () => {
       const namedVersion: NewPromptVersion = {
-        project_id: 1,
+        prompt_family_id: 1,
         version: 3,
         name: "丁寧口調バージョン",
         memo: "語尾を丁寧語に変更した改善版",
@@ -100,11 +99,4 @@ describe("prompt_versions スキーマ型定義", () => {
       expectTypeOf(namedVersion).toMatchTypeOf<NewPromptVersion>();
     });
   });
-});
-it("PromptVersion の prompt_family_id は移行期間中 number | null 型", () => {
-  expectTypeOf<PromptVersion["prompt_family_id"]>().toEqualTypeOf<number | null>();
-});
-
-it("NewPromptVersion の prompt_family_id は移行期間中オプショナル", () => {
-  expectTypeOf<NewPromptVersion["prompt_family_id"]>().toEqualTypeOf<number | null | undefined>();
 });

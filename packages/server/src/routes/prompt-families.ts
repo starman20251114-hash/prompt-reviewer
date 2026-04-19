@@ -1,6 +1,6 @@
 import { zValidator } from "@hono/zod-validator";
 import type { DB } from "@prompt-reviewer/core";
-import { prompt_families, prompt_versions } from "@prompt-reviewer/core";
+import { prompt_families, prompt_versions, runs } from "@prompt-reviewer/core";
 import { desc, eq } from "drizzle-orm";
 import { Hono } from "hono";
 import { z } from "zod";
@@ -103,10 +103,23 @@ export function createPromptFamiliesRouter(db: DB) {
       return c.json({ error: "Prompt family not found" }, 404);
     }
 
-    await db
-      .update(prompt_versions)
-      .set({ prompt_family_id: null })
+    const versions = await db
+      .select({ id: prompt_versions.id })
+      .from(prompt_versions)
       .where(eq(prompt_versions.prompt_family_id, id));
+
+    for (const version of versions) {
+      const [referencingRun] = await db
+        .select({ id: runs.id })
+        .from(runs)
+        .where(eq(runs.prompt_version_id, version.id));
+
+      if (referencingRun) {
+        return c.json({ error: "Prompt family is referenced by runs" }, 409);
+      }
+    }
+
+    await db.delete(prompt_versions).where(eq(prompt_versions.prompt_family_id, id));
     await db.delete(prompt_families).where(eq(prompt_families.id, id));
     return c.body(null, 204);
   });

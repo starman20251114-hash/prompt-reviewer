@@ -62,7 +62,7 @@ type RunsRouterOptions = {
 
 type StoredPromptVersion = {
   id: number;
-  project_id: number;
+  project_id: number | null;
   content: string;
   workflow_definition: string | null;
 };

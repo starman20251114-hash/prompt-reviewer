@@ -34,6 +34,7 @@ async function seed() {
   sqlite.exec("DELETE FROM scores");
   sqlite.exec("DELETE FROM runs");
   sqlite.exec("DELETE FROM prompt_versions");
+  sqlite.exec("DELETE FROM prompt_families");
   sqlite.exec("DELETE FROM test_cases");
   sqlite.exec("DELETE FROM project_settings");
   sqlite.exec("DELETE FROM projects");
@@ -126,11 +127,27 @@ async function seed() {
   );
   console.log(`テストケース2作成: id=${testCase2.id}`);
 
-  // 4. プロンプトバージョン作成
+  // 4. プロンプトファミリー作成
+  const promptFamily = getFirstOrThrow(
+    await db
+      .insert(schema.prompt_families)
+      .values({
+        name: "カスタマーサポートBot",
+        description: "ECサイト向けカスタマーサポートのプロンプト系列",
+        created_at: now,
+        updated_at: now,
+      })
+      .returning(),
+    "promptFamily",
+  );
+  console.log(`プロンプトファミリー作成: id=${promptFamily.id}`);
+
+  // 5. プロンプトバージョン作成
   const promptV1 = getFirstOrThrow(
     await db
       .insert(schema.prompt_versions)
       .values({
+        prompt_family_id: promptFamily.id,
         project_id: project.id,
         version: 1,
         name: "初期バージョン",
@@ -148,6 +165,7 @@ async function seed() {
     await db
       .insert(schema.prompt_versions)
       .values({
+        prompt_family_id: promptFamily.id,
         project_id: project.id,
         version: 2,
         name: "共感強化バージョン",
@@ -167,7 +185,7 @@ async function seed() {
   );
   console.log(`プロンプトバージョン2作成: id=${promptV2.id}`);
 
-  // 5. 実行結果（runs）作成
+  // 6. 実行結果（runs）作成
   const conversation1 = JSON.stringify([
     { role: "user", content: "注文した商品がまだ届いていません。注文番号は#12345です。" },
     {
@@ -224,7 +242,7 @@ async function seed() {
   );
   console.log(`実行結果2作成: id=${run2.id} (ベスト回答)`);
 
-  // 6. スコア（scores）作成
+  // 7. スコア（scores）作成
   const score1 = getFirstOrThrow(
     await db
       .insert(schema.scores)
@@ -268,6 +286,7 @@ async function seed() {
   - プロジェクト: 1件
   - プロジェクト設定: 1件
   - テストケース: 2件
+  - プロンプトファミリー: 1件
   - プロンプトバージョン: 2件 (v1 -> v2 の分岐)
   - 実行結果: 2件 (run2 がベスト回答)
   - スコア: 2件 (3点, 5点)
