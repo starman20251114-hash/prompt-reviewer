@@ -237,9 +237,8 @@ describe("PATCH /api/prompt-families/:id", () => {
 });
 
 describe("DELETE /api/prompt-families/:id", () => {
-  it("関連する prompt_versions の参照を外してから削除し 204 を返す", async () => {
-    let clearedPromptFamilyId: number | undefined;
-    let deleteCalled = false;
+  it("関連する prompt_versions を削除してから family を削除し 204 を返す", async () => {
+    let deleteCallCount = 0;
 
     const db = {
       select: () => ({
@@ -247,21 +246,9 @@ describe("DELETE /api/prompt-families/:id", () => {
           where: () => Promise.resolve([sampleFamily]),
         }),
       }),
-      update: (target: unknown) => ({
-        set: (values: Record<string, unknown>) => {
-          expect(target).toBeDefined();
-          expect(values).toEqual({ prompt_family_id: null });
-          return {
-            where: (_condition: unknown) => {
-              clearedPromptFamilyId = sampleFamily.id;
-              return Promise.resolve();
-            },
-          };
-        },
-      }),
       delete: () => ({
         where: () => {
-          deleteCalled = true;
+          deleteCallCount++;
           return Promise.resolve();
         },
       }),
@@ -272,8 +259,7 @@ describe("DELETE /api/prompt-families/:id", () => {
     });
 
     expect(res.status).toBe(204);
-    expect(clearedPromptFamilyId).toBe(sampleFamily.id);
-    expect(deleteCalled).toBe(true);
+    expect(deleteCallCount).toBe(2);
   });
 
   it("見つからない場合は 404 を返す", async () => {

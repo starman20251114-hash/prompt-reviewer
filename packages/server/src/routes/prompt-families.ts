@@ -103,10 +103,7 @@ export function createPromptFamiliesRouter(db: DB) {
       return c.json({ error: "Prompt family not found" }, 404);
     }
 
-    await db
-      .update(prompt_versions)
-      .set({ prompt_family_id: null })
-      .where(eq(prompt_versions.prompt_family_id, id));
+    await db.delete(prompt_versions).where(eq(prompt_versions.prompt_family_id, id));
     await db.delete(prompt_families).where(eq(prompt_families.id, id));
     return c.body(null, 204);
   });

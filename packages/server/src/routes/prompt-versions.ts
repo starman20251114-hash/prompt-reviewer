@@ -47,6 +47,7 @@ const workflowDefinitionSchema = z
   });
 
 const createPromptVersionSchema = z.object({
+  prompt_family_id: z.number().int().positive("prompt_family_idは正の整数が必要です"),
   content: z.string().min(1, "contentは1文字以上必要です"),
   name: z.string().optional(),
   memo: z.string().optional(),
@@ -63,6 +64,10 @@ const updatePromptVersionSchema = z.object({
 const branchPromptVersionSchema = z.object({
   name: z.string().optional(),
   memo: z.string().optional(),
+});
+
+const updateProjectLinkSchema = z.object({
+  project_id: z.number().int().positive("project_idは正の整数が必要です").nullable(),
 });
 
 function normalizeOptionalString(value: string | null | undefined): string | null {
@@ -95,37 +100,35 @@ export function createPromptVersionsRouter(db: DB) {
     };
   }
 
-  // GET /api/projects/:projectId/prompt-versions - バージョン一覧取得
+  // GET /api/prompt-versions?prompt_family_id=N - family単位でバージョン一覧取得
   router.get("/", async (c) => {
-    const projectId = Number(c.req.param("projectId"));
+    const familyIdParam = c.req.query("prompt_family_id");
+    if (!familyIdParam) {
+      return c.json({ error: "prompt_family_id is required" }, 400);
+    }
 
-    if (Number.isNaN(projectId)) {
-      return c.json({ error: "Invalid projectId" }, 400);
+    const familyId = Number(familyIdParam);
+    if (Number.isNaN(familyId)) {
+      return c.json({ error: "Invalid prompt_family_id" }, 400);
     }
 
     const result = await db
       .select()
       .from(prompt_versions)
-      .where(eq(prompt_versions.project_id, projectId));
+      .where(eq(prompt_versions.prompt_family_id, familyId));
 
     return c.json(result.map(serializePromptVersion));
   });
 
-  // POST /api/projects/:projectId/prompt-versions - 新規バージョン作成
+  // POST /api/prompt-versions - prompt_family_id ベースで新規バージョン作成
   router.post("/", zValidator("json", createPromptVersionSchema), async (c) => {
-    const projectId = Number(c.req.param("projectId"));
-
-    if (Number.isNaN(projectId)) {
-      return c.json({ error: "Invalid projectId" }, 400);
-    }
-
     const body = c.req.valid("json");
+    const { prompt_family_id } = body;
 
-    // version 番号を自動採番（プロジェクト内の最大 version + 1）
     const [maxResult] = await db
       .select({ maxVersion: max(prompt_versions.version) })
       .from(prompt_versions)
-      .where(eq(prompt_versions.project_id, projectId));
+      .where(eq(prompt_versions.prompt_family_id, prompt_family_id));
 
     const nextVersion = (maxResult?.maxVersion ?? 0) + 1;
     const normalizedName =
@@ -134,7 +137,7 @@ export function createPromptVersionsRouter(db: DB) {
     const result = await db
       .insert(prompt_versions)
       .values({
-        project_id: projectId,
+        prompt_family_id,
         version: nextVersion,
         content: body.content,
         name: normalizedName,
@@ -155,19 +158,15 @@ export function createPromptVersionsRouter(db: DB) {
     return c.json(serializePromptVersion(created), 201);
   });
 
-  // GET /api/projects/:projectId/prompt-versions/:id - 特定バージョン取得
+  // GET /api/prompt-versions/:id - 単件取得
   router.get("/:id", async (c) => {
-    const projectId = Number(c.req.param("projectId"));
     const id = Number(c.req.param("id"));
 
-    if (Number.isNaN(projectId) || Number.isNaN(id)) {
+    if (Number.isNaN(id)) {
       return c.json({ error: "Invalid ID" }, 400);
     }
 
-    const [version] = await db
-      .select()
-      .from(prompt_versions)
-      .where(and(eq(prompt_versions.id, id), eq(prompt_versions.project_id, projectId)));
+    const [version] = await db.select().from(prompt_versions).where(eq(prompt_versions.id, id));
 
     if (!version) {
       return c.json({ error: "PromptVersion not found" }, 404);
@@ -176,19 +175,15 @@ export function createPromptVersionsRouter(db: DB) {
     return c.json(serializePromptVersion(version));
   });
 
-  // PATCH /api/projects/:projectId/prompt-versions/:id - バージョン更新
+  // PATCH /api/prompt-versions/:id - 部分更新
   router.patch("/:id", zValidator("json", updatePromptVersionSchema), async (c) => {
-    const projectId = Number(c.req.param("projectId"));
     const id = Number(c.req.param("id"));
 
-    if (Number.isNaN(projectId) || Number.isNaN(id)) {
+    if (Number.isNaN(id)) {
       return c.json({ error: "Invalid ID" }, 400);
     }
 
-    const [existing] = await db
-      .select()
-      .from(prompt_versions)
-      .where(and(eq(prompt_versions.id, id), eq(prompt_versions.project_id, projectId)));
+    const [existing] = await db.select().from(prompt_versions).where(eq(prompt_versions.id, id));
 
     if (!existing) {
       return c.json({ error: "PromptVersion not found" }, 404);
@@ -221,7 +216,7 @@ export function createPromptVersionsRouter(db: DB) {
     const updateResult = await db
       .update(prompt_versions)
       .set(updateData)
-      .where(and(eq(prompt_versions.id, id), eq(prompt_versions.project_id, projectId)))
+      .where(eq(prompt_versions.id, id))
       .returning();
 
     const updated = updateResult[0];
@@ -232,19 +227,15 @@ export function createPromptVersionsRouter(db: DB) {
     return c.json(serializePromptVersion(updated));
   });
 
-  // POST /api/projects/:projectId/prompt-versions/:id/branch - 分岐バージョン作成
+  // POST /api/prompt-versions/:id/branch - 分岐バージョン作成
   router.post("/:id/branch", zValidator("json", branchPromptVersionSchema), async (c) => {
-    const projectId = Number(c.req.param("projectId"));
     const id = Number(c.req.param("id"));
 
-    if (Number.isNaN(projectId) || Number.isNaN(id)) {
+    if (Number.isNaN(id)) {
       return c.json({ error: "Invalid ID" }, 400);
     }
 
-    const [parent] = await db
-      .select()
-      .from(prompt_versions)
-      .where(and(eq(prompt_versions.id, id), eq(prompt_versions.project_id, projectId)));
+    const [parent] = await db.select().from(prompt_versions).where(eq(prompt_versions.id, id));
 
     if (!parent) {
       return c.json({ error: "PromptVersion not found" }, 404);
@@ -252,18 +243,17 @@ export function createPromptVersionsRouter(db: DB) {
 
     const body = c.req.valid("json");
 
-    // version 番号を自動採番（プロジェクト内の最大 version + 1）
     const [maxResult] = await db
       .select({ maxVersion: max(prompt_versions.version) })
       .from(prompt_versions)
-      .where(eq(prompt_versions.project_id, projectId));
+      .where(eq(prompt_versions.prompt_family_id, parent.prompt_family_id));
 
     const nextVersion = (maxResult?.maxVersion ?? 0) + 1;
 
     const result = await db
       .insert(prompt_versions)
       .values({
-        project_id: projectId,
+        prompt_family_id: parent.prompt_family_id,
         version: nextVersion,
         content: parent.content,
         name: body.name ?? null,
@@ -282,36 +272,59 @@ export function createPromptVersionsRouter(db: DB) {
     return c.json(serializePromptVersion(created), 201);
   });
 
-  // PATCH /api/projects/:projectId/prompt-versions/:id/selected - Selected フラグ設定
-  // プロジェクト内の既存フラグを解除してから対象バージョンに設定（1プロジェクト1件制約）
+  // PATCH /api/prompt-versions/:id/selected - family内で選択切り替え（1family1件制約）
   router.patch("/:id/selected", async (c) => {
-    const projectId = Number(c.req.param("projectId"));
     const id = Number(c.req.param("id"));
 
-    if (Number.isNaN(projectId) || Number.isNaN(id)) {
+    if (Number.isNaN(id)) {
       return c.json({ error: "Invalid ID" }, 400);
     }
 
-    const [existing] = await db
-      .select()
-      .from(prompt_versions)
-      .where(and(eq(prompt_versions.id, id), eq(prompt_versions.project_id, projectId)));
+    const [existing] = await db.select().from(prompt_versions).where(eq(prompt_versions.id, id));
 
     if (!existing) {
       return c.json({ error: "PromptVersion not found" }, 404);
     }
 
-    // プロジェクト内の既存 selected フラグを解除
     await db
       .update(prompt_versions)
       .set({ is_selected: false })
-      .where(eq(prompt_versions.project_id, projectId));
+      .where(eq(prompt_versions.prompt_family_id, existing.prompt_family_id));
 
-    // 対象バージョンに selected フラグを設定
     const updateResult = await db
       .update(prompt_versions)
       .set({ is_selected: true })
-      .where(and(eq(prompt_versions.id, id), eq(prompt_versions.project_id, projectId)))
+      .where(eq(prompt_versions.id, id))
+      .returning();
+
+    const updated = updateResult[0];
+    if (!updated) {
+      return c.json({ error: "Failed to update PromptVersion" }, 500);
+    }
+
+    return c.json(serializePromptVersion(updated));
+  });
+
+  // PUT /api/prompt-versions/:id/projects - プロジェクト紐付け更新
+  router.put("/:id/projects", zValidator("json", updateProjectLinkSchema), async (c) => {
+    const id = Number(c.req.param("id"));
+
+    if (Number.isNaN(id)) {
+      return c.json({ error: "Invalid ID" }, 400);
+    }
+
+    const [existing] = await db.select().from(prompt_versions).where(eq(prompt_versions.id, id));
+
+    if (!existing) {
+      return c.json({ error: "PromptVersion not found" }, 404);
+    }
+
+    const body = c.req.valid("json");
+
+    const updateResult = await db
+      .update(prompt_versions)
+      .set({ project_id: body.project_id })
+      .where(eq(prompt_versions.id, id))
       .returning();
 
     const updated = updateResult[0];
