@@ -1,0 +1,1 @@
+CREATE UNIQUE INDEX `execution_profiles_name_unique` ON `execution_profiles` (`name`);
