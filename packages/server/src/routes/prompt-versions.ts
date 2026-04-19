@@ -131,19 +131,27 @@ export function createPromptVersionsRouter(db: DB) {
       .select({ prompt_version_id: prompt_version_projects.prompt_version_id })
       .from(prompt_version_projects)
       .where(eq(prompt_version_projects.project_id, projectId));
+    const directVersions = await db
+      .select()
+      .from(prompt_versions)
+      .where(eq(prompt_versions.project_id, projectId));
 
-    const versions: Array<typeof prompt_versions.$inferSelect> = [];
+    const versions = new Map<number, typeof prompt_versions.$inferSelect>();
     for (const link of links) {
       const [version] = await db
         .select()
         .from(prompt_versions)
         .where(eq(prompt_versions.id, link.prompt_version_id));
       if (version) {
-        versions.push(version);
+        versions.set(version.id, version);
       }
     }
 
-    return versions.sort((a, b) => a.version - b.version || a.id - b.id);
+    for (const version of directVersions) {
+      versions.set(version.id, version);
+    }
+
+    return [...versions.values()].sort((a, b) => a.version - b.version || a.id - b.id);
   }
 
   async function getLegacyProjectVersion(projectId: number, id: number) {
@@ -157,11 +165,15 @@ export function createPromptVersionsRouter(db: DB) {
         ),
       );
 
-    if (!link) {
-      return null;
+    if (link) {
+      const [version] = await db.select().from(prompt_versions).where(eq(prompt_versions.id, id));
+      return version ?? null;
     }
 
-    const [version] = await db.select().from(prompt_versions).where(eq(prompt_versions.id, id));
+    const [version] = await db
+      .select()
+      .from(prompt_versions)
+      .where(and(eq(prompt_versions.id, id), eq(prompt_versions.project_id, projectId)));
     return version ?? null;
   }
 
@@ -519,6 +531,26 @@ export function createPromptVersionsRouter(db: DB) {
       const [project] = await db.select().from(projects).where(eq(projects.id, body.project_id));
       if (!project) {
         return c.json({ error: "Project not found" }, 404);
+      }
+    }
+
+    if (body.project_id === null) {
+      await db
+        .delete(prompt_version_projects)
+        .where(eq(prompt_version_projects.prompt_version_id, id));
+    } else {
+      const [existingLink] = await db
+        .select({ prompt_version_id: prompt_version_projects.prompt_version_id })
+        .from(prompt_version_projects)
+        .where(
+          and(
+            eq(prompt_version_projects.prompt_version_id, id),
+            eq(prompt_version_projects.project_id, body.project_id),
+          ),
+        );
+
+      if (!existingLink) {
+        await linkPromptVersionToProject(id, body.project_id);
       }
     }
 

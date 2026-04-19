@@ -121,6 +121,7 @@ describe("GET /api/prompt-versions", () => {
 describe("GET /api/projects/:projectId/prompt-versions", () => {
   it("project にリンクされた version 一覧を返し、project_id を補完する", async () => {
     let selectCallCount = 0;
+    const directVersion = { ...sampleVersion, id: 2, version: 2, project_id: 7, name: "direct" };
     const db = {
       select: () => ({
         from: () => ({
@@ -128,6 +129,9 @@ describe("GET /api/projects/:projectId/prompt-versions", () => {
             selectCallCount++;
             if (selectCallCount === 1) {
               return Promise.resolve([{ prompt_version_id: 1 }]);
+            }
+            if (selectCallCount === 2) {
+              return Promise.resolve([directVersion]);
             }
             return Promise.resolve([sampleVersion]);
           },
@@ -139,9 +143,11 @@ describe("GET /api/projects/:projectId/prompt-versions", () => {
 
     expect(res.status).toBe(200);
     const body = (await res.json()) as MockPromptVersion[];
-    expect(body).toHaveLength(1);
+    expect(body).toHaveLength(2);
     expect(body[0]?.id).toBe(1);
     expect(body[0]?.project_id).toBe(7);
+    expect(body[1]?.id).toBe(2);
+    expect(body[1]?.project_id).toBe(7);
   });
 });
 
@@ -521,6 +527,31 @@ describe("GET /api/projects/:projectId/prompt-versions/:id", () => {
     expect(res.status).toBe(200);
     const body = (await res.json()) as MockPromptVersion;
     expect(body.id).toBe(1);
+    expect(body.project_id).toBe(7);
+  });
+
+  it("link table に無くても prompt_versions.project_id が一致すれば返す", async () => {
+    let selectCallCount = 0;
+    const directVersion = { ...sampleVersion, id: 2, project_id: 7 };
+    const db = {
+      select: () => ({
+        from: () => ({
+          where: () => {
+            selectCallCount++;
+            if (selectCallCount === 1) {
+              return Promise.resolve([]);
+            }
+            return Promise.resolve([directVersion]);
+          },
+        }),
+      }),
+    };
+
+    const res = await buildLegacyApp(db).request("/api/projects/7/prompt-versions/2");
+
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as MockPromptVersion;
+    expect(body.id).toBe(2);
     expect(body.project_id).toBe(7);
   });
 });
@@ -1042,9 +1073,10 @@ describe("PATCH /api/projects/:projectId/prompt-versions/:id/selected", () => {
 // ---- PUT /api/prompt-versions/:id/projects ----
 
 describe("PUT /api/prompt-versions/:id/projects", () => {
-  it("project_id を設定して200で返す", async () => {
+  it("project_id を設定して link table にも反映し 200で返す", async () => {
     const updated = { ...sampleVersion, project_id: 5 };
     let selectCallCount = 0;
+    let insertCallCount = 0;
 
     const db = {
       select: () => ({
@@ -1054,9 +1086,21 @@ describe("PUT /api/prompt-versions/:id/projects", () => {
             if (selectCallCount === 1) {
               return Promise.resolve([sampleVersion]);
             }
-            return Promise.resolve([{ id: 5 }]);
+            if (selectCallCount === 2) {
+              return Promise.resolve([{ id: 5 }]);
+            }
+            return Promise.resolve([]);
           },
         }),
+      }),
+      insert: () => ({
+        values: (values: { prompt_version_id: number; project_id: number; created_at: number }) => {
+          insertCallCount++;
+          expect(values.prompt_version_id).toBe(1);
+          expect(values.project_id).toBe(5);
+          expect(typeof values.created_at).toBe("number");
+          return Promise.resolve();
+        },
       }),
       update: () => ({
         set: (values: { project_id: number | null }) => ({
@@ -1080,6 +1124,53 @@ describe("PUT /api/prompt-versions/:id/projects", () => {
     expect(res.status).toBe(200);
     const body = (await res.json()) as MockPromptVersion;
     expect(body.project_id).toBe(5);
+    expect(insertCallCount).toBe(1);
+  });
+
+  it("同じ project link が既にある場合は重複 insert しない", async () => {
+    const updated = { ...sampleVersion, project_id: 5 };
+    let selectCallCount = 0;
+    let insertCalled = false;
+
+    const db = {
+      select: () => ({
+        from: (_table?: unknown) => ({
+          where: () => {
+            selectCallCount++;
+            if (selectCallCount === 1) {
+              return Promise.resolve([sampleVersion]);
+            }
+            if (selectCallCount === 2) {
+              return Promise.resolve([{ id: 5 }]);
+            }
+            return Promise.resolve([{ prompt_version_id: 1 }]);
+          },
+        }),
+      }),
+      insert: () => ({
+        values: () => {
+          insertCalled = true;
+          return Promise.resolve();
+        },
+      }),
+      update: () => ({
+        set: () => ({
+          where: () => ({
+            returning: () => Promise.resolve([updated]),
+          }),
+        }),
+      }),
+    };
+
+    const app = buildApp(db);
+    const res = await app.request("/api/prompt-versions/1/projects", {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ project_id: 5 }),
+    });
+
+    expect(res.status).toBe(200);
+    expect(insertCalled).toBe(false);
   });
 
   it("存在しない project_id を指定すると 404 を返す", async () => {
@@ -1122,14 +1213,21 @@ describe("PUT /api/prompt-versions/:id/projects", () => {
     expect(updateCalled).toBe(false);
   });
 
-  it("project_id を null にして紐付けを解除できる", async () => {
+  it("project_id を null にして link table の紐付けも解除できる", async () => {
     const updated = { ...sampleVersion, project_id: null };
+    let deleteCalled = false;
 
     const db = {
       select: () => ({
         from: () => ({
           where: () => Promise.resolve([{ ...sampleVersion, project_id: 5 }]),
         }),
+      }),
+      delete: () => ({
+        where: () => {
+          deleteCalled = true;
+          return Promise.resolve();
+        },
       }),
       update: () => ({
         set: (values: { project_id: number | null }) => ({
@@ -1153,6 +1251,7 @@ describe("PUT /api/prompt-versions/:id/projects", () => {
     expect(res.status).toBe(200);
     const body = (await res.json()) as MockPromptVersion;
     expect(body.project_id).toBeNull();
+    expect(deleteCalled).toBe(true);
   });
 
   it("存在しないIDに対して404を返す", async () => {
