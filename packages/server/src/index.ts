@@ -4,6 +4,7 @@ import { serve } from "@hono/node-server";
 import { assertRequiredSchema, db } from "@prompt-reviewer/core";
 import { Hono } from "hono";
 import { cors } from "hono/cors";
+import { createContextAssetsRouter } from "./routes/context-assets.js";
 import { createContextFilesRouter } from "./routes/context-files.js";
 import { createExecutionProfilesRouter } from "./routes/execution-profiles.js";
 import { createProjectSettingsRouter } from "./routes/project-settings.js";
@@ -71,6 +72,7 @@ app.get("/api/health", (c) => {
   return c.json({ status: "ok" });
 });
 
+app.route("/api/context-assets", createContextAssetsRouter(db));
 app.route("/api/projects", createProjectsRouter(db));
 app.route("/api/execution-profiles", createExecutionProfilesRouter(db));
 app.route("/api/prompt-families", createPromptFamiliesRouter(db));
