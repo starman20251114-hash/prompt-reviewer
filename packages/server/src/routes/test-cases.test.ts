@@ -1,9 +1,13 @@
 /**
- * TestCase CRUD エンドポイントのテスト
+ * TestCase CRUD エンドポイントのテスト（独立資産モデル）
  *
  * better-sqlite3 はネイティブバイナリのビルドが必要なため、
  * 実際のDB接続は行わず、Drizzle の DB インターフェースを模倣した
  * モックを使用してルートハンドラの動作を検証する。
+ *
+ * テストケースは project に依存しない独立資産として管理される。
+ * プロジェクトへの紐付けは test_case_projects 中間テーブル経由。
+ * context asset 関連付けは test_case_context_assets 中間テーブル経由。
  */
 
 // better-sqlite3 のネイティブモジュールをモックしてDB初期化をブロック
@@ -23,7 +27,6 @@ import { createTestCasesRouter } from "./test-cases.js";
 
 type MockTestCase = {
   id: number;
-  project_id: number;
   title: string;
   turns: string;
   context_content: string;
@@ -41,8 +44,7 @@ type ParsedTestCase = Omit<MockTestCase, "turns"> & { turns: Turn[] };
  */
 function buildApp(db: unknown) {
   const app = new Hono();
-  // Honoのルート登録でparamを伝播させるためにネストする
-  app.route("/api/projects/:projectId/test-cases", createTestCasesRouter(db as DB));
+  app.route("/api/test-cases", createTestCasesRouter(db as DB));
   return app;
 }
 
@@ -52,7 +54,6 @@ const sampleTurns: Turn[] = [{ role: "user", content: "テスト入力" }];
 
 const sampleTestCase: MockTestCase = {
   id: 1,
-  project_id: 1,
   title: "サンプルテストケース",
   turns: JSON.stringify(sampleTurns),
   context_content: "",
@@ -62,9 +63,9 @@ const sampleTestCase: MockTestCase = {
   updated_at: 1000000,
 };
 
-// ---- GET /api/projects/:projectId/test-cases ----
+// ---- GET /api/test-cases ----
 
-describe("GET /api/projects/:projectId/test-cases", () => {
+describe("GET /api/test-cases", () => {
   it("テストケース一覧を200で返す", async () => {
     const testCases = [
       sampleTestCase,
@@ -73,16 +74,12 @@ describe("GET /api/projects/:projectId/test-cases", () => {
 
     const db = {
       select: () => ({
-        from: () => ({
-          where: () => ({
-            orderBy: () => Promise.resolve(testCases),
-          }),
-        }),
+        from: () => Promise.resolve(testCases),
       }),
     };
 
     const app = buildApp(db);
-    const res = await app.request("/api/projects/1/test-cases");
+    const res = await app.request("/api/test-cases");
 
     expect(res.status).toBe(200);
     const body = (await res.json()) as ParsedTestCase[];
@@ -95,16 +92,12 @@ describe("GET /api/projects/:projectId/test-cases", () => {
   it("テストケースが0件のとき空配列を返す", async () => {
     const db = {
       select: () => ({
-        from: () => ({
-          where: () => ({
-            orderBy: () => Promise.resolve([]),
-          }),
-        }),
+        from: () => Promise.resolve([]),
       }),
     };
 
     const app = buildApp(db);
-    const res = await app.request("/api/projects/1/test-cases");
+    const res = await app.request("/api/test-cases");
 
     expect(res.status).toBe(200);
     const body = (await res.json()) as ParsedTestCase[];
@@ -121,26 +114,75 @@ describe("GET /api/projects/:projectId/test-cases", () => {
 
     const db = {
       select: () => ({
-        from: () => ({
-          where: () => ({
-            orderBy: () => Promise.resolve([tc]),
-          }),
-        }),
+        from: () => Promise.resolve([tc]),
       }),
     };
 
     const app = buildApp(db);
-    const res = await app.request("/api/projects/1/test-cases");
+    const res = await app.request("/api/test-cases");
 
     expect(res.status).toBe(200);
     const body = (await res.json()) as ParsedTestCase[];
     expect(body.at(0)?.turns).toEqual(multiTurns);
   });
+
+  it("project_idが無効な値のとき400を返す", async () => {
+    const db = {};
+    const app = buildApp(db);
+    const res = await app.request("/api/test-cases?project_id=abc");
+
+    expect(res.status).toBe(400);
+    const body = (await res.json()) as { error: string };
+    expect(body.error).toBe("Invalid project_id");
+  });
+
+  it("unclassifiedが無効な値のとき400を返す", async () => {
+    const db = {};
+    const app = buildApp(db);
+    const res = await app.request("/api/test-cases?unclassified=invalid");
+
+    expect(res.status).toBe(400);
+    const body = (await res.json()) as { error: string };
+    expect(body.error).toBe("Invalid unclassified");
+  });
+
+  it("project_idフィルタが有効なとき該当テストケースのみ返す", async () => {
+    const tc1 = { ...sampleTestCase, id: 1 };
+    const tc2 = { ...sampleTestCase, id: 2, title: "別テストケース" };
+    const allCases = [tc1, tc2];
+
+    const links = [{ test_case_id: 1 }]; // project 10 に id=1 のみ紐付き
+
+    let selectCallCount = 0;
+    const db = {
+      select: () => ({
+        from: (table: unknown) => {
+          selectCallCount++;
+          if (selectCallCount === 1) {
+            // test_cases の全件取得
+            return Promise.resolve(allCases);
+          }
+          // test_case_projects のフィルタ
+          return {
+            where: () => Promise.resolve(links),
+          };
+        },
+      }),
+    };
+
+    const app = buildApp(db);
+    const res = await app.request("/api/test-cases?project_id=10");
+
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as ParsedTestCase[];
+    expect(body).toHaveLength(1);
+    expect(body.at(0)?.id).toBe(1);
+  });
 });
 
-// ---- POST /api/projects/:projectId/test-cases ----
+// ---- POST /api/test-cases ----
 
-describe("POST /api/projects/:projectId/test-cases", () => {
+describe("POST /api/test-cases", () => {
   it("バリデーション通過時に201でテストケースを返す", async () => {
     const created = { ...sampleTestCase };
 
@@ -153,7 +195,7 @@ describe("POST /api/projects/:projectId/test-cases", () => {
     };
 
     const app = buildApp(db);
-    const res = await app.request("/api/projects/1/test-cases", {
+    const res = await app.request("/api/test-cases", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
@@ -169,10 +211,33 @@ describe("POST /api/projects/:projectId/test-cases", () => {
     expect(body.turns).toEqual(sampleTurns);
   });
 
+  it("レスポンスに project_id が含まれない（独立資産モデル）", async () => {
+    const created = { ...sampleTestCase };
+
+    const db = {
+      insert: () => ({
+        values: () => ({
+          returning: () => Promise.resolve([created]),
+        }),
+      }),
+    };
+
+    const app = buildApp(db);
+    const res = await app.request("/api/test-cases", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ title: "テスト", turns: sampleTurns }),
+    });
+
+    expect(res.status).toBe(201);
+    const body = (await res.json()) as Record<string, unknown>;
+    expect(body).not.toHaveProperty("project_id");
+  });
+
   it("title が空文字列のとき400を返す", async () => {
     const db = {};
     const app = buildApp(db);
-    const res = await app.request("/api/projects/1/test-cases", {
+    const res = await app.request("/api/test-cases", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ title: "", turns: sampleTurns }),
@@ -184,7 +249,7 @@ describe("POST /api/projects/:projectId/test-cases", () => {
   it("title が未指定のとき400を返す", async () => {
     const db = {};
     const app = buildApp(db);
-    const res = await app.request("/api/projects/1/test-cases", {
+    const res = await app.request("/api/test-cases", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ turns: sampleTurns }),
@@ -204,7 +269,7 @@ describe("POST /api/projects/:projectId/test-cases", () => {
       }),
     };
     const app = buildApp(db);
-    const res = await app.request("/api/projects/1/test-cases", {
+    const res = await app.request("/api/test-cases", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ title: "テスト", turns: [] }),
@@ -232,7 +297,7 @@ describe("POST /api/projects/:projectId/test-cases", () => {
       }),
     };
     const app = buildApp(db);
-    const res = await app.request("/api/projects/1/test-cases", {
+    const res = await app.request("/api/test-cases", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ title: "テスト" }),
@@ -268,7 +333,7 @@ describe("POST /api/projects/:projectId/test-cases", () => {
     };
 
     const app = buildApp(db);
-    const res = await app.request("/api/projects/1/test-cases", {
+    const res = await app.request("/api/test-cases", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ title: "マルチターン", turns: multiTurns }),
@@ -277,45 +342,6 @@ describe("POST /api/projects/:projectId/test-cases", () => {
     expect(res.status).toBe(201);
     const body = (await res.json()) as ParsedTestCase;
     expect(body.turns).toEqual(multiTurns);
-  });
-
-  it("turns と context_content を同時に持つテストケースを作成できる", async () => {
-    const created = {
-      ...sampleTestCase,
-      turns: JSON.stringify(sampleTurns),
-      context_content: "補足コンテキスト",
-    };
-    const values = vi.fn(() => ({
-      returning: () => Promise.resolve([created]),
-    }));
-    const db = {
-      insert: () => ({
-        values,
-      }),
-    };
-
-    const app = buildApp(db);
-    const res = await app.request("/api/projects/1/test-cases", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        title: "併存ケース",
-        turns: sampleTurns,
-        context_content: "補足コンテキスト",
-      }),
-    });
-
-    expect(res.status).toBe(201);
-    expect(values).toHaveBeenCalledWith(
-      expect.objectContaining({
-        title: "併存ケース",
-        turns: JSON.stringify(sampleTurns),
-        context_content: "補足コンテキスト",
-      }),
-    );
-    const body = (await res.json()) as ParsedTestCase;
-    expect(body.turns).toEqual(sampleTurns);
-    expect(body.context_content).toBe("補足コンテキスト");
   });
 
   it("display_order を指定した場合に正しく反映される", async () => {
@@ -330,7 +356,7 @@ describe("POST /api/projects/:projectId/test-cases", () => {
     };
 
     const app = buildApp(db);
-    const res = await app.request("/api/projects/1/test-cases", {
+    const res = await app.request("/api/test-cases", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ title: "テスト", turns: sampleTurns, display_order: 5 }),
@@ -342,9 +368,9 @@ describe("POST /api/projects/:projectId/test-cases", () => {
   });
 });
 
-// ---- GET /api/projects/:projectId/test-cases/:id ----
+// ---- GET /api/test-cases/:id ----
 
-describe("GET /api/projects/:projectId/test-cases/:id", () => {
+describe("GET /api/test-cases/:id", () => {
   it("存在するIDに対して200でテストケースを返す", async () => {
     const db = {
       select: () => ({
@@ -355,13 +381,30 @@ describe("GET /api/projects/:projectId/test-cases/:id", () => {
     };
 
     const app = buildApp(db);
-    const res = await app.request("/api/projects/1/test-cases/1");
+    const res = await app.request("/api/test-cases/1");
 
     expect(res.status).toBe(200);
     const body = (await res.json()) as ParsedTestCase;
     expect(body.id).toBe(1);
     expect(body.title).toBe("サンプルテストケース");
     expect(body.turns).toEqual(sampleTurns);
+  });
+
+  it("レスポンスに project_id が含まれない（独立資産モデル）", async () => {
+    const db = {
+      select: () => ({
+        from: () => ({
+          where: () => Promise.resolve([sampleTestCase]),
+        }),
+      }),
+    };
+
+    const app = buildApp(db);
+    const res = await app.request("/api/test-cases/1");
+
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as Record<string, unknown>;
+    expect(body).not.toHaveProperty("project_id");
   });
 
   it("存在しないIDに対して404を返す", async () => {
@@ -374,7 +417,7 @@ describe("GET /api/projects/:projectId/test-cases/:id", () => {
     };
 
     const app = buildApp(db);
-    const res = await app.request("/api/projects/1/test-cases/999");
+    const res = await app.request("/api/test-cases/999");
 
     expect(res.status).toBe(404);
     const body = (await res.json()) as { error: string };
@@ -384,23 +427,17 @@ describe("GET /api/projects/:projectId/test-cases/:id", () => {
   it("数値以外のIDに対して400を返す", async () => {
     const db = {};
     const app = buildApp(db);
-    const res = await app.request("/api/projects/1/test-cases/abc");
+    const res = await app.request("/api/test-cases/abc");
 
     expect(res.status).toBe(400);
-  });
-
-  it("数値以外のprojectIdに対して400を返す", async () => {
-    const db = {};
-    const app = buildApp(db);
-    const res = await app.request("/api/projects/abc/test-cases/1");
-
-    expect(res.status).toBe(400);
+    const body = (await res.json()) as { error: string };
+    expect(body.error).toBe("Invalid ID");
   });
 });
 
-// ---- PATCH /api/projects/:projectId/test-cases/:id ----
+// ---- PATCH /api/test-cases/:id ----
 
-describe("PATCH /api/projects/:projectId/test-cases/:id", () => {
+describe("PATCH /api/test-cases/:id", () => {
   it("存在するIDに対して200で更新されたテストケースを返す", async () => {
     const updated = { ...sampleTestCase, title: "更新後のタイトル", updated_at: 2000000 };
 
@@ -420,7 +457,7 @@ describe("PATCH /api/projects/:projectId/test-cases/:id", () => {
     };
 
     const app = buildApp(db);
-    const res = await app.request("/api/projects/1/test-cases/1", {
+    const res = await app.request("/api/test-cases/1", {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ title: "更新後のタイトル" }),
@@ -455,7 +492,7 @@ describe("PATCH /api/projects/:projectId/test-cases/:id", () => {
     };
 
     const app = buildApp(db);
-    const res = await app.request("/api/projects/1/test-cases/1", {
+    const res = await app.request("/api/test-cases/1", {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ turns: newTurns }),
@@ -464,53 +501,6 @@ describe("PATCH /api/projects/:projectId/test-cases/:id", () => {
     expect(res.status).toBe(200);
     const body = (await res.json()) as ParsedTestCase;
     expect(body.turns).toEqual(newTurns);
-  });
-
-  it("turns と context_content を同時に更新できる", async () => {
-    const newTurns: Turn[] = [{ role: "assistant", content: "補足を踏まえた回答" }];
-    const updated = {
-      ...sampleTestCase,
-      turns: JSON.stringify(newTurns),
-      context_content: "更新後コンテキスト",
-      updated_at: 2000000,
-    };
-    const set = vi.fn(() => ({
-      where: () => ({
-        returning: () => Promise.resolve([updated]),
-      }),
-    }));
-
-    const db = {
-      select: () => ({
-        from: () => ({
-          where: () => Promise.resolve([sampleTestCase]),
-        }),
-      }),
-      update: () => ({
-        set,
-      }),
-    };
-
-    const app = buildApp(db);
-    const res = await app.request("/api/projects/1/test-cases/1", {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        turns: newTurns,
-        context_content: "更新後コンテキスト",
-      }),
-    });
-
-    expect(res.status).toBe(200);
-    expect(set).toHaveBeenCalledWith(
-      expect.objectContaining({
-        turns: JSON.stringify(newTurns),
-        context_content: "更新後コンテキスト",
-      }),
-    );
-    const body = (await res.json()) as ParsedTestCase;
-    expect(body.turns).toEqual(newTurns);
-    expect(body.context_content).toBe("更新後コンテキスト");
   });
 
   it("存在しないIDに対して404を返す", async () => {
@@ -523,7 +513,7 @@ describe("PATCH /api/projects/:projectId/test-cases/:id", () => {
     };
 
     const app = buildApp(db);
-    const res = await app.request("/api/projects/1/test-cases/999", {
+    const res = await app.request("/api/test-cases/999", {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ title: "更新後" }),
@@ -537,7 +527,7 @@ describe("PATCH /api/projects/:projectId/test-cases/:id", () => {
   it("title が空文字列のとき400を返す", async () => {
     const db = {};
     const app = buildApp(db);
-    const res = await app.request("/api/projects/1/test-cases/1", {
+    const res = await app.request("/api/test-cases/1", {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ title: "" }),
@@ -549,19 +539,21 @@ describe("PATCH /api/projects/:projectId/test-cases/:id", () => {
   it("数値以外のIDに対して400を返す", async () => {
     const db = {};
     const app = buildApp(db);
-    const res = await app.request("/api/projects/1/test-cases/abc", {
+    const res = await app.request("/api/test-cases/abc", {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ title: "更新後" }),
     });
 
     expect(res.status).toBe(400);
+    const body = (await res.json()) as { error: string };
+    expect(body.error).toBe("Invalid ID");
   });
 });
 
-// ---- DELETE /api/projects/:projectId/test-cases/:id ----
+// ---- DELETE /api/test-cases/:id ----
 
-describe("DELETE /api/projects/:projectId/test-cases/:id", () => {
+describe("DELETE /api/test-cases/:id", () => {
   it("存在するIDに対して204を返す", async () => {
     const db = {
       select: () => ({
@@ -575,7 +567,7 @@ describe("DELETE /api/projects/:projectId/test-cases/:id", () => {
     };
 
     const app = buildApp(db);
-    const res = await app.request("/api/projects/1/test-cases/1", {
+    const res = await app.request("/api/test-cases/1", {
       method: "DELETE",
     });
 
@@ -592,7 +584,7 @@ describe("DELETE /api/projects/:projectId/test-cases/:id", () => {
     };
 
     const app = buildApp(db);
-    const res = await app.request("/api/projects/1/test-cases/999", {
+    const res = await app.request("/api/test-cases/999", {
       method: "DELETE",
     });
 
@@ -604,10 +596,382 @@ describe("DELETE /api/projects/:projectId/test-cases/:id", () => {
   it("数値以外のIDに対して400を返す", async () => {
     const db = {};
     const app = buildApp(db);
-    const res = await app.request("/api/projects/1/test-cases/abc", {
+    const res = await app.request("/api/test-cases/abc", {
       method: "DELETE",
     });
 
     expect(res.status).toBe(400);
+    const body = (await res.json()) as { error: string };
+    expect(body.error).toBe("Invalid ID");
+  });
+
+  it("削除時に中間テーブル（test_case_projects, test_case_context_assets）も削除される", async () => {
+    const deletedTables: string[] = [];
+
+    const db = {
+      select: () => ({
+        from: () => ({
+          where: () => Promise.resolve([sampleTestCase]),
+        }),
+      }),
+      delete: (table: { _: { name?: string } }) => {
+        deletedTables.push(String(table));
+        return {
+          where: () => Promise.resolve(),
+        };
+      },
+    };
+
+    const app = buildApp(db);
+    const res = await app.request("/api/test-cases/1", {
+      method: "DELETE",
+    });
+
+    expect(res.status).toBe(204);
+    // deleteが3回呼ばれる（test_case_projects, test_case_context_assets, test_cases）
+    expect(deletedTables).toHaveLength(3);
+  });
+});
+
+// ---- PUT /api/test-cases/:id/projects ----
+
+describe("PUT /api/test-cases/:id/projects", () => {
+  it("有効なプロジェクトIDでラベル付けすると200でテストケースを返す", async () => {
+    const project = { id: 10, name: "プロジェクト", description: null, created_at: 1000, updated_at: 1000 };
+
+    let selectCallCount = 0;
+    const db = {
+      select: () => ({
+        from: () => ({
+          where: () => {
+            selectCallCount++;
+            if (selectCallCount === 1) {
+              return Promise.resolve([sampleTestCase]); // test_cases
+            }
+            return Promise.resolve([project]); // projects
+          },
+        }),
+      }),
+      delete: () => ({
+        where: () => Promise.resolve(),
+      }),
+      insert: () => ({
+        values: () => Promise.resolve([]),
+      }),
+    };
+
+    const app = buildApp(db);
+    const res = await app.request("/api/test-cases/1/projects", {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ project_ids: [10] }),
+    });
+
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as ParsedTestCase;
+    expect(body.id).toBe(1);
+    expect(body.turns).toEqual(sampleTurns);
+  });
+
+  it("空のproject_idsで関連を全解除できる", async () => {
+    const deleteWhere = vi.fn(() => Promise.resolve());
+    const db = {
+      select: () => ({
+        from: () => ({
+          where: () => Promise.resolve([sampleTestCase]),
+        }),
+      }),
+      delete: () => ({
+        where: deleteWhere,
+      }),
+      insert: () => ({
+        values: () => Promise.resolve([]),
+      }),
+    };
+
+    const app = buildApp(db);
+    const res = await app.request("/api/test-cases/1/projects", {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ project_ids: [] }),
+    });
+
+    expect(res.status).toBe(200);
+    // deleteが呼ばれて既存関連が削除される
+    expect(deleteWhere).toHaveBeenCalled();
+  });
+
+  it("存在しないプロジェクトIDのとき404を返す", async () => {
+    let selectCallCount = 0;
+    const db = {
+      select: () => ({
+        from: () => ({
+          where: () => {
+            selectCallCount++;
+            if (selectCallCount === 1) {
+              return Promise.resolve([sampleTestCase]); // test_cases
+            }
+            return Promise.resolve([]); // projects（存在しない）
+          },
+        }),
+      }),
+    };
+
+    const app = buildApp(db);
+    const res = await app.request("/api/test-cases/1/projects", {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ project_ids: [999] }),
+    });
+
+    expect(res.status).toBe(404);
+    const body = (await res.json()) as { error: string };
+    expect(body.error).toBe("Project not found");
+  });
+
+  it("存在しないテストケースIDのとき404を返す", async () => {
+    const db = {
+      select: () => ({
+        from: () => ({
+          where: () => Promise.resolve([]),
+        }),
+      }),
+    };
+
+    const app = buildApp(db);
+    const res = await app.request("/api/test-cases/999/projects", {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ project_ids: [1] }),
+    });
+
+    expect(res.status).toBe(404);
+    const body = (await res.json()) as { error: string };
+    expect(body.error).toBe("TestCase not found");
+  });
+
+  it("数値以外のIDに対して400を返す", async () => {
+    const db = {};
+    const app = buildApp(db);
+    const res = await app.request("/api/test-cases/abc/projects", {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ project_ids: [1] }),
+    });
+
+    expect(res.status).toBe(400);
+    const body = (await res.json()) as { error: string };
+    expect(body.error).toBe("Invalid ID");
+  });
+
+  it("重複するproject_idは1つにまとめて挿入する", async () => {
+    const project = { id: 10, name: "プロジェクト", description: null, created_at: 1000, updated_at: 1000 };
+    const insertValues = vi.fn(() => Promise.resolve([]));
+
+    let selectCallCount = 0;
+    const db = {
+      select: () => ({
+        from: () => ({
+          where: () => {
+            selectCallCount++;
+            if (selectCallCount === 1) {
+              return Promise.resolve([sampleTestCase]);
+            }
+            return Promise.resolve([project]);
+          },
+        }),
+      }),
+      delete: () => ({
+        where: () => Promise.resolve(),
+      }),
+      insert: () => ({
+        values: insertValues,
+      }),
+    };
+
+    const app = buildApp(db);
+    const res = await app.request("/api/test-cases/1/projects", {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ project_ids: [10, 10, 10] }),
+    });
+
+    expect(res.status).toBe(200);
+    // 重複除去で1回のみ挿入される
+    expect(insertValues).toHaveBeenCalledTimes(1);
+  });
+});
+
+// ---- PUT /api/test-cases/:id/context-assets ----
+
+describe("PUT /api/test-cases/:id/context-assets", () => {
+  const sampleAsset = {
+    id: 20,
+    name: "テスト素材",
+    path: "/test.txt",
+    content: "サンプルコンテンツ",
+    mime_type: "text/plain",
+    content_hash: "sha256:abc",
+    created_at: 1000,
+    updated_at: 1000,
+  };
+
+  it("有効なcontext_asset_idsで関連付けすると200でテストケースを返す", async () => {
+    let selectCallCount = 0;
+    const db = {
+      select: () => ({
+        from: () => ({
+          where: () => {
+            selectCallCount++;
+            if (selectCallCount === 1) {
+              return Promise.resolve([sampleTestCase]); // test_cases
+            }
+            return Promise.resolve([sampleAsset]); // context_assets
+          },
+        }),
+      }),
+      delete: () => ({
+        where: () => Promise.resolve(),
+      }),
+      insert: () => ({
+        values: () => Promise.resolve([]),
+      }),
+    };
+
+    const app = buildApp(db);
+    const res = await app.request("/api/test-cases/1/context-assets", {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ context_asset_ids: [20] }),
+    });
+
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as ParsedTestCase;
+    expect(body.id).toBe(1);
+  });
+
+  it("空のcontext_asset_idsで関連を全解除できる", async () => {
+    const deleteWhere = vi.fn(() => Promise.resolve());
+    const db = {
+      select: () => ({
+        from: () => ({
+          where: () => Promise.resolve([sampleTestCase]),
+        }),
+      }),
+      delete: () => ({
+        where: deleteWhere,
+      }),
+      insert: () => ({
+        values: () => Promise.resolve([]),
+      }),
+    };
+
+    const app = buildApp(db);
+    const res = await app.request("/api/test-cases/1/context-assets", {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ context_asset_ids: [] }),
+    });
+
+    expect(res.status).toBe(200);
+    expect(deleteWhere).toHaveBeenCalled();
+  });
+
+  it("存在しないcontext_asset_idのとき404を返す", async () => {
+    let selectCallCount = 0;
+    const db = {
+      select: () => ({
+        from: () => ({
+          where: () => {
+            selectCallCount++;
+            if (selectCallCount === 1) {
+              return Promise.resolve([sampleTestCase]);
+            }
+            return Promise.resolve([]); // context_assets（存在しない）
+          },
+        }),
+      }),
+    };
+
+    const app = buildApp(db);
+    const res = await app.request("/api/test-cases/1/context-assets", {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ context_asset_ids: [999] }),
+    });
+
+    expect(res.status).toBe(404);
+    const body = (await res.json()) as { error: string };
+    expect(body.error).toBe("ContextAsset not found");
+  });
+
+  it("存在しないテストケースIDのとき404を返す", async () => {
+    const db = {
+      select: () => ({
+        from: () => ({
+          where: () => Promise.resolve([]),
+        }),
+      }),
+    };
+
+    const app = buildApp(db);
+    const res = await app.request("/api/test-cases/999/context-assets", {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ context_asset_ids: [20] }),
+    });
+
+    expect(res.status).toBe(404);
+    const body = (await res.json()) as { error: string };
+    expect(body.error).toBe("TestCase not found");
+  });
+
+  it("数値以外のIDに対して400を返す", async () => {
+    const db = {};
+    const app = buildApp(db);
+    const res = await app.request("/api/test-cases/abc/context-assets", {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ context_asset_ids: [20] }),
+    });
+
+    expect(res.status).toBe(400);
+    const body = (await res.json()) as { error: string };
+    expect(body.error).toBe("Invalid ID");
+  });
+
+  it("重複するcontext_asset_idは1つにまとめて挿入する", async () => {
+    const insertValues = vi.fn(() => Promise.resolve([]));
+
+    let selectCallCount = 0;
+    const db = {
+      select: () => ({
+        from: () => ({
+          where: () => {
+            selectCallCount++;
+            if (selectCallCount === 1) {
+              return Promise.resolve([sampleTestCase]);
+            }
+            return Promise.resolve([sampleAsset]);
+          },
+        }),
+      }),
+      delete: () => ({
+        where: () => Promise.resolve(),
+      }),
+      insert: () => ({
+        values: insertValues,
+      }),
+    };
+
+    const app = buildApp(db);
+    const res = await app.request("/api/test-cases/1/context-assets", {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ context_asset_ids: [20, 20, 20] }),
+    });
+
+    expect(res.status).toBe(200);
+    expect(insertValues).toHaveBeenCalledTimes(1);
   });
 });

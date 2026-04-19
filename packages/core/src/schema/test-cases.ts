@@ -1,18 +1,15 @@
 import { integer, sqliteTable, text } from "drizzle-orm/sqlite-core";
-import { projects } from "./projects";
 
 /**
  * テストケーステーブル
  * システムプロンプトを評価するためのマルチターン入力ケースを管理する
+ * プロジェクトへの所属は中間テーブル test_case_projects で管理する
  *
  * turns: JSON文字列として保存するマルチターン会話 [{role, content}]
  * context_content: {{context}} プレースホルダーに挿入するテキスト
  */
 export const test_cases = sqliteTable("test_cases", {
   id: integer("id").primaryKey({ autoIncrement: true }),
-  project_id: integer("project_id")
-    .notNull()
-    .references(() => projects.id),
   title: text("title").notNull(),
   turns: text("turns").notNull(),
   context_content: text("context_content").notNull().default(""),
