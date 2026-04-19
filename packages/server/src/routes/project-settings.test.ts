@@ -4,6 +4,11 @@
  * better-sqlite3 はネイティブバイナリのビルドが必要なため、
  * 実際のDB接続は行わず、Drizzle の DB インターフェースを模倣した
  * モックを使用してルートハンドラの動作を検証する。
+ *
+ * PUT エンドポイントは project_settings と execution_profiles の両方を操作する。
+ * select は呼び出し順に results[0], results[1] ... を返す:
+ *   results[0]: project_settings の既存チェック
+ *   results[1]: execution_profiles の既存チェック（upsertExecutionProfile 内）
  */
 
 // better-sqlite3 のネイティブモジュールをモックしてDB初期化をブロック
@@ -24,6 +29,17 @@ import { createProjectSettingsRouter } from "./project-settings.js";
 type MockSettings = {
   id: number;
   project_id: number;
+  model: string;
+  temperature: number;
+  api_provider: string;
+  created_at: number;
+  updated_at: number;
+};
+
+type MockExecutionProfile = {
+  id: number;
+  name: string;
+  description: string | null;
   model: string;
   temperature: number;
   api_provider: string;
@@ -140,13 +156,21 @@ describe("PUT /api/projects/:projectId/settings", () => {
       updated_at: 2000000,
     };
 
+    let insertCallCount = 0;
     const db = {
-      // select で既存設定を確認 → 存在しない
-      ...makeSelectMock([[]]),
+      // select[0]: project_settings 既存チェック → 存在しない
+      // select[1]: execution_profiles 既存チェック → 存在しない
+      ...makeSelectMock([[], []]),
       insert: () => ({
-        values: () => ({
-          returning: () => Promise.resolve([created]),
-        }),
+        values: () => {
+          insertCallCount++;
+          if (insertCallCount === 1) {
+            // execution_profiles への insert
+            return { returning: () => Promise.resolve([]) };
+          }
+          // project_settings への insert
+          return { returning: () => Promise.resolve([created]) };
+        },
       }),
     };
 
@@ -178,8 +202,12 @@ describe("PUT /api/projects/:projectId/settings", () => {
     };
 
     const db = {
-      // select で既存設定を確認 → 存在する
-      ...makeSelectMock([[sampleSettings]]),
+      // select[0]: project_settings 既存チェック → 存在する
+      // select[1]: execution_profiles 既存チェック → 存在しない（execution_profiles は新規 insert）
+      ...makeSelectMock([[sampleSettings], []]),
+      insert: () => ({
+        values: () => ({ returning: () => Promise.resolve([]) }),
+      }),
       update: () => ({
         set: () => ({
           where: () => ({
@@ -306,14 +334,21 @@ describe("PUT /api/projects/:projectId/settings", () => {
       updated_at: 4000000,
     };
 
+    let insertCallCount = 0;
     const db = {
-      ...makeSelectMock([[]]),
+      // select[0]: project_settings 既存チェック → 存在しない
+      // select[1]: execution_profiles 既存チェック → 存在しない
+      ...makeSelectMock([[], []]),
       insert: () => ({
         values: (values: Record<string, unknown>) => {
+          insertCallCount++;
+          if (insertCallCount === 1) {
+            // execution_profiles への insert（project_id を含まない）
+            return { returning: () => Promise.resolve([]) };
+          }
+          // project_settings への insert（project_id を含む）
           capturedValues = values;
-          return {
-            returning: () => Promise.resolve([created]),
-          };
+          return { returning: () => Promise.resolve([created]) };
         },
       }),
     };
@@ -343,11 +378,21 @@ describe("PUT /api/projects/:projectId/settings", () => {
       updated_at: 9999999,
     };
 
+    let updateCallCount = 0;
     const db = {
-      ...makeSelectMock([[sampleSettings]]),
+      // select[0]: project_settings 既存チェック → 存在する
+      // select[1]: execution_profiles 既存チェック → 存在しない（insert に分岐）
+      ...makeSelectMock([[sampleSettings], []]),
+      insert: () => ({
+        values: () => ({ returning: () => Promise.resolve([]) }),
+      }),
       update: () => ({
         set: (data: Record<string, unknown>) => {
-          capturedUpdateData = data;
+          updateCallCount++;
+          if (updateCallCount === 1) {
+            // project_settings の update（capturedUpdateData に記録）
+            capturedUpdateData = data;
+          }
           return {
             where: () => ({
               returning: () => Promise.resolve([updated]),
@@ -378,12 +423,17 @@ describe("PUT /api/projects/:projectId/settings", () => {
       temperature: 0,
     };
 
+    let insertCallCount = 0;
     const db = {
-      ...makeSelectMock([[]]),
+      ...makeSelectMock([[], []]),
       insert: () => ({
-        values: () => ({
-          returning: () => Promise.resolve([created]),
-        }),
+        values: () => {
+          insertCallCount++;
+          if (insertCallCount === 1) {
+            return { returning: () => Promise.resolve([]) };
+          }
+          return { returning: () => Promise.resolve([created]) };
+        },
       }),
     };
 
@@ -409,12 +459,17 @@ describe("PUT /api/projects/:projectId/settings", () => {
       temperature: 2,
     };
 
+    let insertCallCount = 0;
     const db = {
-      ...makeSelectMock([[]]),
+      ...makeSelectMock([[], []]),
       insert: () => ({
-        values: () => ({
-          returning: () => Promise.resolve([created]),
-        }),
+        values: () => {
+          insertCallCount++;
+          if (insertCallCount === 1) {
+            return { returning: () => Promise.resolve([]) };
+          }
+          return { returning: () => Promise.resolve([created]) };
+        },
       }),
     };
 
@@ -432,6 +487,164 @@ describe("PUT /api/projects/:projectId/settings", () => {
     expect(res.status).toBe(201);
     const body = (await res.json()) as MockSettings;
     expect(body.temperature).toBe(2);
+  });
+});
+
+// ---- 新旧整合テスト ----
+
+describe("PUT /api/projects/:projectId/settings - execution_profiles 同期", () => {
+  it("settings 新規作成時に execution_profiles への insert が実行される", async () => {
+    const created: MockSettings = {
+      id: 1,
+      project_id: 1,
+      model: "claude-opus-4-5",
+      temperature: 0.7,
+      api_provider: "anthropic",
+      created_at: 5000000,
+      updated_at: 5000000,
+    };
+
+    let executionProfileInsertCalled = false;
+    let executionProfileInsertValues: Record<string, unknown> = {};
+    let insertCallCount = 0;
+
+    const db = {
+      // select[0]: project_settings 既存チェック → 存在しない
+      // select[1]: execution_profiles 既存チェック → 存在しない
+      ...makeSelectMock([[], []]),
+      insert: () => ({
+        values: (values: Record<string, unknown>) => {
+          insertCallCount++;
+          if (insertCallCount === 1) {
+            // 1回目: execution_profiles への insert
+            executionProfileInsertCalled = true;
+            executionProfileInsertValues = values;
+            return { returning: () => Promise.resolve([]) };
+          }
+          // 2回目: project_settings への insert
+          return { returning: () => Promise.resolve([created]) };
+        },
+      }),
+    };
+
+    const app = buildApp(db);
+    const res = await app.request("/api/projects/1/settings", {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        model: "claude-opus-4-5",
+        temperature: 0.7,
+        api_provider: "anthropic",
+      }),
+    });
+
+    expect(res.status).toBe(201);
+    expect(executionProfileInsertCalled).toBe(true);
+    expect(executionProfileInsertValues.name).toBe("project-1-default");
+    expect(executionProfileInsertValues.model).toBe("claude-opus-4-5");
+    expect(executionProfileInsertValues.temperature).toBe(0.7);
+    expect(executionProfileInsertValues.api_provider).toBe("anthropic");
+  });
+
+  it("settings 更新時に execution_profiles の既存 profile が更新される", async () => {
+    const updatedSettings: MockSettings = {
+      ...sampleSettings,
+      model: "claude-haiku-4-5",
+      updated_at: 6000000,
+    };
+
+    const existingProfile: MockExecutionProfile = {
+      id: 10,
+      name: "project-1-default",
+      description: null,
+      model: "claude-opus-4-5",
+      temperature: 0.7,
+      api_provider: "anthropic",
+      created_at: 1000000,
+      updated_at: 1000000,
+    };
+
+    let executionProfileUpdateCalled = false;
+    let executionProfileUpdateValues: Record<string, unknown> = {};
+    let updateCallCount = 0;
+
+    const db = {
+      // select[0]: project_settings 既存チェック → 存在する
+      // select[1]: execution_profiles 既存チェック → 存在する
+      ...makeSelectMock([[sampleSettings], [existingProfile]]),
+      update: () => ({
+        set: (values: Record<string, unknown>) => ({
+          where: () => {
+            updateCallCount++;
+            if (updateCallCount === 1) {
+              // 1回目: execution_profiles の update
+              executionProfileUpdateCalled = true;
+              executionProfileUpdateValues = values;
+              return { returning: () => Promise.resolve([]) };
+            }
+            // 2回目: project_settings の update
+            return { returning: () => Promise.resolve([updatedSettings]) };
+          },
+        }),
+      }),
+    };
+
+    const app = buildApp(db);
+    const res = await app.request("/api/projects/1/settings", {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        model: "claude-haiku-4-5",
+        temperature: 0.7,
+        api_provider: "anthropic",
+      }),
+    });
+
+    expect(res.status).toBe(200);
+    expect(executionProfileUpdateCalled).toBe(true);
+    expect(executionProfileUpdateValues.model).toBe("claude-haiku-4-5");
+  });
+
+  it("project-{projectId}-default という名前で execution_profile を識別する", async () => {
+    const created: MockSettings = {
+      id: 1,
+      project_id: 42,
+      model: "gpt-4o",
+      temperature: 0.5,
+      api_provider: "openai",
+      created_at: 7000000,
+      updated_at: 7000000,
+    };
+
+    let capturedProfileName = "";
+    let insertCallCount = 0;
+
+    const db = {
+      ...makeSelectMock([[], []]),
+      insert: () => ({
+        values: (values: Record<string, unknown>) => {
+          insertCallCount++;
+          if (insertCallCount === 1) {
+            capturedProfileName = values.name as string;
+            return { returning: () => Promise.resolve([]) };
+          }
+          return { returning: () => Promise.resolve([created]) };
+        },
+      }),
+    };
+
+    const app = buildApp(db);
+    await app.request("/api/projects/42/settings", {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        model: "gpt-4o",
+        temperature: 0.5,
+        api_provider: "openai",
+      }),
+    });
+
+    expect(capturedProfileName).toBe("project-42-default");
   });
 });
 

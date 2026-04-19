@@ -1,6 +1,6 @@
 import { zValidator } from "@hono/zod-validator";
 import type { DB } from "@prompt-reviewer/core";
-import { project_settings } from "@prompt-reviewer/core";
+import { execution_profiles, project_settings } from "@prompt-reviewer/core";
 import { eq } from "drizzle-orm";
 import { Hono } from "hono";
 import { z } from "zod";
@@ -28,14 +28,20 @@ type ProjectSettingsRouterOptions = {
   modelClientFactory?: ExecutionProfileModelClientFactory;
 };
 
-/** 文字列または undefined を整数に変換する。無効・undefined の場合は null を返す */
 function parseIntParam(value: string | undefined): number | null {
   if (value === undefined) return null;
   const parsed = Number(value);
   return Number.isNaN(parsed) ? null : parsed;
 }
 
-/** 既存設定を更新し、更新後のレコードを返す。失敗時は null */
+/**
+ * project ごとの既定 execution_profile を識別する name
+ * 命名規則: "project-{projectId}-default"
+ */
+function defaultProfileName(projectId: number): string {
+  return `project-${projectId}-default`;
+}
+
 async function updateSettings(db: DB, projectId: number, body: UpsertBody, now: number) {
   const [updated] = await db
     .update(project_settings)
@@ -50,7 +56,6 @@ async function updateSettings(db: DB, projectId: number, body: UpsertBody, now: 
   return updated ?? null;
 }
 
-/** 新規設定を作成し、作成後のレコードを返す。失敗時は null */
 async function createSettings(db: DB, projectId: number, body: UpsertBody, now: number) {
   const [created] = await db
     .insert(project_settings)
@@ -67,17 +72,61 @@ async function createSettings(db: DB, projectId: number, body: UpsertBody, now: 
 }
 
 /**
- * ProjectSettings CRUD エンドポイントのルーター
+ * project_settings の PUT と連動して execution_profiles を upsert する。
  *
- * GET /api/projects/:projectId/settings  - 設定取得（存在しなければ404）
- * PUT /api/projects/:projectId/settings  - 設定のupsert（存在しなければ作成、あれば更新）
+ * project ごとの既定 profile は name = "project-{projectId}-default" で識別する。
+ * 存在しなければ新規作成、存在すれば model/temperature/api_provider を更新する。
+ * これにより旧 settings UI からの操作が execution_profiles テーブルにも反映される。
+ */
+async function upsertExecutionProfile(
+  db: DB,
+  projectId: number,
+  body: UpsertBody,
+  now: number,
+): Promise<void> {
+  const name = defaultProfileName(projectId);
+
+  const [existing] = await db
+    .select()
+    .from(execution_profiles)
+    .where(eq(execution_profiles.name, name));
+
+  if (existing) {
+    await db
+      .update(execution_profiles)
+      .set({
+        model: body.model,
+        temperature: body.temperature,
+        api_provider: body.api_provider,
+        updated_at: now,
+      })
+      .where(eq(execution_profiles.name, name));
+  } else {
+    await db.insert(execution_profiles).values({
+      name,
+      description: null,
+      model: body.model,
+      temperature: body.temperature,
+      api_provider: body.api_provider,
+      created_at: now,
+      updated_at: now,
+    });
+  }
+}
+
+/**
+ * ProjectSettings エンドポイントのルーター（互換レイヤ）
+ *
+ * GET  /api/projects/:projectId/settings  - 設定取得（project_settings テーブルを参照）
+ * PUT  /api/projects/:projectId/settings  - 設定の upsert
+ *   - project_settings テーブルを更新（旧 UI との互換維持）
+ *   - execution_profiles テーブルにも同期（新テーブルへの書き込み）
  */
 export function createProjectSettingsRouter(db: DB, options: ProjectSettingsRouterOptions = {}) {
   const router = new Hono();
   const modelClientFactory =
     options.modelClientFactory ?? defaultExecutionProfileModelClientFactory;
 
-  // GET /api/projects/:projectId/settings - 設定取得
   router.get("/", async (c) => {
     const projectId = parseIntParam(c.req.param("projectId"));
 
@@ -97,8 +146,6 @@ export function createProjectSettingsRouter(db: DB, options: ProjectSettingsRout
     return c.json(settings);
   });
 
-  // PUT /api/projects/:projectId/settings - 設定のupsert
-  // 設定が存在しなければ作成、存在すれば更新する
   router.put("/", zValidator("json", upsertSettingsSchema), async (c) => {
     const projectId = parseIntParam(c.req.param("projectId"));
 
@@ -113,6 +160,8 @@ export function createProjectSettingsRouter(db: DB, options: ProjectSettingsRout
       .select()
       .from(project_settings)
       .where(eq(project_settings.project_id, projectId));
+
+    await upsertExecutionProfile(db, projectId, body, now);
 
     if (existing) {
       const updated = await updateSettings(db, projectId, body, now);
