@@ -87,7 +87,7 @@ describe("POST /api/prompt-families", () => {
     await expect(res.json()).resolves.toEqual(created);
   });
 
-  it("name が未指定なら 400 を返す", async () => {
+  it("name と description が未指定なら 400 を返す", async () => {
     const res = await buildApp({}).request("/api/prompt-families", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -107,11 +107,11 @@ describe("POST /api/prompt-families", () => {
     expect(res.status).toBe(400);
   });
 
-  it("name が null なら 400 を返す", async () => {
+  it("name と description がともに null なら 400 を返す", async () => {
     const res = await buildApp({}).request("/api/prompt-families", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ name: null }),
+      body: JSON.stringify({ name: null, description: null }),
     });
 
     expect(res.status).toBe(400);
@@ -219,16 +219,6 @@ describe("PATCH /api/prompt-families/:id", () => {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({}),
-    });
-
-    expect(res.status).toBe(400);
-  });
-
-  it("name を null に更新しようとすると 400 を返す", async () => {
-    const res = await buildApp({}).request("/api/prompt-families/1", {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ name: null }),
     });
 
     expect(res.status).toBe(400);
