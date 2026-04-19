@@ -90,6 +90,40 @@ function makeReturning(rows: unknown[]) {
   return { all: () => rows };
 }
 
+function makeInsertTxMock(options: {
+  projectSettingsRows?: unknown[];
+  onExecutionProfileUpsert?: (values: Record<string, unknown>) => void;
+  onProjectSettingsValues?: (values: Record<string, unknown>) => void;
+  onProjectSettingsConflict?: (config: { target: unknown; set: Record<string, unknown> }) => void;
+}) {
+  return {
+    insert: (table: unknown) => ({
+      values: (values: Record<string, unknown>) => ({
+        onConflictDoUpdate: (config: { target: unknown; set: Record<string, unknown> }) => {
+          if (table === execution_profiles) {
+            return {
+              run: () => options.onExecutionProfileUpsert?.(values),
+            };
+          }
+
+          if (table === project_settings) {
+            options.onProjectSettingsValues?.(values);
+            options.onProjectSettingsConflict?.(config);
+            return {
+              returning: () => makeReturning(options.projectSettingsRows ?? []),
+            };
+          }
+
+          return {
+            run: () => {},
+            returning: () => makeReturning([]),
+          };
+        },
+      }),
+    }),
+  };
+}
+
 // ---- テストデータ ----
 
 const sampleSettings: MockSettings = {
@@ -161,16 +195,9 @@ describe("PUT /api/projects/:projectId/settings", () => {
     };
 
     // トランザクション内の tx モック
-    const tx = {
-      insert: (table: unknown) => ({
-        values: () => ({
-          onConflictDoUpdate: () => ({
-            run: () => {},
-          }),
-          returning: () => makeReturning(table === project_settings ? [created] : []),
-        }),
-      }),
-    };
+    const tx = makeInsertTxMock({
+      projectSettingsRows: [created],
+    });
 
     const db = {
       ...makeSelectMock(new Map([[project_settings, []]])),
@@ -344,22 +371,12 @@ describe("PUT /api/projects/:projectId/settings", () => {
       updated_at: 4000000,
     };
 
-    const tx = {
-      insert: (table: unknown) => ({
-        values: (values: Record<string, unknown>) => ({
-          onConflictDoUpdate: () => ({
-            run: () => {},
-          }),
-          returning: () => {
-            if (table === project_settings) {
-              capturedValues = values;
-              return makeReturning([created]);
-            }
-            return makeReturning([]);
-          },
-        }),
-      }),
-    };
+    const tx = makeInsertTxMock({
+      projectSettingsRows: [created],
+      onProjectSettingsValues: (values) => {
+        capturedValues = values;
+      },
+    });
 
     const db = {
       ...makeSelectMock(new Map([[project_settings, []]])),
@@ -440,16 +457,9 @@ describe("PUT /api/projects/:projectId/settings", () => {
       temperature: 0,
     };
 
-    const tx = {
-      insert: (table: unknown) => ({
-        values: () => ({
-          onConflictDoUpdate: () => ({
-            run: () => {},
-          }),
-          returning: () => makeReturning(table === project_settings ? [created] : []),
-        }),
-      }),
-    };
+    const tx = makeInsertTxMock({
+      projectSettingsRows: [created],
+    });
 
     const db = {
       ...makeSelectMock(new Map([[project_settings, []]])),
@@ -478,16 +488,9 @@ describe("PUT /api/projects/:projectId/settings", () => {
       temperature: 2,
     };
 
-    const tx = {
-      insert: (table: unknown) => ({
-        values: () => ({
-          onConflictDoUpdate: () => ({
-            run: () => {},
-          }),
-          returning: () => makeReturning(table === project_settings ? [created] : []),
-        }),
-      }),
-    };
+    const tx = makeInsertTxMock({
+      projectSettingsRows: [created],
+    });
 
     const db = {
       ...makeSelectMock(new Map([[project_settings, []]])),
@@ -528,21 +531,13 @@ describe("PUT /api/projects/:projectId/settings - execution_profiles 同期", ()
     let executionProfileInsertCalled = false;
     let executionProfileInsertValues: Record<string, unknown> = {};
 
-    const tx = {
-      insert: (table: unknown) => ({
-        values: (values: Record<string, unknown>) => ({
-          onConflictDoUpdate: () => ({
-            run: () => {
-              if (table === execution_profiles) {
-                executionProfileInsertCalled = true;
-                executionProfileInsertValues = values;
-              }
-            },
-          }),
-          returning: () => makeReturning(table === project_settings ? [created] : []),
-        }),
-      }),
-    };
+    const tx = makeInsertTxMock({
+      projectSettingsRows: [created],
+      onExecutionProfileUpsert: (values) => {
+        executionProfileInsertCalled = true;
+        executionProfileInsertValues = values;
+      },
+    });
 
     const db = {
       ...makeSelectMock(new Map([[project_settings, []]])),
@@ -634,20 +629,12 @@ describe("PUT /api/projects/:projectId/settings - execution_profiles 同期", ()
 
     let capturedProfileName = "";
 
-    const tx = {
-      insert: (table: unknown) => ({
-        values: (values: Record<string, unknown>) => ({
-          onConflictDoUpdate: () => ({
-            run: () => {
-              if (table === execution_profiles) {
-                capturedProfileName = values.name as string;
-              }
-            },
-          }),
-          returning: () => makeReturning(table === project_settings ? [created] : []),
-        }),
-      }),
-    };
+    const tx = makeInsertTxMock({
+      projectSettingsRows: [created],
+      onExecutionProfileUpsert: (values) => {
+        capturedProfileName = values.name as string;
+      },
+    });
 
     const db = {
       ...makeSelectMock(new Map([[project_settings, []]])),
@@ -666,6 +653,53 @@ describe("PUT /api/projects/:projectId/settings - execution_profiles 同期", ()
     });
 
     expect(capturedProfileName).toBe("project-42-default");
+  });
+
+  it("settings 新規作成時に project_settings.project_id を conflict target に使う", async () => {
+    const created: MockSettings = {
+      id: 1,
+      project_id: 7,
+      model: "gpt-4o",
+      temperature: 0.4,
+      api_provider: "openai",
+      created_at: 7100000,
+      updated_at: 7100000,
+    };
+
+    let conflictTarget: unknown;
+    let conflictSet: Record<string, unknown> | undefined;
+
+    const tx = makeInsertTxMock({
+      projectSettingsRows: [created],
+      onProjectSettingsConflict: (config) => {
+        conflictTarget = config.target;
+        conflictSet = config.set;
+      },
+    });
+
+    const db = {
+      ...makeSelectMock(new Map([[project_settings, []]])),
+      transaction: makeTransactionMock(tx),
+    };
+
+    const app = buildApp(db);
+    const res = await app.request("/api/projects/7/settings", {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        model: "gpt-4o",
+        temperature: 0.4,
+        api_provider: "openai",
+      }),
+    });
+
+    expect(res.status).toBe(201);
+    expect(conflictTarget).toBe(project_settings.project_id);
+    expect(conflictSet).toMatchObject({
+      model: "gpt-4o",
+      temperature: 0.4,
+      api_provider: "openai",
+    });
   });
 });
 

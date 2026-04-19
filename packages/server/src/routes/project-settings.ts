@@ -28,6 +28,8 @@ type ProjectSettingsRouterOptions = {
   modelClientFactory?: ExecutionProfileModelClientFactory;
 };
 
+type ProjectSettingsWriteTx = Pick<DB, "insert" | "update">;
+
 function parseIntParam(value: string | undefined): number | null {
   if (value === undefined) return null;
   const parsed = Number(value);
@@ -40,6 +42,34 @@ function parseIntParam(value: string | undefined): number | null {
  */
 function defaultProfileName(projectId: number): string {
   return `project-${projectId}-default`;
+}
+
+function upsertDefaultExecutionProfile(
+  tx: ProjectSettingsWriteTx,
+  projectId: number,
+  body: UpsertBody,
+  now: number,
+) {
+  tx.insert(execution_profiles)
+    .values({
+      name: defaultProfileName(projectId),
+      description: null,
+      model: body.model,
+      temperature: body.temperature,
+      api_provider: body.api_provider,
+      created_at: now,
+      updated_at: now,
+    })
+    .onConflictDoUpdate({
+      target: execution_profiles.name,
+      set: {
+        model: body.model,
+        temperature: body.temperature,
+        api_provider: body.api_provider,
+        updated_at: now,
+      },
+    })
+    .run();
 }
 
 /**
@@ -90,30 +120,9 @@ export function createProjectSettingsRouter(db: DB, options: ProjectSettingsRout
       .from(project_settings)
       .where(eq(project_settings.project_id, projectId));
 
-    const name = defaultProfileName(projectId);
-
     if (existing) {
       const updated = db.transaction((tx) => {
-        tx.insert(execution_profiles)
-          .values({
-            name,
-            description: null,
-            model: body.model,
-            temperature: body.temperature,
-            api_provider: body.api_provider,
-            created_at: now,
-            updated_at: now,
-          })
-          .onConflictDoUpdate({
-            target: execution_profiles.name,
-            set: {
-              model: body.model,
-              temperature: body.temperature,
-              api_provider: body.api_provider,
-              updated_at: now,
-            },
-          })
-          .run();
+        upsertDefaultExecutionProfile(tx, projectId, body, now);
 
         const results = tx
           .update(project_settings)
@@ -134,26 +143,7 @@ export function createProjectSettingsRouter(db: DB, options: ProjectSettingsRout
     }
 
     const created = db.transaction((tx) => {
-      tx.insert(execution_profiles)
-        .values({
-          name,
-          description: null,
-          model: body.model,
-          temperature: body.temperature,
-          api_provider: body.api_provider,
-          created_at: now,
-          updated_at: now,
-        })
-        .onConflictDoUpdate({
-          target: execution_profiles.name,
-          set: {
-            model: body.model,
-            temperature: body.temperature,
-            api_provider: body.api_provider,
-            updated_at: now,
-          },
-        })
-        .run();
+      upsertDefaultExecutionProfile(tx, projectId, body, now);
 
       const results = tx
         .insert(project_settings)
@@ -164,6 +154,15 @@ export function createProjectSettingsRouter(db: DB, options: ProjectSettingsRout
           api_provider: body.api_provider,
           created_at: now,
           updated_at: now,
+        })
+        .onConflictDoUpdate({
+          target: project_settings.project_id,
+          set: {
+            model: body.model,
+            temperature: body.temperature,
+            api_provider: body.api_provider,
+            updated_at: now,
+          },
         })
         .returning()
         .all();
