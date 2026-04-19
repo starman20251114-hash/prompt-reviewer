@@ -77,6 +77,7 @@ app.route("/api/prompt-families", createPromptFamiliesRouter(db));
 app.route("/api/projects/:projectId/context-files", createContextFilesRouter());
 app.route("/api/projects/:projectId/test-cases", createTestCasesRouter(db));
 app.route("/api/prompt-versions", createPromptVersionsRouter(db));
+app.route("/api/projects/:projectId/prompt-versions", createPromptVersionsRouter(db));
 app.route("/api/projects/:projectId/prompt-versions", createVersionSummaryRouter(db));
 app.route("/api/projects/:projectId/runs", createRunsRouter(db));
 app.route("/api/runs", createScoresRouter(db));

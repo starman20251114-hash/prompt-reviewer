@@ -41,6 +41,12 @@ function buildApp(db: unknown) {
   return app;
 }
 
+function buildLegacyApp(db: unknown) {
+  const app = new Hono();
+  app.route("/api/projects/:projectId/prompt-versions", createPromptVersionsRouter(db as DB));
+  return app;
+}
+
 // ---- テストデータ ----
 
 const sampleVersion: MockPromptVersion = {
@@ -107,6 +113,41 @@ describe("GET /api/prompt-versions", () => {
     expect(res.status).toBe(200);
     const body = (await res.json()) as MockPromptVersion[];
     expect(body).toHaveLength(0);
+  });
+});
+
+// ---- GET /api/projects/:projectId/prompt-versions ----
+
+describe("GET /api/projects/:projectId/prompt-versions", () => {
+  it("project にリンクされた version 一覧を返し、project_id を補完する", async () => {
+    let selectCallCount = 0;
+    const directVersion = { ...sampleVersion, id: 2, version: 2, project_id: 7, name: "direct" };
+    const db = {
+      select: () => ({
+        from: () => ({
+          where: () => {
+            selectCallCount++;
+            if (selectCallCount === 1) {
+              return Promise.resolve([{ prompt_version_id: 1 }]);
+            }
+            if (selectCallCount === 2) {
+              return Promise.resolve([directVersion]);
+            }
+            return Promise.resolve([sampleVersion]);
+          },
+        }),
+      }),
+    };
+
+    const res = await buildLegacyApp(db).request("/api/projects/7/prompt-versions");
+
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as MockPromptVersion[];
+    expect(body).toHaveLength(2);
+    expect(body[0]?.id).toBe(1);
+    expect(body[0]?.project_id).toBe(7);
+    expect(body[1]?.id).toBe(2);
+    expect(body[1]?.project_id).toBe(7);
   });
 });
 
@@ -326,6 +367,93 @@ describe("POST /api/prompt-versions", () => {
   });
 });
 
+// ---- POST /api/projects/:projectId/prompt-versions ----
+
+describe("POST /api/projects/:projectId/prompt-versions", () => {
+  it("legacy path で family 未作成なら新規 family を作って version を作成する", async () => {
+    const created = { ...sampleVersion, prompt_family_id: 30, project_id: 7 };
+    let selectCallCount = 0;
+    let insertCallCount = 0;
+
+    const db = {
+      select: () => ({
+        from: () => ({
+          where: () => {
+            selectCallCount++;
+            if (selectCallCount === 1) {
+              return Promise.resolve([]);
+            }
+            return Promise.resolve([{ maxVersion: null }]);
+          },
+        }),
+      }),
+      insert: () => ({
+        values: (values: Record<string, unknown>) => {
+          insertCallCount++;
+          if (insertCallCount === 1) {
+            expect(values.name).toBeNull();
+            return {
+              returning: () => Promise.resolve([{ id: 30 }]),
+            };
+          }
+          if (insertCallCount === 2) {
+            expect(values.prompt_family_id).toBe(30);
+            expect(values.project_id).toBe(7);
+            return {
+              returning: () => Promise.resolve([created]),
+            };
+          }
+          expect(values.prompt_version_id).toBe(1);
+          expect(values.project_id).toBe(7);
+          return Promise.resolve();
+        },
+      }),
+    };
+
+    const res = await buildLegacyApp(db).request("/api/projects/7/prompt-versions", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ content: "互換 API で作成" }),
+    });
+
+    expect(res.status).toBe(201);
+    const body = (await res.json()) as MockPromptVersion;
+    expect(body.prompt_family_id).toBe(30);
+    expect(body.project_id).toBe(7);
+  });
+
+  it("legacy path で複数 family にまたがる project は 409 を返す", async () => {
+    let selectCallCount = 0;
+    const db = {
+      select: () => ({
+        from: () => ({
+          where: () => {
+            selectCallCount++;
+            if (selectCallCount === 1) {
+              return Promise.resolve([{ prompt_version_id: 1 }, { prompt_version_id: 2 }]);
+            }
+            if (selectCallCount === 2) {
+              return Promise.resolve([sampleVersion]);
+            }
+            return Promise.resolve([{ ...sampleVersion, id: 2, prompt_family_id: 11 }]);
+          },
+        }),
+      }),
+    };
+
+    const res = await buildLegacyApp(db).request("/api/projects/7/prompt-versions", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ content: "互換 API で作成" }),
+    });
+
+    expect(res.status).toBe(409);
+    await expect(res.json()).resolves.toEqual({
+      error: "Legacy project is linked to multiple prompt families",
+    });
+  });
+});
+
 // ---- GET /api/prompt-versions/:id ----
 
 describe("GET /api/prompt-versions/:id", () => {
@@ -372,6 +500,59 @@ describe("GET /api/prompt-versions/:id", () => {
     const res = await app.request("/api/prompt-versions/abc");
 
     expect(res.status).toBe(400);
+  });
+});
+
+// ---- GET /api/projects/:projectId/prompt-versions/:id ----
+
+describe("GET /api/projects/:projectId/prompt-versions/:id", () => {
+  it("legacy path で project にリンクされた version 詳細を返す", async () => {
+    let selectCallCount = 0;
+    const db = {
+      select: () => ({
+        from: () => ({
+          where: () => {
+            selectCallCount++;
+            if (selectCallCount === 1) {
+              return Promise.resolve([{ prompt_version_id: 1 }]);
+            }
+            return Promise.resolve([sampleVersion]);
+          },
+        }),
+      }),
+    };
+
+    const res = await buildLegacyApp(db).request("/api/projects/7/prompt-versions/1");
+
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as MockPromptVersion;
+    expect(body.id).toBe(1);
+    expect(body.project_id).toBe(7);
+  });
+
+  it("link table に無くても prompt_versions.project_id が一致すれば返す", async () => {
+    let selectCallCount = 0;
+    const directVersion = { ...sampleVersion, id: 2, project_id: 7 };
+    const db = {
+      select: () => ({
+        from: () => ({
+          where: () => {
+            selectCallCount++;
+            if (selectCallCount === 1) {
+              return Promise.resolve([]);
+            }
+            return Promise.resolve([directVersion]);
+          },
+        }),
+      }),
+    };
+
+    const res = await buildLegacyApp(db).request("/api/projects/7/prompt-versions/2");
+
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as MockPromptVersion;
+    expect(body.id).toBe(2);
+    expect(body.project_id).toBe(7);
   });
 });
 
@@ -507,6 +688,47 @@ describe("PATCH /api/prompt-versions/:id", () => {
     });
 
     expect(res.status).toBe(400);
+  });
+});
+
+// ---- PATCH /api/projects/:projectId/prompt-versions/:id ----
+
+describe("PATCH /api/projects/:projectId/prompt-versions/:id", () => {
+  it("legacy path で project にリンクされた version を更新できる", async () => {
+    const updated = { ...sampleVersion, content: "互換更新後", project_id: null };
+    let selectCallCount = 0;
+
+    const db = {
+      select: () => ({
+        from: () => ({
+          where: () => {
+            selectCallCount++;
+            if (selectCallCount === 1) {
+              return Promise.resolve([{ prompt_version_id: 1 }]);
+            }
+            return Promise.resolve([sampleVersion]);
+          },
+        }),
+      }),
+      update: () => ({
+        set: () => ({
+          where: () => ({
+            returning: () => Promise.resolve([updated]),
+          }),
+        }),
+      }),
+    };
+
+    const res = await buildLegacyApp(db).request("/api/projects/7/prompt-versions/1", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ content: "互換更新後" }),
+    });
+
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as MockPromptVersion;
+    expect(body.content).toBe("互換更新後");
+    expect(body.project_id).toBe(7);
   });
 });
 
@@ -671,6 +893,65 @@ describe("POST /api/prompt-versions/:id/branch", () => {
   });
 });
 
+// ---- POST /api/projects/:projectId/prompt-versions/:id/branch ----
+
+describe("POST /api/projects/:projectId/prompt-versions/:id/branch", () => {
+  it("legacy path で branch 作成時に project_id を維持し project link を張る", async () => {
+    const branched: MockPromptVersion = {
+      ...sampleVersion,
+      id: 2,
+      version: 2,
+      project_id: 7,
+      parent_version_id: 1,
+    };
+    let selectCallCount = 0;
+    let insertCallCount = 0;
+
+    const db = {
+      select: () => ({
+        from: () => ({
+          where: () => {
+            selectCallCount++;
+            if (selectCallCount === 1) {
+              return Promise.resolve([{ prompt_version_id: 1 }]);
+            }
+            if (selectCallCount === 2) {
+              return Promise.resolve([sampleVersion]);
+            }
+            return Promise.resolve([{ maxVersion: 1 }]);
+          },
+        }),
+      }),
+      insert: () => ({
+        values: (values: Record<string, unknown>) => {
+          insertCallCount++;
+          if (insertCallCount === 1) {
+            expect(values.parent_version_id).toBe(1);
+            expect(values.project_id).toBe(7);
+            return {
+              returning: () => Promise.resolve([branched]),
+            };
+          }
+          expect(values.prompt_version_id).toBe(2);
+          expect(values.project_id).toBe(7);
+          return Promise.resolve();
+        },
+      }),
+    };
+
+    const res = await buildLegacyApp(db).request("/api/projects/7/prompt-versions/1/branch", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ name: "branch" }),
+    });
+
+    expect(res.status).toBe(201);
+    const body = (await res.json()) as MockPromptVersion;
+    expect(body.parent_version_id).toBe(1);
+    expect(body.project_id).toBe(7);
+  });
+});
+
 // ---- PATCH /api/prompt-versions/:id/selected ----
 
 describe("PATCH /api/prompt-versions/:id/selected", () => {
@@ -742,12 +1023,60 @@ describe("PATCH /api/prompt-versions/:id/selected", () => {
   });
 });
 
+// ---- PATCH /api/projects/:projectId/prompt-versions/:id/selected ----
+
+describe("PATCH /api/projects/:projectId/prompt-versions/:id/selected", () => {
+  it("legacy path でも selected 切り替え結果の project_id を補完する", async () => {
+    const updated = { ...sampleVersion, is_selected: true, project_id: null };
+    let selectCallCount = 0;
+    let updateCallCount = 0;
+
+    const db = {
+      select: () => ({
+        from: () => ({
+          where: () => {
+            selectCallCount++;
+            if (selectCallCount === 1) {
+              return Promise.resolve([{ prompt_version_id: 1 }]);
+            }
+            return Promise.resolve([sampleVersion]);
+          },
+        }),
+      }),
+      update: () => ({
+        set: (values: { is_selected: boolean }) => ({
+          where: () => {
+            updateCallCount++;
+            if (updateCallCount === 1) {
+              expect(values.is_selected).toBe(false);
+              return Promise.resolve([]);
+            }
+            return {
+              returning: () => Promise.resolve([updated]),
+            };
+          },
+        }),
+      }),
+    };
+
+    const res = await buildLegacyApp(db).request("/api/projects/7/prompt-versions/1/selected", {
+      method: "PATCH",
+    });
+
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as MockPromptVersion;
+    expect(body.is_selected).toBe(true);
+    expect(body.project_id).toBe(7);
+  });
+});
+
 // ---- PUT /api/prompt-versions/:id/projects ----
 
 describe("PUT /api/prompt-versions/:id/projects", () => {
-  it("project_id を設定して200で返す", async () => {
+  it("project_id を設定して link table にも反映し 200で返す", async () => {
     const updated = { ...sampleVersion, project_id: 5 };
     let selectCallCount = 0;
+    let insertCallCount = 0;
 
     const db = {
       select: () => ({
@@ -757,9 +1086,21 @@ describe("PUT /api/prompt-versions/:id/projects", () => {
             if (selectCallCount === 1) {
               return Promise.resolve([sampleVersion]);
             }
-            return Promise.resolve([{ id: 5 }]);
+            if (selectCallCount === 2) {
+              return Promise.resolve([{ id: 5 }]);
+            }
+            return Promise.resolve([]);
           },
         }),
+      }),
+      insert: () => ({
+        values: (values: { prompt_version_id: number; project_id: number; created_at: number }) => {
+          insertCallCount++;
+          expect(values.prompt_version_id).toBe(1);
+          expect(values.project_id).toBe(5);
+          expect(typeof values.created_at).toBe("number");
+          return Promise.resolve();
+        },
       }),
       update: () => ({
         set: (values: { project_id: number | null }) => ({
@@ -783,6 +1124,53 @@ describe("PUT /api/prompt-versions/:id/projects", () => {
     expect(res.status).toBe(200);
     const body = (await res.json()) as MockPromptVersion;
     expect(body.project_id).toBe(5);
+    expect(insertCallCount).toBe(1);
+  });
+
+  it("同じ project link が既にある場合は重複 insert しない", async () => {
+    const updated = { ...sampleVersion, project_id: 5 };
+    let selectCallCount = 0;
+    let insertCalled = false;
+
+    const db = {
+      select: () => ({
+        from: (_table?: unknown) => ({
+          where: () => {
+            selectCallCount++;
+            if (selectCallCount === 1) {
+              return Promise.resolve([sampleVersion]);
+            }
+            if (selectCallCount === 2) {
+              return Promise.resolve([{ id: 5 }]);
+            }
+            return Promise.resolve([{ prompt_version_id: 1 }]);
+          },
+        }),
+      }),
+      insert: () => ({
+        values: () => {
+          insertCalled = true;
+          return Promise.resolve();
+        },
+      }),
+      update: () => ({
+        set: () => ({
+          where: () => ({
+            returning: () => Promise.resolve([updated]),
+          }),
+        }),
+      }),
+    };
+
+    const app = buildApp(db);
+    const res = await app.request("/api/prompt-versions/1/projects", {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ project_id: 5 }),
+    });
+
+    expect(res.status).toBe(200);
+    expect(insertCalled).toBe(false);
   });
 
   it("存在しない project_id を指定すると 404 を返す", async () => {
@@ -825,14 +1213,21 @@ describe("PUT /api/prompt-versions/:id/projects", () => {
     expect(updateCalled).toBe(false);
   });
 
-  it("project_id を null にして紐付けを解除できる", async () => {
+  it("project_id を null にして link table の紐付けも解除できる", async () => {
     const updated = { ...sampleVersion, project_id: null };
+    let deleteCalled = false;
 
     const db = {
       select: () => ({
         from: () => ({
           where: () => Promise.resolve([{ ...sampleVersion, project_id: 5 }]),
         }),
+      }),
+      delete: () => ({
+        where: () => {
+          deleteCalled = true;
+          return Promise.resolve();
+        },
       }),
       update: () => ({
         set: (values: { project_id: number | null }) => ({
@@ -856,6 +1251,7 @@ describe("PUT /api/prompt-versions/:id/projects", () => {
     expect(res.status).toBe(200);
     const body = (await res.json()) as MockPromptVersion;
     expect(body.project_id).toBeNull();
+    expect(deleteCalled).toBe(true);
   });
 
   it("存在しないIDに対して404を返す", async () => {
