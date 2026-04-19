@@ -9,6 +9,7 @@ prompt-reviewer のデータベーススキーマ案（Drizzle ORM / SQLite）
 - `projects` は所有単位ではなく、後から付与できる分類ラベルとして扱う
 - `project_settings` は廃止し、実行条件は `execution_profiles` として独立管理する
 - `未分類` は実テーブルのレコードではなく、「ラベルが1件も付いていない状態」を指す
+- annotation 機能のドメイン仕様は `doc/annotation-feature-spec.md` で別管理し、この ER 図にはまだ反映していない
 
 ## テーブル関連図
 

@@ -16,6 +16,8 @@
 - DB は SQLite を主対象にしつつ、将来の PostgreSQL / D1 移植性を維持する
 - `context_assets` は DB 主体で保存する
 - スコープは「ドメインモデル移行 + API/UI 移行」。LLM 機能追加は含めない
+- annotation 機能のドメイン仕様は `doc/annotation-feature-spec.md` に分離して管理する
+- annotation 機能の DB / API 詳細は、この移行で `context_assets` / `test_cases` / `runs` の責務整理が固まった後に確定する
 
 ## 移行方針
 
@@ -76,6 +78,13 @@
 - ローカル DB を移行
 - 互換 API 利用箇所を除去
 - 旧カラム / 旧ルート削除
+
+### Phase 5: Annotation 機能の接続
+
+- `doc/annotation-feature-spec.md` を基に annotation 機能の DB / API を具体化する
+- `context_assets` を annotation 対象としてどう扱うかを確定する
+- `runs` から Candidate を生成する接続点を定義する
+- Review 画面の導線を既存 UI に統合する
 
 ## Issue 一覧
 
@@ -360,6 +369,8 @@
 
 ## Issue 8: `context_assets` API を追加する
 
+GitHub Issue: #114
+
 ### 目的
 
 旧 `context-files` を置き換える独立資産 API を追加する。
@@ -433,6 +444,8 @@
 
 ## Issue 10: `test_cases` API を独立資産化する
 
+GitHub Issue: #116
+
 ### 目的
 
 テストケース API を project 親子モデルから独立資産モデルへ移す。
@@ -504,6 +517,8 @@
 ---
 
 ## Issue 12: `runs` API を `execution_profile` / prompt-label 基準に移行する
+
+GitHub Issue: #118
 
 ### 目的
 
@@ -868,6 +883,159 @@ Run 関連 UI を project 親子から独立させ、プロンプト側ラベル
 
 ---
 
+## Issue 22: annotation 対象テキストの責務を凍結する
+
+GitHub Issue: #137
+
+### 目的
+
+annotation 設計で最も重要な前提となる「どの本文に対して annotation するのか」を明確にする。
+
+`context_assets.content`、`test_cases.context_content`、取り込み時スナップショットの関係が曖昧なままだと、行番号や正解データの意味がぶれるため、ここを先に固定する。
+
+### 対象
+
+- `doc/er-diagram.md`
+- `doc/api-spec.md`
+- `doc/annotation-feature-spec.md`
+- 必要なら `doc/spec.md`
+
+### 実装内容
+
+- annotation の一次対象を何にするかを決める
+  - `context_assets.content`
+  - `test_cases.context_content`
+  - 両者の使い分け
+- `context_assets` と `test_cases.context_content` の責務分担を文章で明文化する
+- asset 取り込み後に本文が変化した場合の扱いを定義する
+  - 再同期するか
+  - スナップショットとして固定するか
+- annotation 用の行番号ルールを定義する
+  - 改行コード正規化
+  - 先頭行番号
+  - 空行の扱い
+- annotation で参照する本文が安定して再現できることを完了条件に含める
+
+### 完了条件
+
+- annotation 対象本文の source of truth が決まっている
+- 行番号の採番ルールが文書化されている
+- `context_assets` と `test_cases` の責務境界が説明できる
+
+### テスト
+
+- ドキュメント整合確認
+- 必要なら改行正規化のユニットテスト
+
+### 依存
+
+- Issue 8
+- Issue 10
+
+---
+
+## Issue 23: `runs` と annotation 候補生成の接続前提を整理する
+
+GitHub Issue: #138
+
+### 目的
+
+run のどの出力を annotation 候補の元にするか、どの本文に対する候補なのかを識別するための前提を固める。
+
+annotation 機能は `Candidate <- Run` の接続が重要なため、ここを設計前に整理する。
+
+### 対象
+
+- `doc/api-spec.md`
+- `doc/annotation-feature-spec.md`
+- 必要なら `doc/er-diagram.md`
+- 必要なら `packages/core/src/schema/runs.ts`
+
+### 実装内容
+
+- Candidate 生成元として使う run 出力を定義する
+  - 最終回答
+  - 構造化 JSON 出力
+  - `execution_trace` の特定 step 出力
+- annotation 候補に必要な最小メタデータを定義する
+  - 対象本文の識別子
+  - source run の識別子
+  - 候補生成元の出力箇所
+- 1 run が複数 `context_asset` を参照する場合の扱いを決める
+- run 側に追加保存が必要かどうかを判断する
+  - 対象 asset の明示
+  - 構造化出力の保存
+- `runs` API の責務と annotation 側 API の責務の境界を整理する
+
+### 完了条件
+
+- Candidate をどの run 出力から生成するか説明できる
+- run と annotation 候補の紐付け方針が決まっている
+- run スキーマ変更が必要なら、その要否が判断済みである
+
+### テスト
+
+- ドキュメント整合確認
+- 必要なら run payload 例の追加
+
+### 依存
+
+- Issue 12
+- Issue 19
+- Issue 22
+
+---
+
+## Issue 24: annotation 設計キックオフ条件を確定する
+
+GitHub Issue: #139
+
+### 目的
+
+annotation 機能の本格設計を開始してよい条件と、最初に扱うスコープを明確にする。
+
+移行途中の揺れている前提を持ち込まないため、設計開始条件を Issue として独立させる。
+
+### 対象
+
+- `doc/migration-plan.md`
+- `doc/annotation-feature-spec.md`
+- 必要なら新規メモ
+
+### 実装内容
+
+- annotation 設計開始の前提条件を列挙する
+  - `context_assets` / `test_cases` / `runs` の責務が固まっている
+  - annotation 対象本文の source of truth が決まっている
+  - run から Candidate を作る接続点が決まっている
+- 初回 annotation 設計の対象スコープを固定する
+  - `span_label`
+  - Candidate / Gold の分離
+  - Review 画面
+- annotation 実装 Issue の切り方を先に整理する
+  - schema / migration
+  - API
+  - UI
+  - import / review
+- 「Issue 21 の完了は annotation 設計開始の必須条件ではない」ことを明記する
+
+### 完了条件
+
+- annotation 設計開始条件が文書で確認できる
+- 初回スコープと除外範囲が明文化されている
+- 次に起票すべき annotation 実装 Issue の粒度が見えている
+
+### テスト
+
+- なし
+
+### 依存
+
+- Issue 22
+- Issue 23
+
+---
+
 ## 推奨実装順
 
 1. Issue 1
@@ -890,13 +1058,17 @@ Run 関連 UI を project 親子から独立させ、プロンプト側ラベル
 18. Issue 18
 19. Issue 19
 20. Issue 20
-21. Issue 21
+21. Issue 22
+22. Issue 23
+23. Issue 24
+24. Issue 21
 
 ## 並行化しやすい組み合わせ
 
 - Issue 3 と Issue 5 は並行しやすい
 - Issue 8 と Issue 10 は API 層として並行しやすい
 - Issue 15 / 16 / 17 は UI 画面単位で並行しやすい
+- Issue 22 と Issue 23 は、実装より文書整理の比重が高いため比較的並行しやすい
 
 ただし以下は直列で進めるべき:
 
@@ -904,6 +1076,7 @@ Run 関連 UI を project 親子から独立させ、プロンプト側ラベル
 - Issue 6 -> Issue 7
 - Issue 10 -> Issue 11
 - Issue 12 -> Issue 13
+- Issue 22 -> Issue 23 -> Issue 24
 - Issue 20 -> Issue 21
 
 ## リスク
@@ -912,6 +1085,8 @@ Run 関連 UI を project 親子から独立させ、プロンプト側ラベル
 - `context-files` 取り込みで asset 重複が多発すると UI が煩雑になる
 - 旧 UI 互換で `project_id` を補完する期間は、概念上のねじれが残る
 - `prompt_family` 導入時に既存 prompt version の系列分けルールを誤ると、履歴の意味が崩れる
+- annotation の対象本文をどこに置くかが曖昧なままだと、正解データの行番号と意味が不安定になる
+- run と annotation 候補の接続点が曖昧なままだと、後続の DB / API 設計が旧前提に引きずられやすい
 
 ## 最初のマイルストーン
 
@@ -923,3 +1098,18 @@ Run 関連 UI を project 親子から独立させ、プロンプト側ラベル
 - Issue 5: `prompt_families` API を追加する
 
 ここまで終わると、新旧共存のベースができる。
+
+## annotation 設計開始の目安
+
+annotation 機能の本格設計は、少なくとも次が終わってから始めるのが安全。
+
+- Issue 8 / #114: `context_assets` API を追加する
+- Issue 10 / #116: `test_cases` API を独立資産化する
+- Issue 12 / #118: `runs` API を `execution_profile` / prompt-label 基準に移行する
+- Issue 22 / #137: annotation 対象テキストの責務を凍結する
+- Issue 23 / #138: `runs` と annotation 候補生成の接続前提を整理する
+- Issue 24 / #139: annotation 設計キックオフ条件を確定する
+
+逆に、Issue 21 の完了は annotation 設計開始の必須条件ではない。
+
+旧互換レイヤが残っていても、上記の前提が固まっていれば annotation の本格設計には着手できる。

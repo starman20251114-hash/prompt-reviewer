@@ -6,6 +6,14 @@ prompt-reviewer の REST API 案（Hono / Node.js）
 
 この仕様は、`project` を所有単位ではなく分類ラベルとして扱う新データモデルに基づく。
 
+## この文書の範囲
+
+この文書は、現行の移行対象である基盤 API を中心にまとめたものである。
+
+- annotation 機能のドメイン仕様は `doc/annotation-feature-spec.md` を参照する
+- annotation 関連 API は、`context_assets` / `test_cases` / `runs` の移行後に別途この文書へ追加する
+- そのため、現時点では annotation 用の resource や endpoint は未定義とする
+
 ## 共通仕様
 
 ### レスポンス形式
@@ -806,4 +814,3 @@ Run に対する評価スコアを管理する API。
 - `/context-assets`
 - `/execution-profiles`
 - `/runs`
-
