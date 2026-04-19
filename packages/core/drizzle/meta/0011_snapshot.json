@@ -1,8 +1,8 @@
 {
   "version": "6",
   "dialect": "sqlite",
-  "id": "469b52c7-0e58-4fcb-91c1-79355e19998a",
-  "prevId": "a7b53b3a-b43e-403c-bb64-404274bdda61",
+  "id": "75739b02-5a67-47bc-a7d1-bdba18983c15",
+  "prevId": "a21ed24a-cb48-45e8-b378-de09f03324c5",
   "tables": {
     "project_settings": {
       "name": "project_settings",
@@ -229,7 +229,13 @@
           "autoincrement": false
         }
       },
-      "indexes": {},
+      "indexes": {
+        "execution_profiles_name_unique": {
+          "name": "execution_profiles_name_unique",
+          "columns": ["name"],
+          "isUnique": true
+        }
+      },
       "foreignKeys": {},
       "compositePrimaryKeys": {},
       "uniqueConstraints": {},
@@ -298,6 +304,61 @@
       "indexes": {},
       "foreignKeys": {},
       "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "checkConstraints": {}
+    },
+    "context_asset_projects": {
+      "name": "context_asset_projects",
+      "columns": {
+        "context_asset_id": {
+          "name": "context_asset_id",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "project_id": {
+          "name": "project_id",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {
+        "context_asset_projects_context_asset_id_context_assets_id_fk": {
+          "name": "context_asset_projects_context_asset_id_context_assets_id_fk",
+          "tableFrom": "context_asset_projects",
+          "tableTo": "context_assets",
+          "columnsFrom": ["context_asset_id"],
+          "columnsTo": ["id"],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "context_asset_projects_project_id_projects_id_fk": {
+          "name": "context_asset_projects_project_id_projects_id_fk",
+          "tableFrom": "context_asset_projects",
+          "tableTo": "projects",
+          "columnsFrom": ["project_id"],
+          "columnsTo": ["id"],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {
+        "context_asset_projects_context_asset_id_project_id_pk": {
+          "columns": ["context_asset_id", "project_id"],
+          "name": "context_asset_projects_context_asset_id_project_id_pk"
+        }
+      },
       "uniqueConstraints": {},
       "checkConstraints": {}
     },

@@ -42,78 +42,6 @@ function defaultProfileName(projectId: number): string {
   return `project-${projectId}-default`;
 }
 
-async function updateSettings(db: DB, projectId: number, body: UpsertBody, now: number) {
-  const [updated] = await db
-    .update(project_settings)
-    .set({
-      model: body.model,
-      temperature: body.temperature,
-      api_provider: body.api_provider,
-      updated_at: now,
-    })
-    .where(eq(project_settings.project_id, projectId))
-    .returning();
-  return updated ?? null;
-}
-
-async function createSettings(db: DB, projectId: number, body: UpsertBody, now: number) {
-  const [created] = await db
-    .insert(project_settings)
-    .values({
-      project_id: projectId,
-      model: body.model,
-      temperature: body.temperature,
-      api_provider: body.api_provider,
-      created_at: now,
-      updated_at: now,
-    })
-    .returning();
-  return created ?? null;
-}
-
-/**
- * project_settings の PUT と連動して execution_profiles を upsert する。
- *
- * project ごとの既定 profile は name = "project-{projectId}-default" で識別する。
- * 存在しなければ新規作成、存在すれば model/temperature/api_provider を更新する。
- * これにより旧 settings UI からの操作が execution_profiles テーブルにも反映される。
- */
-async function upsertExecutionProfile(
-  db: DB,
-  projectId: number,
-  body: UpsertBody,
-  now: number,
-): Promise<void> {
-  const name = defaultProfileName(projectId);
-
-  const [existing] = await db
-    .select()
-    .from(execution_profiles)
-    .where(eq(execution_profiles.name, name));
-
-  if (existing) {
-    await db
-      .update(execution_profiles)
-      .set({
-        model: body.model,
-        temperature: body.temperature,
-        api_provider: body.api_provider,
-        updated_at: now,
-      })
-      .where(eq(execution_profiles.name, name));
-  } else {
-    await db.insert(execution_profiles).values({
-      name,
-      description: null,
-      model: body.model,
-      temperature: body.temperature,
-      api_provider: body.api_provider,
-      created_at: now,
-      updated_at: now,
-    });
-  }
-}
-
 /**
  * ProjectSettings エンドポイントのルーター（互換レイヤ）
  *
@@ -121,6 +49,7 @@ async function upsertExecutionProfile(
  * PUT  /api/projects/:projectId/settings  - 設定の upsert
  *   - project_settings テーブルを更新（旧 UI との互換維持）
  *   - execution_profiles テーブルにも同期（新テーブルへの書き込み）
+ *   - 両テーブルへの書き込みはトランザクションで保護し、片方の失敗で不整合が生じないようにする
  */
 export function createProjectSettingsRouter(db: DB, options: ProjectSettingsRouterOptions = {}) {
   const router = new Hono();
@@ -161,15 +90,86 @@ export function createProjectSettingsRouter(db: DB, options: ProjectSettingsRout
       .from(project_settings)
       .where(eq(project_settings.project_id, projectId));
 
-    await upsertExecutionProfile(db, projectId, body, now);
+    const name = defaultProfileName(projectId);
 
     if (existing) {
-      const updated = await updateSettings(db, projectId, body, now);
+      const updated = db.transaction((tx) => {
+        tx.insert(execution_profiles)
+          .values({
+            name,
+            description: null,
+            model: body.model,
+            temperature: body.temperature,
+            api_provider: body.api_provider,
+            created_at: now,
+            updated_at: now,
+          })
+          .onConflictDoUpdate({
+            target: execution_profiles.name,
+            set: {
+              model: body.model,
+              temperature: body.temperature,
+              api_provider: body.api_provider,
+              updated_at: now,
+            },
+          })
+          .run();
+
+        const results = tx
+          .update(project_settings)
+          .set({
+            model: body.model,
+            temperature: body.temperature,
+            api_provider: body.api_provider,
+            updated_at: now,
+          })
+          .where(eq(project_settings.project_id, projectId))
+          .returning()
+          .all();
+        return results[0] ?? null;
+      });
+
       if (!updated) return c.json({ error: "Failed to update Settings" }, 500);
       return c.json(updated);
     }
 
-    const created = await createSettings(db, projectId, body, now);
+    const created = db.transaction((tx) => {
+      tx.insert(execution_profiles)
+        .values({
+          name,
+          description: null,
+          model: body.model,
+          temperature: body.temperature,
+          api_provider: body.api_provider,
+          created_at: now,
+          updated_at: now,
+        })
+        .onConflictDoUpdate({
+          target: execution_profiles.name,
+          set: {
+            model: body.model,
+            temperature: body.temperature,
+            api_provider: body.api_provider,
+            updated_at: now,
+          },
+        })
+        .run();
+
+      const results = tx
+        .insert(project_settings)
+        .values({
+          project_id: projectId,
+          model: body.model,
+          temperature: body.temperature,
+          api_provider: body.api_provider,
+          created_at: now,
+          updated_at: now,
+        })
+        .returning()
+        .all();
+      return results[0] ?? null;
+    });
+
     if (!created) return c.json({ error: "Failed to create Settings" }, 500);
     return c.json(created, 201);
   });

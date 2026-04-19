@@ -5,10 +5,11 @@
  * 実際のDB接続は行わず、Drizzle の DB インターフェースを模倣した
  * モックを使用してルートハンドラの動作を検証する。
  *
- * PUT エンドポイントは project_settings と execution_profiles の両方を操作する。
- * select は呼び出し順に results[0], results[1] ... を返す:
- *   results[0]: project_settings の既存チェック
- *   results[1]: execution_profiles の既存チェック（upsertExecutionProfile 内）
+ * db.transaction() は同期コールバックを受け取り、その返り値をそのまま返す。
+ * テスト内のモック transaction も同様に (fn) => fn(tx) の形で実装する。
+ *
+ * 同期ドライバ（better-sqlite3）では .returning().all() で結果配列を取得するため、
+ * モックの .returning() も .all() メソッドを持つオブジェクトを返す必要がある。
  */
 
 // better-sqlite3 のネイティブモジュールをモックしてDB初期化をブロック
@@ -19,6 +20,7 @@ vi.mock("better-sqlite3", () => {
 });
 
 import type { DB } from "@prompt-reviewer/core";
+import { execution_profiles, project_settings } from "@prompt-reviewer/core";
 import { LLMAuthenticationError } from "@prompt-reviewer/core";
 import { Hono } from "hono";
 import { describe, expect, it, vi } from "vitest";
@@ -29,17 +31,6 @@ import { createProjectSettingsRouter } from "./project-settings.js";
 type MockSettings = {
   id: number;
   project_id: number;
-  model: string;
-  temperature: number;
-  api_provider: string;
-  created_at: number;
-  updated_at: number;
-};
-
-type MockExecutionProfile = {
-  id: number;
-  name: string;
-  description: string | null;
   model: string;
   temperature: number;
   api_provider: string;
@@ -68,22 +59,35 @@ function buildApp(
 }
 
 /**
- * select().from().where() を n 回呼べるモックを作成する
- * 各呼び出しに対して results[i] を返す
+ * select().from().where() のモックを作成する。
+ * from() に渡されたテーブルオブジェクトで結果を識別する。
  */
-function makeSelectMock(results: unknown[][]) {
-  let callIndex = 0;
+function makeSelectMock(resultsByTable: Map<unknown, unknown[]>) {
   return {
     select: () => ({
-      from: () => ({
+      from: (table: unknown) => ({
         where: () => {
-          const result = results[callIndex] ?? [];
-          callIndex++;
-          return Promise.resolve(result);
+          return Promise.resolve(resultsByTable.get(table) ?? []);
         },
       }),
     }),
   };
+}
+
+/**
+ * db.transaction() のモックを作成する。
+ * better-sqlite3 の transaction は同期なので、コールバックを直接呼び出して返り値を返す。
+ */
+function makeTransactionMock(tx: unknown) {
+  return (fn: (tx: unknown) => unknown) => fn(tx);
+}
+
+/**
+ * .returning() チェーンの末尾に .all() メソッドを持つオブジェクトを返すヘルパー。
+ * 同期ドライバ（better-sqlite3）では .returning().all() で結果配列を取得する。
+ */
+function makeReturning(rows: unknown[]) {
+  return { all: () => rows };
 }
 
 // ---- テストデータ ----
@@ -103,7 +107,7 @@ const sampleSettings: MockSettings = {
 describe("GET /api/projects/:projectId/settings", () => {
   it("設定が存在しない場合に 404 を返す", async () => {
     const db = {
-      ...makeSelectMock([[]]),
+      ...makeSelectMock(new Map([[project_settings, []]])),
     };
 
     const app = buildApp(db);
@@ -116,7 +120,7 @@ describe("GET /api/projects/:projectId/settings", () => {
 
   it("設定が存在する場合に 200 で設定を返す", async () => {
     const db = {
-      ...makeSelectMock([[sampleSettings]]),
+      ...makeSelectMock(new Map([[project_settings, [sampleSettings]]])),
     };
 
     const app = buildApp(db);
@@ -156,22 +160,21 @@ describe("PUT /api/projects/:projectId/settings", () => {
       updated_at: 2000000,
     };
 
-    let insertCallCount = 0;
-    const db = {
-      // select[0]: project_settings 既存チェック → 存在しない
-      // select[1]: execution_profiles 既存チェック → 存在しない
-      ...makeSelectMock([[], []]),
-      insert: () => ({
-        values: () => {
-          insertCallCount++;
-          if (insertCallCount === 1) {
-            // execution_profiles への insert
-            return { returning: () => Promise.resolve([]) };
-          }
-          // project_settings への insert
-          return { returning: () => Promise.resolve([created]) };
-        },
+    // トランザクション内の tx モック
+    const tx = {
+      insert: (table: unknown) => ({
+        values: () => ({
+          onConflictDoUpdate: () => ({
+            run: () => {},
+          }),
+          returning: () => makeReturning(table === project_settings ? [created] : []),
+        }),
       }),
+    };
+
+    const db = {
+      ...makeSelectMock(new Map([[project_settings, []]])),
+      transaction: makeTransactionMock(tx),
     };
 
     const app = buildApp(db);
@@ -201,20 +204,27 @@ describe("PUT /api/projects/:projectId/settings", () => {
       updated_at: 3000000,
     };
 
-    const db = {
-      // select[0]: project_settings 既存チェック → 存在する
-      // select[1]: execution_profiles 既存チェック → 存在しない（execution_profiles は新規 insert）
-      ...makeSelectMock([[sampleSettings], []]),
+    // トランザクション内の tx モック
+    const tx = {
       insert: () => ({
-        values: () => ({ returning: () => Promise.resolve([]) }),
-      }),
-      update: () => ({
-        set: () => ({
-          where: () => ({
-            returning: () => Promise.resolve([updated]),
+        values: () => ({
+          onConflictDoUpdate: () => ({
+            run: () => {},
           }),
         }),
       }),
+      update: (table: unknown) => ({
+        set: () => ({
+          where: () => ({
+            returning: () => makeReturning(table === project_settings ? [updated] : []),
+          }),
+        }),
+      }),
+    };
+
+    const db = {
+      ...makeSelectMock(new Map([[project_settings, [sampleSettings]]])),
+      transaction: makeTransactionMock(tx),
     };
 
     const app = buildApp(db);
@@ -334,23 +344,26 @@ describe("PUT /api/projects/:projectId/settings", () => {
       updated_at: 4000000,
     };
 
-    let insertCallCount = 0;
-    const db = {
-      // select[0]: project_settings 既存チェック → 存在しない
-      // select[1]: execution_profiles 既存チェック → 存在しない
-      ...makeSelectMock([[], []]),
-      insert: () => ({
-        values: (values: Record<string, unknown>) => {
-          insertCallCount++;
-          if (insertCallCount === 1) {
-            // execution_profiles への insert（project_id を含まない）
-            return { returning: () => Promise.resolve([]) };
-          }
-          // project_settings への insert（project_id を含む）
-          capturedValues = values;
-          return { returning: () => Promise.resolve([created]) };
-        },
+    const tx = {
+      insert: (table: unknown) => ({
+        values: (values: Record<string, unknown>) => ({
+          onConflictDoUpdate: () => ({
+            run: () => {},
+          }),
+          returning: () => {
+            if (table === project_settings) {
+              capturedValues = values;
+              return makeReturning([created]);
+            }
+            return makeReturning([]);
+          },
+        }),
       }),
+    };
+
+    const db = {
+      ...makeSelectMock(new Map([[project_settings, []]])),
+      transaction: makeTransactionMock(tx),
     };
 
     const app = buildApp(db);
@@ -378,28 +391,32 @@ describe("PUT /api/projects/:projectId/settings", () => {
       updated_at: 9999999,
     };
 
-    let updateCallCount = 0;
-    const db = {
-      // select[0]: project_settings 既存チェック → 存在する
-      // select[1]: execution_profiles 既存チェック → 存在しない（insert に分岐）
-      ...makeSelectMock([[sampleSettings], []]),
+    const tx = {
       insert: () => ({
-        values: () => ({ returning: () => Promise.resolve([]) }),
+        values: () => ({
+          onConflictDoUpdate: () => ({
+            run: () => {},
+          }),
+        }),
       }),
-      update: () => ({
-        set: (data: Record<string, unknown>) => {
-          updateCallCount++;
-          if (updateCallCount === 1) {
-            // project_settings の update（capturedUpdateData に記録）
-            capturedUpdateData = data;
-          }
-          return {
-            where: () => ({
-              returning: () => Promise.resolve([updated]),
-            }),
-          };
-        },
+      update: (table: unknown) => ({
+        set: (data: Record<string, unknown>) => ({
+          where: () => ({
+            returning: () => {
+              if (table === project_settings) {
+                capturedUpdateData = data;
+                return makeReturning([updated]);
+              }
+              return makeReturning([]);
+            },
+          }),
+        }),
       }),
+    };
+
+    const db = {
+      ...makeSelectMock(new Map([[project_settings, [sampleSettings]]])),
+      transaction: makeTransactionMock(tx),
     };
 
     const app = buildApp(db);
@@ -423,18 +440,20 @@ describe("PUT /api/projects/:projectId/settings", () => {
       temperature: 0,
     };
 
-    let insertCallCount = 0;
-    const db = {
-      ...makeSelectMock([[], []]),
-      insert: () => ({
-        values: () => {
-          insertCallCount++;
-          if (insertCallCount === 1) {
-            return { returning: () => Promise.resolve([]) };
-          }
-          return { returning: () => Promise.resolve([created]) };
-        },
+    const tx = {
+      insert: (table: unknown) => ({
+        values: () => ({
+          onConflictDoUpdate: () => ({
+            run: () => {},
+          }),
+          returning: () => makeReturning(table === project_settings ? [created] : []),
+        }),
       }),
+    };
+
+    const db = {
+      ...makeSelectMock(new Map([[project_settings, []]])),
+      transaction: makeTransactionMock(tx),
     };
 
     const app = buildApp(db);
@@ -459,18 +478,20 @@ describe("PUT /api/projects/:projectId/settings", () => {
       temperature: 2,
     };
 
-    let insertCallCount = 0;
-    const db = {
-      ...makeSelectMock([[], []]),
-      insert: () => ({
-        values: () => {
-          insertCallCount++;
-          if (insertCallCount === 1) {
-            return { returning: () => Promise.resolve([]) };
-          }
-          return { returning: () => Promise.resolve([created]) };
-        },
+    const tx = {
+      insert: (table: unknown) => ({
+        values: () => ({
+          onConflictDoUpdate: () => ({
+            run: () => {},
+          }),
+          returning: () => makeReturning(table === project_settings ? [created] : []),
+        }),
       }),
+    };
+
+    const db = {
+      ...makeSelectMock(new Map([[project_settings, []]])),
+      transaction: makeTransactionMock(tx),
     };
 
     const app = buildApp(db);
@@ -493,7 +514,7 @@ describe("PUT /api/projects/:projectId/settings", () => {
 // ---- 新旧整合テスト ----
 
 describe("PUT /api/projects/:projectId/settings - execution_profiles 同期", () => {
-  it("settings 新規作成時に execution_profiles への insert が実行される", async () => {
+  it("settings 新規作成時に execution_profiles への insert(upsert) が実行される", async () => {
     const created: MockSettings = {
       id: 1,
       project_id: 1,
@@ -506,25 +527,26 @@ describe("PUT /api/projects/:projectId/settings - execution_profiles 同期", ()
 
     let executionProfileInsertCalled = false;
     let executionProfileInsertValues: Record<string, unknown> = {};
-    let insertCallCount = 0;
+
+    const tx = {
+      insert: (table: unknown) => ({
+        values: (values: Record<string, unknown>) => ({
+          onConflictDoUpdate: () => ({
+            run: () => {
+              if (table === execution_profiles) {
+                executionProfileInsertCalled = true;
+                executionProfileInsertValues = values;
+              }
+            },
+          }),
+          returning: () => makeReturning(table === project_settings ? [created] : []),
+        }),
+      }),
+    };
 
     const db = {
-      // select[0]: project_settings 既存チェック → 存在しない
-      // select[1]: execution_profiles 既存チェック → 存在しない
-      ...makeSelectMock([[], []]),
-      insert: () => ({
-        values: (values: Record<string, unknown>) => {
-          insertCallCount++;
-          if (insertCallCount === 1) {
-            // 1回目: execution_profiles への insert
-            executionProfileInsertCalled = true;
-            executionProfileInsertValues = values;
-            return { returning: () => Promise.resolve([]) };
-          }
-          // 2回目: project_settings への insert
-          return { returning: () => Promise.resolve([created]) };
-        },
-      }),
+      ...makeSelectMock(new Map([[project_settings, []]])),
+      transaction: makeTransactionMock(tx),
     };
 
     const app = buildApp(db);
@@ -546,47 +568,41 @@ describe("PUT /api/projects/:projectId/settings - execution_profiles 同期", ()
     expect(executionProfileInsertValues.api_provider).toBe("anthropic");
   });
 
-  it("settings 更新時に execution_profiles の既存 profile が更新される", async () => {
+  it("settings 更新時に execution_profiles の upsert が実行される", async () => {
     const updatedSettings: MockSettings = {
       ...sampleSettings,
       model: "claude-haiku-4-5",
       updated_at: 6000000,
     };
 
-    const existingProfile: MockExecutionProfile = {
-      id: 10,
-      name: "project-1-default",
-      description: null,
-      model: "claude-opus-4-5",
-      temperature: 0.7,
-      api_provider: "anthropic",
-      created_at: 1000000,
-      updated_at: 1000000,
-    };
+    let executionProfileUpsertCalled = false;
+    let executionProfileUpsertValues: Record<string, unknown> = {};
 
-    let executionProfileUpdateCalled = false;
-    let executionProfileUpdateValues: Record<string, unknown> = {};
-    let updateCallCount = 0;
-
-    const db = {
-      // select[0]: project_settings 既存チェック → 存在する
-      // select[1]: execution_profiles 既存チェック → 存在する
-      ...makeSelectMock([[sampleSettings], [existingProfile]]),
-      update: () => ({
-        set: (values: Record<string, unknown>) => ({
-          where: () => {
-            updateCallCount++;
-            if (updateCallCount === 1) {
-              // 1回目: execution_profiles の update
-              executionProfileUpdateCalled = true;
-              executionProfileUpdateValues = values;
-              return { returning: () => Promise.resolve([]) };
-            }
-            // 2回目: project_settings の update
-            return { returning: () => Promise.resolve([updatedSettings]) };
-          },
+    const tx = {
+      insert: (table: unknown) => ({
+        values: (values: Record<string, unknown>) => ({
+          onConflictDoUpdate: () => ({
+            run: () => {
+              if (table === execution_profiles) {
+                executionProfileUpsertCalled = true;
+                executionProfileUpsertValues = values;
+              }
+            },
+          }),
         }),
       }),
+      update: (table: unknown) => ({
+        set: () => ({
+          where: () => ({
+            returning: () => makeReturning(table === project_settings ? [updatedSettings] : []),
+          }),
+        }),
+      }),
+    };
+
+    const db = {
+      ...makeSelectMock(new Map([[project_settings, [sampleSettings]]])),
+      transaction: makeTransactionMock(tx),
     };
 
     const app = buildApp(db);
@@ -601,8 +617,8 @@ describe("PUT /api/projects/:projectId/settings - execution_profiles 同期", ()
     });
 
     expect(res.status).toBe(200);
-    expect(executionProfileUpdateCalled).toBe(true);
-    expect(executionProfileUpdateValues.model).toBe("claude-haiku-4-5");
+    expect(executionProfileUpsertCalled).toBe(true);
+    expect(executionProfileUpsertValues.model).toBe("claude-haiku-4-5");
   });
 
   it("project-{projectId}-default という名前で execution_profile を識別する", async () => {
@@ -617,20 +633,25 @@ describe("PUT /api/projects/:projectId/settings - execution_profiles 同期", ()
     };
 
     let capturedProfileName = "";
-    let insertCallCount = 0;
+
+    const tx = {
+      insert: (table: unknown) => ({
+        values: (values: Record<string, unknown>) => ({
+          onConflictDoUpdate: () => ({
+            run: () => {
+              if (table === execution_profiles) {
+                capturedProfileName = values.name as string;
+              }
+            },
+          }),
+          returning: () => makeReturning(table === project_settings ? [created] : []),
+        }),
+      }),
+    };
 
     const db = {
-      ...makeSelectMock([[], []]),
-      insert: () => ({
-        values: (values: Record<string, unknown>) => {
-          insertCallCount++;
-          if (insertCallCount === 1) {
-            capturedProfileName = values.name as string;
-            return { returning: () => Promise.resolve([]) };
-          }
-          return { returning: () => Promise.resolve([created]) };
-        },
-      }),
+      ...makeSelectMock(new Map([[project_settings, []]])),
+      transaction: makeTransactionMock(tx),
     };
 
     const app = buildApp(db);
