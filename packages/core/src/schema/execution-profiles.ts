@@ -6,7 +6,7 @@ import { integer, real, sqliteTable, text } from "drizzle-orm/sqlite-core";
  */
 export const execution_profiles = sqliteTable("execution_profiles", {
   id: integer("id").primaryKey({ autoIncrement: true }),
-  name: text("name").notNull(),
+  name: text("name").notNull().unique(),
   description: text("description"),
   model: text("model").notNull().default("claude-opus-4-5"),
   temperature: real("temperature").notNull().default(0.7),

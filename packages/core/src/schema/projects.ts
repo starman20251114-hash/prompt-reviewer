@@ -20,7 +20,8 @@ export const project_settings = sqliteTable("project_settings", {
   id: integer("id").primaryKey({ autoIncrement: true }),
   project_id: integer("project_id")
     .notNull()
-    .references(() => projects.id),
+    .references(() => projects.id)
+    .unique(),
   model: text("model").notNull().default("claude-opus-4-5"),
   temperature: real("temperature").notNull().default(0.7),
   api_provider: text("api_provider", { enum: ["anthropic", "openai"] })
