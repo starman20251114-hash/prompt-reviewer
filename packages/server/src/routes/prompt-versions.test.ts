@@ -747,11 +747,18 @@ describe("PATCH /api/prompt-versions/:id/selected", () => {
 describe("PUT /api/prompt-versions/:id/projects", () => {
   it("project_id を設定して200で返す", async () => {
     const updated = { ...sampleVersion, project_id: 5 };
+    let selectCallCount = 0;
 
     const db = {
       select: () => ({
-        from: () => ({
-          where: () => Promise.resolve([sampleVersion]),
+        from: (_table?: unknown) => ({
+          where: () => {
+            selectCallCount++;
+            if (selectCallCount === 1) {
+              return Promise.resolve([sampleVersion]);
+            }
+            return Promise.resolve([{ id: 5 }]);
+          },
         }),
       }),
       update: () => ({
@@ -776,6 +783,46 @@ describe("PUT /api/prompt-versions/:id/projects", () => {
     expect(res.status).toBe(200);
     const body = (await res.json()) as MockPromptVersion;
     expect(body.project_id).toBe(5);
+  });
+
+  it("存在しない project_id を指定すると 404 を返す", async () => {
+    let updateCalled = false;
+    let selectCallCount = 0;
+
+    const db = {
+      select: () => ({
+        from: (_table?: unknown) => ({
+          where: () => {
+            selectCallCount++;
+            if (selectCallCount === 1) {
+              return Promise.resolve([sampleVersion]);
+            }
+            return Promise.resolve([]);
+          },
+        }),
+      }),
+      update: () => ({
+        set: () => {
+          updateCalled = true;
+          return {
+            where: () => ({
+              returning: () => Promise.resolve([]),
+            }),
+          };
+        },
+      }),
+    };
+
+    const app = buildApp(db);
+    const res = await app.request("/api/prompt-versions/1/projects", {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ project_id: 999 }),
+    });
+
+    expect(res.status).toBe(404);
+    await expect(res.json()).resolves.toEqual({ error: "Project not found" });
+    expect(updateCalled).toBe(false);
   });
 
   it("project_id を null にして紐付けを解除できる", async () => {

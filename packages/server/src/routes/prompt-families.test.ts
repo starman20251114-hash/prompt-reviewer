@@ -237,13 +237,23 @@ describe("PATCH /api/prompt-families/:id", () => {
 });
 
 describe("DELETE /api/prompt-families/:id", () => {
-  it("関連する prompt_versions を削除してから family を削除し 204 を返す", async () => {
+  it("関連する run がなければ prompt_versions を削除してから family を削除し 204 を返す", async () => {
     let deleteCallCount = 0;
+    let selectCallCount = 0;
 
     const db = {
       select: () => ({
-        from: () => ({
-          where: () => Promise.resolve([sampleFamily]),
+        from: (_table?: unknown) => ({
+          where: () => {
+            selectCallCount++;
+            if (selectCallCount === 1) {
+              return Promise.resolve([sampleFamily]);
+            }
+            if (selectCallCount === 2) {
+              return Promise.resolve([{ id: 10 }]);
+            }
+            return Promise.resolve([]);
+          },
         }),
       }),
       delete: () => ({
@@ -260,6 +270,42 @@ describe("DELETE /api/prompt-families/:id", () => {
 
     expect(res.status).toBe(204);
     expect(deleteCallCount).toBe(2);
+  });
+
+  it("関連する run がある場合は 409 を返す", async () => {
+    let deleteCalled = false;
+    let selectCallCount = 0;
+
+    const db = {
+      select: () => ({
+        from: (_table?: unknown) => ({
+          where: () => {
+            selectCallCount++;
+            if (selectCallCount === 1) {
+              return Promise.resolve([sampleFamily]);
+            }
+            if (selectCallCount === 2) {
+              return Promise.resolve([{ id: 10 }]);
+            }
+            return Promise.resolve([{ id: 99 }]);
+          },
+        }),
+      }),
+      delete: () => ({
+        where: () => {
+          deleteCalled = true;
+          return Promise.resolve();
+        },
+      }),
+    };
+
+    const res = await buildApp(db).request("/api/prompt-families/1", {
+      method: "DELETE",
+    });
+
+    expect(res.status).toBe(409);
+    await expect(res.json()).resolves.toEqual({ error: "Prompt family is referenced by runs" });
+    expect(deleteCalled).toBe(false);
   });
 
   it("見つからない場合は 404 を返す", async () => {

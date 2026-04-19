@@ -1,7 +1,7 @@
 import { zValidator } from "@hono/zod-validator";
 import type { DB } from "@prompt-reviewer/core";
-import { prompt_versions } from "@prompt-reviewer/core";
-import { and, eq, max } from "drizzle-orm";
+import { projects, prompt_versions } from "@prompt-reviewer/core";
+import { eq, max } from "drizzle-orm";
 import { Hono } from "hono";
 import { z } from "zod";
 
@@ -320,6 +320,12 @@ export function createPromptVersionsRouter(db: DB) {
     }
 
     const body = c.req.valid("json");
+    if (body.project_id !== null) {
+      const [project] = await db.select().from(projects).where(eq(projects.id, body.project_id));
+      if (!project) {
+        return c.json({ error: "Project not found" }, 404);
+      }
+    }
 
     const updateResult = await db
       .update(prompt_versions)
