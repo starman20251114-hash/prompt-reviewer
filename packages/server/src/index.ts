@@ -5,6 +5,7 @@ import { assertRequiredSchema, db } from "@prompt-reviewer/core";
 import { Hono } from "hono";
 import { cors } from "hono/cors";
 import { createContextFilesRouter } from "./routes/context-files.js";
+import { createExecutionProfilesRouter } from "./routes/execution-profiles.js";
 import { createProjectSettingsRouter } from "./routes/project-settings.js";
 import { createProjectsRouter } from "./routes/projects.js";
 import { createPromptVersionsRouter } from "./routes/prompt-versions.js";
@@ -70,6 +71,7 @@ app.get("/api/health", (c) => {
 });
 
 app.route("/api/projects", createProjectsRouter(db));
+app.route("/api/execution-profiles", createExecutionProfilesRouter(db));
 app.route("/api/projects/:projectId/context-files", createContextFilesRouter());
 app.route("/api/projects/:projectId/test-cases", createTestCasesRouter(db));
 app.route("/api/projects/:projectId/prompt-versions", createPromptVersionsRouter(db));
