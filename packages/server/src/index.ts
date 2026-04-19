@@ -8,6 +8,7 @@ import { createContextFilesRouter } from "./routes/context-files.js";
 import { createExecutionProfilesRouter } from "./routes/execution-profiles.js";
 import { createProjectSettingsRouter } from "./routes/project-settings.js";
 import { createProjectsRouter } from "./routes/projects.js";
+import { createPromptFamiliesRouter } from "./routes/prompt-families.js";
 import { createPromptVersionsRouter } from "./routes/prompt-versions.js";
 import { createRunsRouter } from "./routes/runs.js";
 import { createScoreProgressionRouter } from "./routes/score-progression.js";
@@ -72,6 +73,7 @@ app.get("/api/health", (c) => {
 
 app.route("/api/projects", createProjectsRouter(db));
 app.route("/api/execution-profiles", createExecutionProfilesRouter(db));
+app.route("/api/prompt-families", createPromptFamiliesRouter(db));
 app.route("/api/projects/:projectId/context-files", createContextFilesRouter());
 app.route("/api/projects/:projectId/test-cases", createTestCasesRouter(db));
 app.route("/api/projects/:projectId/prompt-versions", createPromptVersionsRouter(db));
