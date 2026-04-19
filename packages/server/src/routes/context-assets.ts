@@ -35,6 +35,7 @@ const updateContextAssetProjectsSchema = z.object({
 });
 
 type ContextAssetRecord = typeof context_assets.$inferSelect;
+type ContextAssetSummary = Omit<ContextAssetRecord, "content">;
 
 function parseIdParam(value: string): number | null {
   const parsed = Number(value);
@@ -111,6 +112,11 @@ function filterByIds(assets: ContextAssetRecord[], ids: Set<number>): ContextAss
   return assets.filter((asset) => ids.has(asset.id));
 }
 
+function serializeContextAssetSummary(asset: ContextAssetRecord): ContextAssetSummary {
+  const { content: _content, ...summary } = asset;
+  return summary;
+}
+
 export function createContextAssetsRouter(db: DB) {
   const router = new Hono();
 
@@ -165,7 +171,7 @@ export function createContextAssetsRouter(db: DB) {
     }
 
     assets.sort((a, b) => b.updated_at - a.updated_at || a.id - b.id);
-    return c.json(assets);
+    return c.json(assets.map(serializeContextAssetSummary));
   });
 
   router.post("/", zValidator("json", createContextAssetSchema), async (c) => {

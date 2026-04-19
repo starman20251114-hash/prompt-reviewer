@@ -20,6 +20,8 @@ type MockContextAsset = {
   updated_at: number;
 };
 
+type MockContextAssetSummary = Omit<MockContextAsset, "content">;
+
 function buildApp(db: unknown) {
   const app = new Hono();
   app.route("/api/context-assets", createContextAssetsRouter(db as DB));
@@ -37,6 +39,16 @@ const sampleAsset: MockContextAsset = {
   updated_at: 1000000,
 };
 
+const sampleAssetSummary: MockContextAssetSummary = {
+  id: 1,
+  name: "refund-policy.md",
+  path: "policies/refund-policy.md",
+  mime_type: "text/markdown",
+  content_hash: "sha256:old",
+  created_at: 1000000,
+  updated_at: 1000000,
+};
+
 describe("GET /api/context-assets", () => {
   it("一覧を 200 で返す", async () => {
     const db = {
@@ -48,7 +60,21 @@ describe("GET /api/context-assets", () => {
     const res = await buildApp(db).request("/api/context-assets");
 
     expect(res.status).toBe(200);
-    await expect(res.json()).resolves.toEqual([sampleAsset]);
+    await expect(res.json()).resolves.toEqual([sampleAssetSummary]);
+  });
+
+  it("一覧レスポンスに content を含めない", async () => {
+    const db = {
+      select: () => ({
+        from: () => Promise.resolve([sampleAsset]),
+      }),
+    };
+
+    const res = await buildApp(db).request("/api/context-assets");
+
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as Array<Record<string, unknown>>;
+    expect(body[0]).not.toHaveProperty("content");
   });
 
   it("q で name / path を部分一致検索できる", async () => {
@@ -70,7 +96,7 @@ describe("GET /api/context-assets", () => {
     const res = await buildApp(db).request("/api/context-assets?q=refund");
 
     expect(res.status).toBe(200);
-    const body = (await res.json()) as MockContextAsset[];
+    const body = (await res.json()) as MockContextAssetSummary[];
     expect(body).toHaveLength(1);
     expect(body[0]?.id).toBe(1);
   });
@@ -111,7 +137,7 @@ describe("GET /api/context-assets", () => {
     const res = await app.request("/api/context-assets?project_id=10");
 
     expect(res.status).toBe(200);
-    const body = (await res.json()) as MockContextAsset[];
+    const body = (await res.json()) as MockContextAssetSummary[];
     expect(body).toHaveLength(1);
     expect(body[0]?.id).toBe(1);
   });
@@ -136,7 +162,7 @@ describe("GET /api/context-assets", () => {
     const res = await app.request("/api/context-assets?unclassified=true");
 
     expect(res.status).toBe(200);
-    const body = (await res.json()) as MockContextAsset[];
+    const body = (await res.json()) as MockContextAssetSummary[];
     expect(body).toHaveLength(1);
     expect(body[0]?.id).toBe(2);
   });
@@ -162,7 +188,7 @@ describe("GET /api/context-assets", () => {
     const res = await app.request("/api/context-assets?linked_to=test_case:12");
 
     expect(res.status).toBe(200);
-    const body = (await res.json()) as MockContextAsset[];
+    const body = (await res.json()) as MockContextAssetSummary[];
     expect(body).toHaveLength(1);
     expect(body[0]?.id).toBe(2);
   });
@@ -188,7 +214,7 @@ describe("GET /api/context-assets", () => {
     const res = await app.request("/api/context-assets?linked_to=prompt_family:4");
 
     expect(res.status).toBe(200);
-    const body = (await res.json()) as MockContextAsset[];
+    const body = (await res.json()) as MockContextAssetSummary[];
     expect(body).toHaveLength(1);
     expect(body[0]?.id).toBe(1);
   });
