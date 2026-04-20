@@ -181,6 +181,21 @@ function parseStructuredOutput(json: string | null): StructuredOutput | null {
   return JSON.parse(json) as StructuredOutput;
 }
 
+function extractJsonFromText(text: string): unknown {
+  // まず直接パースを試みる
+  try {
+    return JSON.parse(text);
+  } catch {
+    // ignore
+  }
+  // ```json ... ``` または ``` ... ``` のコードブロックを除去してパース
+  const codeBlockMatch = text.match(/```(?:json)?\s*([\s\S]*?)```/);
+  if (codeBlockMatch?.[1]) {
+    return JSON.parse(codeBlockMatch[1].trim());
+  }
+  throw new SyntaxError("Failed to parse as JSON");
+}
+
 function parseStructuredItems(
   value: unknown,
 ): z.infer<typeof structuredOutputSchema>["items"] | null {
@@ -912,7 +927,7 @@ export function createRunsRouter(db: DB, options: RunsRouterOptions = {}) {
 
       let parsedFinalAnswer: unknown;
       try {
-        parsedFinalAnswer = JSON.parse(lastAssistantMessage.content);
+        parsedFinalAnswer = extractJsonFromText(lastAssistantMessage.content);
       } catch {
         return c.json({ error: "Failed to parse assistant message as JSON" }, 400);
       }

@@ -224,11 +224,13 @@ function AnnotationExtractPanel({
   const lastAssistantMsg = [...run.conversation].reverse().find((m) => m.role === "assistant");
   const lastMsgIsJson = (() => {
     if (!lastAssistantMsg) return false;
+    const text = lastAssistantMsg.content;
     try {
-      JSON.parse(lastAssistantMsg.content);
+      JSON.parse(text);
       return true;
     } catch {
-      return false;
+      // コードブロック内のJSONも許容
+      return /```(?:json)?\s*[\s\S]*?```/.test(text);
     }
   })();
   const canExtract = hasStructuredOutput || lastMsgIsJson;
