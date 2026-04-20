@@ -20,7 +20,14 @@ async function fetchJson<T>(path: string, init?: RequestInit): Promise<T> {
   });
 
   if (!response.ok) {
-    throw new ApiError(response.status, `API error: ${response.status} ${response.statusText}`);
+    let message = `API error: ${response.status} ${response.statusText}`;
+    try {
+      const body = (await response.json()) as { error?: string };
+      if (body.error) message = body.error;
+    } catch {
+      // ignore parse error
+    }
+    throw new ApiError(response.status, message);
   }
 
   if (response.status === 204 || response.headers.get("Content-Length") === "0") {

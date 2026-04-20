@@ -1117,6 +1117,25 @@
   cursor: not-allowed;
 }
 
+.annotationWarning {
+  margin: 0 0 8px;
+  padding: 8px 10px;
+  font-size: 12px;
+  background: #fff8e1;
+  border: 1px solid #ffe082;
+  border-radius: 4px;
+  color: #795548;
+  line-height: 1.5;
+}
+
+.annotationWarning code {
+  font-family: monospace;
+  font-size: 11px;
+  background: rgba(0, 0, 0, 0.06);
+  padding: 1px 3px;
+  border-radius: 2px;
+}
+
 .annotationError {
   margin: 8px 0 0;
   font-size: 12px;

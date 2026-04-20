@@ -220,6 +220,19 @@ function AnnotationExtractPanel({
   } | null>(null);
   const [extractError, setExtractError] = useState<string | null>(null);
 
+  const hasStructuredOutput = run.structured_output !== null;
+  const lastAssistantMsg = [...run.conversation].reverse().find((m) => m.role === "assistant");
+  const lastMsgIsJson = (() => {
+    if (!lastAssistantMsg) return false;
+    try {
+      JSON.parse(lastAssistantMsg.content);
+      return true;
+    } catch {
+      return false;
+    }
+  })();
+  const canExtract = hasStructuredOutput || lastMsgIsJson;
+
   const extractMutation = useMutation({
     mutationFn: () => {
       if (selectedTaskId === "") throw new Error("タスクを選択してください");
@@ -238,6 +251,13 @@ function AnnotationExtractPanel({
 
   return (
     <div className={styles.annotationPanel}>
+      {!canExtract && (
+        <p className={styles.annotationWarning}>
+          このRunのアシスタント応答は平文テキストです。抽出にはLLMがJSON形式 （
+          <code>{`{"items":[{"label","start_line","end_line","quote"}]}`}</code>）
+          で出力したRunが必要です。
+        </p>
+      )}
       <div className={styles.annotationPanelRow}>
         <label htmlFor={`task-select-${run.id}`} className={styles.annotationLabel}>
           アノテーションタスク
@@ -262,7 +282,7 @@ function AnnotationExtractPanel({
         <button
           type="button"
           onClick={() => extractMutation.mutate()}
-          disabled={selectedTaskId === "" || extractMutation.isPending}
+          disabled={selectedTaskId === "" || extractMutation.isPending || !canExtract}
           className={styles.btnAnnotationExtract}
         >
           {extractMutation.isPending ? "抽出中..." : "抽出実行"}
