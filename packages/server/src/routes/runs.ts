@@ -8,6 +8,9 @@ import {
   type PromptExecutionStepDefinition,
   type PromptWorkflowDefinition,
   type StructuredOutput,
+  annotation_candidates,
+  annotation_labels,
+  annotation_tasks,
   execution_profiles,
   prompt_version_projects,
   prompt_versions,
@@ -769,6 +772,180 @@ export function createRunsRouter(db: DB, options: RunsRouterOptions = {}) {
     }
 
     return c.json(serializeRun(updated));
+  });
+
+  // POST /api/projects/:projectId/runs/:id/candidates/extract - annotation_candidates を抽出して保存
+  router.post("/:id/candidates/extract", async (c) => {
+    const projectId = parseIntParam(c.req.param("projectId"));
+    const id = parseIntParam(c.req.param("id"));
+
+    if (projectId === null || id === null) {
+      return c.json({ error: "Invalid ID" }, 400);
+    }
+
+    let body: { annotation_task_id: number };
+    try {
+      body = (await c.req.json()) as { annotation_task_id: number };
+    } catch {
+      return c.json({ error: "Invalid JSON body" }, 400);
+    }
+
+    const parsedBody = z
+      .object({ annotation_task_id: z.number().int().positive() })
+      .safeParse(body);
+    if (!parsedBody.success) {
+      return c.json({ error: "annotation_task_id must be a positive integer" }, 400);
+    }
+    const { annotation_task_id } = parsedBody.data;
+
+    // run が存在し、該当プロジェクトに属することを確認
+    const versionIds = await fetchVersionIdsByProject(db, projectId);
+    if (versionIds.length === 0) {
+      return c.json({ error: "Run not found" }, 404);
+    }
+
+    const [run] = await db
+      .select()
+      .from(runs)
+      .where(
+        and(
+          eq(runs.id, id),
+          eq(runs.project_id, projectId),
+          inArray(runs.prompt_version_id, versionIds),
+        ),
+      );
+
+    if (!run) {
+      return c.json({ error: "Run not found" }, 404);
+    }
+
+    // annotation_task が存在することを確認
+    const [task] = await db
+      .select()
+      .from(annotation_tasks)
+      .where(eq(annotation_tasks.id, annotation_task_id));
+
+    if (!task) {
+      return c.json({ error: "Annotation task not found" }, 404);
+    }
+
+    // annotation_task に紐づく有効な label keys を取得
+    const labels = await db
+      .select({ key: annotation_labels.key })
+      .from(annotation_labels)
+      .where(eq(annotation_labels.annotation_task_id, annotation_task_id));
+    const validLabelKeys = new Set(labels.map((l) => l.key));
+
+    // ソースタイプ決定とアイテム抽出
+    let sourceType: "structured_json" | "final_answer";
+    let items: z.infer<typeof structuredOutputSchema>["items"];
+
+    const parsedStructuredOutput = parseStructuredOutput(run.structured_output);
+
+    if (parsedStructuredOutput !== null) {
+      // structured_output が存在する場合
+      sourceType = "structured_json";
+      const parsed = structuredOutputSchema.safeParse(parsedStructuredOutput);
+      if (!parsed.success) {
+        return c.json({ error: "structured_output has invalid format" }, 400);
+      }
+      items = parsed.data.items;
+    } else {
+      // final_answer: 最後の assistant メッセージを JSON としてパース
+      sourceType = "final_answer";
+      const conversation = parseConversation(run.conversation);
+      const lastAssistantMessage = [...conversation].reverse().find((m) => m.role === "assistant");
+      if (!lastAssistantMessage) {
+        return c.json({ error: "No assistant message found in conversation" }, 400);
+      }
+
+      let parsed: unknown;
+      try {
+        parsed = JSON.parse(lastAssistantMessage.content);
+      } catch {
+        return c.json({ error: "Failed to parse assistant message as JSON" }, 400);
+      }
+
+      const parsedItems = structuredOutputSchema.safeParse(parsed);
+      if (!parsedItems.success) {
+        return c.json(
+          {
+            error:
+              "Assistant message JSON has invalid format (missing items field or invalid schema)",
+          },
+          400,
+        );
+      }
+      items = parsedItems.data.items;
+    }
+
+    // label の存在チェック
+    for (const item of items) {
+      if (!validLabelKeys.has(item.label)) {
+        return c.json(
+          { error: `Label "${item.label}" is not valid for this annotation task` },
+          400,
+        );
+      }
+    }
+
+    // line range チェック
+    for (const item of items) {
+      if (item.start_line > item.end_line) {
+        return c.json(
+          {
+            error: `start_line (${item.start_line}) must not be greater than end_line (${item.end_line})`,
+          },
+          400,
+        );
+      }
+    }
+
+    // 重複チェック: 同一 run / task / source からの重複取り込みを防ぐ
+    const [existing] = await db
+      .select({ id: annotation_candidates.id })
+      .from(annotation_candidates)
+      .where(
+        and(
+          eq(annotation_candidates.run_id, id),
+          eq(annotation_candidates.annotation_task_id, annotation_task_id),
+          eq(annotation_candidates.source_type, sourceType),
+        ),
+      );
+
+    if (existing) {
+      return c.json(
+        { error: "Candidates already extracted for this run/task/source combination" },
+        409,
+      );
+    }
+
+    const targetTextRef = `test_case:${run.test_case_id}`;
+    const now = Date.now();
+
+    const inserted = await db
+      .insert(annotation_candidates)
+      .values(
+        items.map((item) => ({
+          run_id: id,
+          annotation_task_id,
+          target_text_ref: targetTextRef,
+          source_type: sourceType,
+          source_step_id: null,
+          label: item.label,
+          start_line: item.start_line,
+          end_line: item.end_line,
+          quote: item.quote,
+          rationale: item.rationale ?? null,
+          status: "pending" as const,
+          note: null,
+          created_at: now,
+          updated_at: now,
+        })),
+      )
+      .returning();
+
+    return c.json(inserted, 201);
   });
 
   // PATCH /api/projects/:projectId/runs/:id/discard - Run破棄
