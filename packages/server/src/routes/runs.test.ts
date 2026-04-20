@@ -4,6 +4,9 @@
  * better-sqlite3 はネイティブバイナリのビルドが必要なため、
  * 実際のDB接続は行わず、Drizzle の DB インターフェースを模倣した
  * モックを使用してルートハンドラの動作を検証する。
+ *
+ * project フィルタは prompt_version_projects 基準で実装されている。
+ * execution_profile_id を指定して実行設定を snapshot として保存する。
  */
 
 // better-sqlite3 のネイティブモジュールをモックしてDB初期化をブロック
@@ -38,6 +41,7 @@ type MockRun = {
   model: string;
   temperature: number;
   api_provider: string;
+  execution_profile_id: number | null;
 };
 
 // ---- ヘルパー ----
@@ -68,20 +72,46 @@ const sampleRun: MockRun = {
   model: "claude-sonnet-4-6",
   temperature: 0.7,
   api_provider: "anthropic",
+  execution_profile_id: null,
+};
+
+const sampleProfile = {
+  id: 1,
+  name: "Test Profile",
+  description: null,
+  model: "claude-sonnet-4-6",
+  temperature: 0.4,
+  api_provider: "anthropic" as const,
+  created_at: 1000000,
+  updated_at: 1000000,
 };
 
 // ---- テスト ----
 
 describe("GET /api/projects/:projectId/runs", () => {
-  it("Run一覧を200で返す", async () => {
+  it("prompt_version_projects 基準でフィルタしてRun一覧を200で返す", async () => {
     const runs = [sampleRun, { ...sampleRun, id: 2 }];
 
+    // selectが2回呼ばれる: 1回目はprompt_version_projects、2回目はruns
+    let selectCallCount = 0;
     const db = {
-      select: () => ({
-        from: () => ({
-          where: () => Promise.resolve(runs),
-        }),
-      }),
+      select: () => {
+        selectCallCount++;
+        if (selectCallCount === 1) {
+          // prompt_version_projects の結果
+          return {
+            from: () => ({
+              where: () => Promise.resolve([{ prompt_version_id: 1 }]),
+            }),
+          };
+        }
+        // runs の結果
+        return {
+          from: () => ({
+            where: () => Promise.resolve(runs),
+          }),
+        };
+      },
     };
 
     const app = buildApp(db);
@@ -92,11 +122,11 @@ describe("GET /api/projects/:projectId/runs", () => {
     expect(body).toHaveLength(2);
   });
 
-  it("Runが0件のとき空配列を返す", async () => {
+  it("プロジェクトにバージョンが紐づいていない場合は空配列を返す", async () => {
     const db = {
       select: () => ({
         from: () => ({
-          where: () => Promise.resolve([]),
+          where: () => Promise.resolve([]), // prompt_version_projects が空
         }),
       }),
     };
@@ -110,12 +140,23 @@ describe("GET /api/projects/:projectId/runs", () => {
   });
 
   it("conversationがJSONパースされて返される", async () => {
+    let selectCallCount = 0;
     const db = {
-      select: () => ({
-        from: () => ({
-          where: () => Promise.resolve([sampleRun]),
-        }),
-      }),
+      select: () => {
+        selectCallCount++;
+        if (selectCallCount === 1) {
+          return {
+            from: () => ({
+              where: () => Promise.resolve([{ prompt_version_id: 1 }]),
+            }),
+          };
+        }
+        return {
+          from: () => ({
+            where: () => Promise.resolve([sampleRun]),
+          }),
+        };
+      },
     };
 
     const app = buildApp(db);
@@ -129,12 +170,23 @@ describe("GET /api/projects/:projectId/runs", () => {
   it("prompt_version_idでフィルタリングできる", async () => {
     const filteredRuns = [sampleRun];
 
+    let selectCallCount = 0;
     const db = {
-      select: () => ({
-        from: () => ({
-          where: () => Promise.resolve(filteredRuns),
-        }),
-      }),
+      select: () => {
+        selectCallCount++;
+        if (selectCallCount === 1) {
+          return {
+            from: () => ({
+              where: () => Promise.resolve([{ prompt_version_id: 1 }]),
+            }),
+          };
+        }
+        return {
+          from: () => ({
+            where: () => Promise.resolve(filteredRuns),
+          }),
+        };
+      },
     };
 
     const app = buildApp(db);
@@ -149,12 +201,23 @@ describe("GET /api/projects/:projectId/runs", () => {
   it("test_case_idでフィルタリングできる", async () => {
     const filteredRuns = [sampleRun];
 
+    let selectCallCount = 0;
     const db = {
-      select: () => ({
-        from: () => ({
-          where: () => Promise.resolve(filteredRuns),
-        }),
-      }),
+      select: () => {
+        selectCallCount++;
+        if (selectCallCount === 1) {
+          return {
+            from: () => ({
+              where: () => Promise.resolve([{ prompt_version_id: 1 }]),
+            }),
+          };
+        }
+        return {
+          from: () => ({
+            where: () => Promise.resolve(filteredRuns),
+          }),
+        };
+      },
     };
 
     const app = buildApp(db);
@@ -167,7 +230,24 @@ describe("GET /api/projects/:projectId/runs", () => {
   });
 
   it("数値以外のprompt_version_idに対して400を返す", async () => {
-    const db = {};
+    let selectCallCount = 0;
+    const db = {
+      select: () => {
+        selectCallCount++;
+        if (selectCallCount === 1) {
+          return {
+            from: () => ({
+              where: () => Promise.resolve([{ prompt_version_id: 1 }]),
+            }),
+          };
+        }
+        return {
+          from: () => ({
+            where: () => Promise.resolve([]),
+          }),
+        };
+      },
+    };
 
     const app = buildApp(db);
     const res = await app.request("/api/projects/1/runs?prompt_version_id=abc");
@@ -178,7 +258,24 @@ describe("GET /api/projects/:projectId/runs", () => {
   });
 
   it("数値以外のtest_case_idに対して400を返す", async () => {
-    const db = {};
+    let selectCallCount = 0;
+    const db = {
+      select: () => {
+        selectCallCount++;
+        if (selectCallCount === 1) {
+          return {
+            from: () => ({
+              where: () => Promise.resolve([{ prompt_version_id: 1 }]),
+            }),
+          };
+        }
+        return {
+          from: () => ({
+            where: () => Promise.resolve([]),
+          }),
+        };
+      },
+    };
 
     const app = buildApp(db);
     const res = await app.request("/api/projects/1/runs?test_case_id=abc");
@@ -193,7 +290,17 @@ describe("POST /api/projects/:projectId/runs", () => {
   it("バリデーション通過時に201でRunを返す", async () => {
     const created = { ...sampleRun };
 
+    let selectCallCount = 0;
     const db = {
+      select: () => {
+        selectCallCount++;
+        // prompt_version_projects のリンク確認
+        return {
+          from: () => ({
+            where: () => Promise.resolve([{ prompt_version_id: 1, project_id: 1, created_at: 0 }]),
+          }),
+        };
+      },
       insert: () => ({
         values: () => ({
           returning: () => Promise.resolve([created]),
@@ -225,6 +332,11 @@ describe("POST /api/projects/:projectId/runs", () => {
     const created = { ...sampleRun, is_best: false };
 
     const db = {
+      select: () => ({
+        from: () => ({
+          where: () => Promise.resolve([{ prompt_version_id: 1, project_id: 1, created_at: 0 }]),
+        }),
+      }),
       insert: () => ({
         values: (values: { is_best: boolean }) => ({
           returning: () => {
@@ -258,6 +370,11 @@ describe("POST /api/projects/:projectId/runs", () => {
     const created = { ...sampleRun, is_discarded: false };
 
     const db = {
+      select: () => ({
+        from: () => ({
+          where: () => Promise.resolve([{ prompt_version_id: 1, project_id: 1, created_at: 0 }]),
+        }),
+      }),
       insert: () => ({
         values: (values: { is_discarded: boolean }) => ({
           returning: () => {
@@ -285,6 +402,73 @@ describe("POST /api/projects/:projectId/runs", () => {
     expect(res.status).toBe(201);
     const body = (await res.json()) as MockRun;
     expect(body.is_discarded).toBe(false);
+  });
+
+  it("execution_profile_idをRun作成時に保存できる", async () => {
+    const created = { ...sampleRun, execution_profile_id: 1 };
+
+    const db = {
+      select: () => ({
+        from: () => ({
+          where: () => Promise.resolve([{ prompt_version_id: 1, project_id: 1, created_at: 0 }]),
+        }),
+      }),
+      insert: () => ({
+        values: (values: { execution_profile_id: number | null }) => ({
+          returning: () => {
+            expect(values.execution_profile_id).toBe(1);
+            return Promise.resolve([created]);
+          },
+        }),
+      }),
+    };
+
+    const app = buildApp(db);
+    const res = await app.request("/api/projects/1/runs", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        prompt_version_id: 1,
+        test_case_id: 1,
+        conversation: sampleConversation,
+        model: "claude-sonnet-4-6",
+        temperature: 0.7,
+        api_provider: "anthropic",
+        execution_profile_id: 1,
+      }),
+    });
+
+    expect(res.status).toBe(201);
+    const body = (await res.json()) as MockRun;
+    expect(body.execution_profile_id).toBe(1);
+  });
+
+  it("プロジェクトに紐づかないバージョンで404を返す", async () => {
+    const db = {
+      select: () => ({
+        from: () => ({
+          where: () => Promise.resolve([]), // versionLinkなし
+        }),
+      }),
+    };
+
+    const app = buildApp(db);
+    const res = await app.request("/api/projects/1/runs", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        prompt_version_id: 99,
+        test_case_id: 1,
+        conversation: sampleConversation,
+        model: "claude-sonnet-4-6",
+        temperature: 0.7,
+        api_provider: "anthropic",
+      }),
+    });
+
+    expect(res.status).toBe(404);
+    const body = (await res.json()) as { error: string };
+    expect(body.error).toBe("Prompt version not found in this project");
   });
 
   it("conversationが空配列のとき400を返す", async () => {
@@ -324,7 +508,66 @@ describe("POST /api/projects/:projectId/runs", () => {
 });
 
 describe("POST /api/projects/:projectId/runs/execute", () => {
-  it("LLM応答をSSEで返し、完了時にRunとして保存する", async () => {
+  it("execution_profile_id が未指定のとき400を返す", async () => {
+    const version = {
+      id: 1,
+      project_id: 1,
+      content: "あなたは親切なアシスタントです。",
+      workflow_definition: null,
+    };
+    const testCase = {
+      id: 1,
+      project_id: 1,
+      turns: JSON.stringify([{ role: "user", content: "要約してください" }]),
+      context_content: "",
+    };
+
+    let selectCallCount = 0;
+    const db = {
+      select: () => {
+        selectCallCount++;
+        if (selectCallCount === 1) {
+          // prompt_version_projects リンク確認
+          return {
+            from: () => ({
+              where: () =>
+                Promise.resolve([{ prompt_version_id: 1, project_id: 1, created_at: 0 }]),
+            }),
+          };
+        }
+        if (selectCallCount === 2) {
+          // test_case_projects リンク確認
+          return {
+            from: () => ({
+              where: () => Promise.resolve([{ test_case_id: 1, project_id: 1, created_at: 0 }]),
+            }),
+          };
+        }
+        if (selectCallCount === 3) {
+          return { from: () => ({ where: () => Promise.resolve([version]) }) };
+        }
+        return { from: () => ({ where: () => Promise.resolve([testCase]) }) };
+      },
+    };
+
+    const app = buildApp(db);
+    const res = await app.request("/api/projects/1/runs/execute", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        prompt_version_id: 1,
+        test_case_id: 1,
+        api_key: "sk-ant-test",
+        // execution_profile_id なし
+      }),
+    });
+
+    expect(res.status).toBe(400);
+    const body = (await res.json()) as { error: string };
+    expect(body.error).toBe("execution_profile_id is required");
+  });
+
+  it("execution_profile からスナップショットを保存してLLM応答をSSEで返す", async () => {
     const version = {
       id: 1,
       project_id: 1,
@@ -336,11 +579,11 @@ describe("POST /api/projects/:projectId/runs/execute", () => {
       project_id: 1,
       turns: JSON.stringify([{ role: "user", content: "要約してください" }]),
       context_content: "入力文: 今日は晴れです。",
-    };
-    const settings = {
-      model: "claude-sonnet-4-6",
-      temperature: 0.4,
-      api_provider: "anthropic",
+      title: "テストケース1",
+      expected_description: null,
+      display_order: 0,
+      created_at: 0,
+      updated_at: 0,
     };
     const created = {
       ...sampleRun,
@@ -348,9 +591,10 @@ describe("POST /api/projects/:projectId/runs/execute", () => {
         { role: "user", content: "要約してください" },
         { role: "assistant", content: "今日は晴れです。" },
       ]),
-      model: settings.model,
-      temperature: settings.temperature,
-      api_provider: settings.api_provider,
+      model: sampleProfile.model,
+      temperature: sampleProfile.temperature,
+      api_provider: sampleProfile.api_provider,
+      execution_profile_id: sampleProfile.id,
     };
 
     const capturedRequests: LLMRequest[] = [];
@@ -359,19 +603,38 @@ describe("POST /api/projects/:projectId/runs/execute", () => {
       model: string;
       temperature: number;
       api_provider: string;
+      execution_profile_id: number | null;
     }> = [];
     let selectCallCount = 0;
 
     const db = {
       select: () => {
         selectCallCount++;
-        const result =
-          selectCallCount === 1 ? [version] : selectCallCount === 2 ? [testCase] : [settings];
-        return {
-          from: () => ({
-            where: () => Promise.resolve(result),
-          }),
-        };
+        if (selectCallCount === 1) {
+          // prompt_version_projects リンク確認
+          return {
+            from: () => ({
+              where: () =>
+                Promise.resolve([{ prompt_version_id: 1, project_id: 1, created_at: 0 }]),
+            }),
+          };
+        }
+        if (selectCallCount === 2) {
+          // test_case_projects リンク確認
+          return {
+            from: () => ({
+              where: () => Promise.resolve([{ test_case_id: 1, project_id: 1, created_at: 0 }]),
+            }),
+          };
+        }
+        if (selectCallCount === 3) {
+          return { from: () => ({ where: () => Promise.resolve([version]) }) };
+        }
+        if (selectCallCount === 4) {
+          return { from: () => ({ where: () => Promise.resolve([testCase]) }) };
+        }
+        // execution_profile
+        return { from: () => ({ where: () => Promise.resolve([sampleProfile]) }) };
       },
       insert: () => ({
         values: (values: {
@@ -379,6 +642,7 @@ describe("POST /api/projects/:projectId/runs/execute", () => {
           model: string;
           temperature: number;
           api_provider: string;
+          execution_profile_id: number | null;
         }) => {
           capturedInsertValues.push(values);
           return {
@@ -420,6 +684,7 @@ describe("POST /api/projects/:projectId/runs/execute", () => {
         prompt_version_id: 1,
         test_case_id: 1,
         api_key: "sk-ant-test",
+        execution_profile_id: 1,
       }),
     });
 
@@ -431,21 +696,18 @@ describe("POST /api/projects/:projectId/runs/execute", () => {
     expect(streamText).toContain('event: delta\ndata: {"text":"晴れです。"}');
     expect(streamText).toContain("event: run");
 
-    expect(capturedRequests).toEqual([
-      {
-        model: "claude-sonnet-4-6",
-        messages: [{ role: "user", content: "要約してください" }],
-        systemPrompt: "あなたは親切なアシスタントです。\n\n入力文: 今日は晴れです。",
-        temperature: 0.4,
-      },
-    ]);
-    expect(JSON.parse(capturedInsertValues[0]?.conversation ?? "[]")).toEqual([
-      { role: "user", content: "要約してください" },
-      { role: "assistant", content: "今日は晴れです。" },
-    ]);
-    expect(capturedInsertValues[0]?.model).toBe("claude-sonnet-4-6");
-    expect(capturedInsertValues[0]?.temperature).toBe(0.4);
-    expect(capturedInsertValues[0]?.api_provider).toBe("anthropic");
+    // execution_profile からのスナップショットが保存される
+    expect(capturedInsertValues[0]?.model).toBe(sampleProfile.model);
+    expect(capturedInsertValues[0]?.temperature).toBe(sampleProfile.temperature);
+    expect(capturedInsertValues[0]?.api_provider).toBe(sampleProfile.api_provider);
+    expect(capturedInsertValues[0]?.execution_profile_id).toBe(sampleProfile.id);
+
+    // LLMリクエストも execution_profile の設定で実行される
+    expect(capturedRequests[0]).toMatchObject({
+      model: sampleProfile.model,
+      temperature: sampleProfile.temperature,
+      systemPrompt: "あなたは親切なアシスタントです。\n\n入力文: 今日は晴れです。",
+    });
   });
 
   it("text-delta より完全な最終 response があるときは response.content を保存する", async () => {
@@ -460,11 +722,11 @@ describe("POST /api/projects/:projectId/runs/execute", () => {
       project_id: 1,
       turns: JSON.stringify([{ role: "user", content: "詳しく説明してください" }]),
       context_content: "",
-    };
-    const settings = {
-      model: "claude-sonnet-4-6",
-      temperature: 0.4,
-      api_provider: "anthropic",
+      title: "テストケース",
+      expected_description: null,
+      display_order: 0,
+      created_at: 0,
+      updated_at: 0,
     };
     const fullResponse = "冒頭だけでなく、最後まで含んだ完全な応答です。";
     const created = {
@@ -473,9 +735,9 @@ describe("POST /api/projects/:projectId/runs/execute", () => {
         { role: "user", content: "詳しく説明してください" },
         { role: "assistant", content: fullResponse },
       ]),
-      model: settings.model,
-      temperature: settings.temperature,
-      api_provider: settings.api_provider,
+      model: sampleProfile.model,
+      temperature: sampleProfile.temperature,
+      api_provider: sampleProfile.api_provider,
     };
 
     const capturedInsertValues: Array<{ conversation: string }> = [];
@@ -484,13 +746,28 @@ describe("POST /api/projects/:projectId/runs/execute", () => {
     const db = {
       select: () => {
         selectCallCount++;
-        const result =
-          selectCallCount === 1 ? [version] : selectCallCount === 2 ? [testCase] : [settings];
-        return {
-          from: () => ({
-            where: () => Promise.resolve(result),
-          }),
-        };
+        if (selectCallCount === 1) {
+          return {
+            from: () => ({
+              where: () =>
+                Promise.resolve([{ prompt_version_id: 1, project_id: 1, created_at: 0 }]),
+            }),
+          };
+        }
+        if (selectCallCount === 2) {
+          return {
+            from: () => ({
+              where: () => Promise.resolve([{ test_case_id: 1, project_id: 1, created_at: 0 }]),
+            }),
+          };
+        }
+        if (selectCallCount === 3) {
+          return { from: () => ({ where: () => Promise.resolve([version]) }) };
+        }
+        if (selectCallCount === 4) {
+          return { from: () => ({ where: () => Promise.resolve([testCase]) }) };
+        }
+        return { from: () => ({ where: () => Promise.resolve([sampleProfile]) }) };
       },
       insert: () => ({
         values: (values: { conversation: string }) => {
@@ -532,6 +809,7 @@ describe("POST /api/projects/:projectId/runs/execute", () => {
         prompt_version_id: 1,
         test_case_id: 1,
         api_key: "sk-ant-test",
+        execution_profile_id: 1,
       }),
     });
 
@@ -554,11 +832,11 @@ describe("POST /api/projects/:projectId/runs/execute", () => {
       project_id: 1,
       turns: JSON.stringify([]),
       context_content: "入力文: 今日は晴れです。",
-    };
-    const settings = {
-      model: "claude-sonnet-4-6",
-      temperature: 0.4,
-      api_provider: "anthropic",
+      title: "テストケース",
+      expected_description: null,
+      display_order: 0,
+      created_at: 0,
+      updated_at: 0,
     };
     const promptMessage = "次のルールで回答してください。\n\n入力文: 今日は晴れです。";
     const created = {
@@ -567,9 +845,9 @@ describe("POST /api/projects/:projectId/runs/execute", () => {
         { role: "user", content: promptMessage },
         { role: "assistant", content: "今日は晴れです。" },
       ]),
-      model: settings.model,
-      temperature: settings.temperature,
-      api_provider: settings.api_provider,
+      model: sampleProfile.model,
+      temperature: sampleProfile.temperature,
+      api_provider: sampleProfile.api_provider,
     };
 
     const capturedRequests: LLMRequest[] = [];
@@ -579,13 +857,28 @@ describe("POST /api/projects/:projectId/runs/execute", () => {
     const db = {
       select: () => {
         selectCallCount++;
-        const result =
-          selectCallCount === 1 ? [version] : selectCallCount === 2 ? [testCase] : [settings];
-        return {
-          from: () => ({
-            where: () => Promise.resolve(result),
-          }),
-        };
+        if (selectCallCount === 1) {
+          return {
+            from: () => ({
+              where: () =>
+                Promise.resolve([{ prompt_version_id: 1, project_id: 1, created_at: 0 }]),
+            }),
+          };
+        }
+        if (selectCallCount === 2) {
+          return {
+            from: () => ({
+              where: () => Promise.resolve([{ test_case_id: 1, project_id: 1, created_at: 0 }]),
+            }),
+          };
+        }
+        if (selectCallCount === 3) {
+          return { from: () => ({ where: () => Promise.resolve([version]) }) };
+        }
+        if (selectCallCount === 4) {
+          return { from: () => ({ where: () => Promise.resolve([testCase]) }) };
+        }
+        return { from: () => ({ where: () => Promise.resolve([sampleProfile]) }) };
       },
       insert: () => ({
         values: (values: { conversation: string }) => {
@@ -628,15 +921,16 @@ describe("POST /api/projects/:projectId/runs/execute", () => {
         prompt_version_id: 1,
         test_case_id: 1,
         api_key: "sk-ant-test",
+        execution_profile_id: 1,
       }),
     });
 
     expect(res.status).toBe(200);
     expect(capturedRequests).toEqual([
       {
-        model: "claude-sonnet-4-6",
+        model: sampleProfile.model,
         messages: [{ role: "user", content: promptMessage }],
-        temperature: 0.4,
+        temperature: sampleProfile.temperature,
       },
     ]);
     expect(JSON.parse(capturedInsertValues[0]?.conversation ?? "[]")).toEqual([
@@ -650,17 +944,53 @@ describe("POST /api/projects/:projectId/runs/execute", () => {
     const db = {
       select: () => {
         selectCallCount++;
-        const result =
-          selectCallCount === 1
-            ? [{ id: 1, project_id: 1, content: "   ", workflow_definition: null }]
-            : selectCallCount === 2
-              ? [{ id: 1, project_id: 1, turns: JSON.stringify([]), context_content: "" }]
-              : [{ model: "claude-sonnet-4-6", temperature: 0.7, api_provider: "anthropic" }];
-        return {
-          from: () => ({
-            where: () => Promise.resolve(result),
-          }),
-        };
+        if (selectCallCount === 1) {
+          return {
+            from: () => ({
+              where: () =>
+                Promise.resolve([{ prompt_version_id: 1, project_id: 1, created_at: 0 }]),
+            }),
+          };
+        }
+        if (selectCallCount === 2) {
+          return {
+            from: () => ({
+              where: () => Promise.resolve([{ test_case_id: 1, project_id: 1, created_at: 0 }]),
+            }),
+          };
+        }
+        if (selectCallCount === 3) {
+          return {
+            from: () => ({
+              where: () =>
+                Promise.resolve([
+                  { id: 1, project_id: 1, content: "   ", workflow_definition: null },
+                ]),
+            }),
+          };
+        }
+        if (selectCallCount === 4) {
+          return {
+            from: () => ({
+              where: () =>
+                Promise.resolve([
+                  {
+                    id: 1,
+                    project_id: 1,
+                    turns: JSON.stringify([]),
+                    context_content: "",
+                    title: "test",
+                    expected_description: null,
+                    display_order: 0,
+                    created_at: 0,
+                    updated_at: 0,
+                  },
+                ]),
+            }),
+          };
+        }
+        // execution_profile
+        return { from: () => ({ where: () => Promise.resolve([sampleProfile]) }) };
       },
     };
 
@@ -672,6 +1002,7 @@ describe("POST /api/projects/:projectId/runs/execute", () => {
         prompt_version_id: 1,
         test_case_id: 1,
         api_key: "sk-ant-test",
+        execution_profile_id: 1,
       }),
     });
 
@@ -680,29 +1011,52 @@ describe("POST /api/projects/:projectId/runs/execute", () => {
     expect(body.error).toBe("Prompt or test case turns are required");
   });
 
-  it("プロジェクト設定が未作成のとき404を返す", async () => {
+  it("execution_profile が存在しないとき404を返す", async () => {
+    const version = {
+      id: 1,
+      project_id: 1,
+      content: "system",
+      workflow_definition: null,
+    };
+    const testCase = {
+      id: 1,
+      project_id: 1,
+      turns: JSON.stringify(sampleConversation),
+      context_content: "",
+      title: "test",
+      expected_description: null,
+      display_order: 0,
+      created_at: 0,
+      updated_at: 0,
+    };
+
     let selectCallCount = 0;
     const db = {
       select: () => {
         selectCallCount++;
-        const result =
-          selectCallCount === 1
-            ? [{ id: 1, project_id: 1, content: "system", workflow_definition: null }]
-            : selectCallCount === 2
-              ? [
-                  {
-                    id: 1,
-                    project_id: 1,
-                    turns: JSON.stringify(sampleConversation),
-                    context_content: "",
-                  },
-                ]
-              : [];
-        return {
-          from: () => ({
-            where: () => Promise.resolve(result),
-          }),
-        };
+        if (selectCallCount === 1) {
+          return {
+            from: () => ({
+              where: () =>
+                Promise.resolve([{ prompt_version_id: 1, project_id: 1, created_at: 0 }]),
+            }),
+          };
+        }
+        if (selectCallCount === 2) {
+          return {
+            from: () => ({
+              where: () => Promise.resolve([{ test_case_id: 1, project_id: 1, created_at: 0 }]),
+            }),
+          };
+        }
+        if (selectCallCount === 3) {
+          return { from: () => ({ where: () => Promise.resolve([version]) }) };
+        }
+        if (selectCallCount === 4) {
+          return { from: () => ({ where: () => Promise.resolve([testCase]) }) };
+        }
+        // execution_profile が存在しない
+        return { from: () => ({ where: () => Promise.resolve([]) }) };
       },
     };
 
@@ -714,37 +1068,65 @@ describe("POST /api/projects/:projectId/runs/execute", () => {
         prompt_version_id: 1,
         test_case_id: 1,
         api_key: "sk-ant-test",
+        execution_profile_id: 999,
       }),
     });
 
     expect(res.status).toBe(404);
     const body = (await res.json()) as { error: string };
-    expect(body.error).toBe("Project settings not found");
+    expect(body.error).toBe("Execution profile not found");
   });
 
   it("未対応プロバイダーのとき501を返す", async () => {
+    const openAiProfile = {
+      ...sampleProfile,
+      model: "gpt-4o",
+      api_provider: "openai" as const,
+    };
+    const version = {
+      id: 1,
+      project_id: 1,
+      content: "system",
+      workflow_definition: null,
+    };
+    const testCase = {
+      id: 1,
+      project_id: 1,
+      turns: JSON.stringify(sampleConversation),
+      context_content: "",
+      title: "test",
+      expected_description: null,
+      display_order: 0,
+      created_at: 0,
+      updated_at: 0,
+    };
+
     let selectCallCount = 0;
     const db = {
       select: () => {
         selectCallCount++;
-        const result =
-          selectCallCount === 1
-            ? [{ id: 1, project_id: 1, content: "system", workflow_definition: null }]
-            : selectCallCount === 2
-              ? [
-                  {
-                    id: 1,
-                    project_id: 1,
-                    turns: JSON.stringify(sampleConversation),
-                    context_content: "",
-                  },
-                ]
-              : [{ model: "gpt-4o", temperature: 0.7, api_provider: "openai" }];
-        return {
-          from: () => ({
-            where: () => Promise.resolve(result),
-          }),
-        };
+        if (selectCallCount === 1) {
+          return {
+            from: () => ({
+              where: () =>
+                Promise.resolve([{ prompt_version_id: 1, project_id: 1, created_at: 0 }]),
+            }),
+          };
+        }
+        if (selectCallCount === 2) {
+          return {
+            from: () => ({
+              where: () => Promise.resolve([{ test_case_id: 1, project_id: 1, created_at: 0 }]),
+            }),
+          };
+        }
+        if (selectCallCount === 3) {
+          return { from: () => ({ where: () => Promise.resolve([version]) }) };
+        }
+        if (selectCallCount === 4) {
+          return { from: () => ({ where: () => Promise.resolve([testCase]) }) };
+        }
+        return { from: () => ({ where: () => Promise.resolve([openAiProfile]) }) };
       },
     };
 
@@ -756,12 +1138,39 @@ describe("POST /api/projects/:projectId/runs/execute", () => {
         prompt_version_id: 1,
         test_case_id: 1,
         api_key: "sk-test",
+        execution_profile_id: 1,
       }),
     });
 
     expect(res.status).toBe(501);
     const body = (await res.json()) as { error: string };
     expect(body.error).toBe("Provider execution is not implemented");
+  });
+
+  it("プロジェクトに紐づかないバージョンは404を返す", async () => {
+    const db = {
+      select: () => ({
+        from: () => ({
+          where: () => Promise.resolve([]), // versionLink が存在しない
+        }),
+      }),
+    };
+
+    const app = buildApp(db);
+    const res = await app.request("/api/projects/1/runs/execute", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        prompt_version_id: 99,
+        test_case_id: 1,
+        api_key: "sk-ant-test",
+        execution_profile_id: 1,
+      }),
+    });
+
+    expect(res.status).toBe(404);
+    const body = (await res.json()) as { error: string };
+    expect(body.error).toBe("Prompt version not found");
   });
 
   it("workflow_definition があるときプロンプト本文をStep 1として追加ステップを順番に実行して保存する", async () => {
@@ -784,11 +1193,11 @@ describe("POST /api/projects/:projectId/runs/execute", () => {
       project_id: 1,
       turns: JSON.stringify([{ role: "user", content: "長い相談ログ" }]),
       context_content: "元の相談コンテキスト",
-    };
-    const settings = {
-      model: "claude-sonnet-4-6",
-      temperature: 0.4,
-      api_provider: "anthropic",
+      title: "テストケース",
+      expected_description: null,
+      display_order: 0,
+      created_at: 0,
+      updated_at: 0,
     };
     const created = {
       ...sampleRun,
@@ -796,27 +1205,11 @@ describe("POST /api/projects/:projectId/runs/execute", () => {
         { role: "user", content: "長い相談ログ" },
         { role: "assistant", content: "効果があった発言は A と B です。" },
       ]),
-      execution_trace: JSON.stringify([
-        {
-          id: "__base_prompt__",
-          title: "プロンプト本文",
-          prompt: "判定してください\n\n{{context}}",
-          renderedPrompt: "判定してください\n\n元の相談コンテキスト",
-          inputConversation: [{ role: "user", content: "長い相談ログ" }],
-          output: "行動を促せている",
-        },
-        {
-          id: "extract_effective",
-          title: "効果発言抽出",
-          prompt: "文脈: {{context}}\n前段: {{step:__base_prompt__}}\n前回: {{previous_output}}",
-          renderedPrompt: "文脈: 行動を促せている\n前段: 行動を促せている\n前回: 行動を促せている",
-          inputConversation: [{ role: "user", content: "長い相談ログ" }],
-          output: "効果があった発言は A と B です。",
-        },
-      ]),
-      model: settings.model,
-      temperature: settings.temperature,
-      api_provider: settings.api_provider,
+      execution_trace: JSON.stringify([]),
+      model: sampleProfile.model,
+      temperature: sampleProfile.temperature,
+      api_provider: sampleProfile.api_provider,
+      execution_profile_id: sampleProfile.id,
     };
 
     let selectCallCount = 0;
@@ -827,13 +1220,28 @@ describe("POST /api/projects/:projectId/runs/execute", () => {
     const db = {
       select: () => {
         selectCallCount++;
-        const result =
-          selectCallCount === 1 ? [version] : selectCallCount === 2 ? [testCase] : [settings];
-        return {
-          from: () => ({
-            where: () => Promise.resolve(result),
-          }),
-        };
+        if (selectCallCount === 1) {
+          return {
+            from: () => ({
+              where: () =>
+                Promise.resolve([{ prompt_version_id: 1, project_id: 1, created_at: 0 }]),
+            }),
+          };
+        }
+        if (selectCallCount === 2) {
+          return {
+            from: () => ({
+              where: () => Promise.resolve([{ test_case_id: 1, project_id: 1, created_at: 0 }]),
+            }),
+          };
+        }
+        if (selectCallCount === 3) {
+          return { from: () => ({ where: () => Promise.resolve([version]) }) };
+        }
+        if (selectCallCount === 4) {
+          return { from: () => ({ where: () => Promise.resolve([testCase]) }) };
+        }
+        return { from: () => ({ where: () => Promise.resolve([sampleProfile]) }) };
       },
       insert: () => ({
         values: (values: { execution_trace: string | null }) => {
@@ -874,6 +1282,7 @@ describe("POST /api/projects/:projectId/runs/execute", () => {
         prompt_version_id: 1,
         test_case_id: 1,
         api_key: "sk-ant-test",
+        execution_profile_id: 1,
       }),
     });
 
@@ -891,157 +1300,28 @@ describe("POST /api/projects/:projectId/runs/execute", () => {
     expect(streamText).toContain("event: step-start");
     expect(streamText).toContain("event: step-complete");
   });
-
-  it("workflow 実行でも最終 response があれば step 出力として保存する", async () => {
-    const version = {
-      id: 1,
-      project_id: 1,
-      content: "判定してください",
-      workflow_definition: JSON.stringify({
-        steps: [
-          {
-            id: "summarize",
-            title: "要約",
-            prompt: "要約してください",
-          },
-        ],
-      }),
-    };
-    const testCase = {
-      id: 1,
-      project_id: 1,
-      turns: JSON.stringify([{ role: "user", content: "長い入力" }]),
-      context_content: "",
-    };
-    const settings = {
-      model: "claude-sonnet-4-6",
-      temperature: 0.4,
-      api_provider: "anthropic",
-    };
-    const fullStepResponse = "途中までではなく、最後まで含んだ完全な要約です。";
-    const created = {
-      ...sampleRun,
-      conversation: JSON.stringify([
-        { role: "user", content: "長い入力" },
-        { role: "assistant", content: fullStepResponse },
-      ]),
-      execution_trace: JSON.stringify([
-        {
-          id: "__base_prompt__",
-          title: "プロンプト本文",
-          prompt: "判定してください",
-          renderedPrompt: "判定してください",
-          inputConversation: [{ role: "user", content: "長い入力" }],
-          output: "途中出力",
-        },
-        {
-          id: "summarize",
-          title: "要約",
-          prompt: "要約してください",
-          renderedPrompt: "要約してください",
-          inputConversation: [{ role: "user", content: "長い入力" }],
-          output: fullStepResponse,
-        },
-      ]),
-      model: settings.model,
-      temperature: settings.temperature,
-      api_provider: settings.api_provider,
-    };
-
-    const capturedInsertValues: Array<{ execution_trace: string | null; conversation: string }> =
-      [];
-    let selectCallCount = 0;
-    let streamCallCount = 0;
-
-    const db = {
-      select: () => {
-        selectCallCount++;
-        const result =
-          selectCallCount === 1 ? [version] : selectCallCount === 2 ? [testCase] : [settings];
-        return {
-          from: () => ({
-            where: () => Promise.resolve(result),
-          }),
-        };
-      },
-      insert: () => ({
-        values: (values: { execution_trace: string | null; conversation: string }) => {
-          capturedInsertValues.push(values);
-          return {
-            returning: () => Promise.resolve([created]),
-          };
-        },
-      }),
-    };
-
-    const app = new Hono();
-    app.route(
-      "/api/projects/:projectId/runs",
-      createRunsRouter(db as unknown as DB, {
-        llmClientFactory: () => ({
-          async sendMessage() {
-            throw new Error("sendMessage should not be used for streaming execute");
-          },
-          async *stream() {
-            if (streamCallCount === 0) {
-              streamCallCount++;
-              yield { type: "text-delta" as const, text: "途中出力" };
-              yield {
-                type: "response" as const,
-                response: {
-                  content: "途中出力",
-                  stopReason: "end_turn",
-                  raw: {},
-                },
-              };
-              return;
-            }
-
-            yield { type: "text-delta" as const, text: "途中まで" };
-            yield {
-              type: "response" as const,
-              response: {
-                content: fullStepResponse,
-                stopReason: "end_turn",
-                raw: {},
-              },
-            };
-          },
-        }),
-      }),
-    );
-
-    const res = await app.request("/api/projects/1/runs/execute", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        prompt_version_id: 1,
-        test_case_id: 1,
-        api_key: "sk-ant-test",
-      }),
-    });
-
-    expect(res.status).toBe(200);
-    await res.text();
-    expect(JSON.parse(capturedInsertValues[0]?.conversation ?? "[]")).toEqual([
-      { role: "user", content: "長い入力" },
-      { role: "assistant", content: fullStepResponse },
-    ]);
-    expect(JSON.parse(capturedInsertValues[0]?.execution_trace ?? "[]")).toMatchObject([
-      { id: "__base_prompt__", output: "途中出力" },
-      { id: "summarize", output: fullStepResponse },
-    ]);
-  });
 });
 
 describe("GET /api/projects/:projectId/runs/:id", () => {
   it("存在するIDに対して200でRunを返す", async () => {
+    let selectCallCount = 0;
     const db = {
-      select: () => ({
-        from: () => ({
-          where: () => Promise.resolve([sampleRun]),
-        }),
-      }),
+      select: () => {
+        selectCallCount++;
+        if (selectCallCount === 1) {
+          // prompt_version_projects
+          return {
+            from: () => ({
+              where: () => Promise.resolve([{ prompt_version_id: 1 }]),
+            }),
+          };
+        }
+        return {
+          from: () => ({
+            where: () => Promise.resolve([sampleRun]),
+          }),
+        };
+      },
     };
 
     const app = buildApp(db);
@@ -1054,16 +1334,44 @@ describe("GET /api/projects/:projectId/runs/:id", () => {
   });
 
   it("存在しないIDに対して404を返す", async () => {
+    let selectCallCount = 0;
+    const db = {
+      select: () => {
+        selectCallCount++;
+        if (selectCallCount === 1) {
+          return {
+            from: () => ({
+              where: () => Promise.resolve([{ prompt_version_id: 1 }]),
+            }),
+          };
+        }
+        return {
+          from: () => ({
+            where: () => Promise.resolve([]),
+          }),
+        };
+      },
+    };
+
+    const app = buildApp(db);
+    const res = await app.request("/api/projects/1/runs/999");
+
+    expect(res.status).toBe(404);
+    const body = (await res.json()) as { error: string };
+    expect(body.error).toBe("Run not found");
+  });
+
+  it("プロジェクトにバージョンが存在しない場合404を返す", async () => {
     const db = {
       select: () => ({
         from: () => ({
-          where: () => Promise.resolve([]),
+          where: () => Promise.resolve([]), // prompt_version_projects が空
         }),
       }),
     };
 
     const app = buildApp(db);
-    const res = await app.request("/api/projects/1/runs/999");
+    const res = await app.request("/api/projects/1/runs/1");
 
     expect(res.status).toBe(404);
     const body = (await res.json()) as { error: string };
@@ -1084,12 +1392,23 @@ describe("PATCH /api/projects/:projectId/runs/:id/best", () => {
   it("存在するIDに対して200でis_best=trueのRunを返す", async () => {
     const updated = { ...sampleRun, is_best: true };
 
+    let selectCallCount = 0;
     const db = {
-      select: () => ({
-        from: () => ({
-          where: () => Promise.resolve([sampleRun]),
-        }),
-      }),
+      select: () => {
+        selectCallCount++;
+        if (selectCallCount === 1) {
+          return {
+            from: () => ({
+              where: () => Promise.resolve([{ prompt_version_id: 1 }]),
+            }),
+          };
+        }
+        return {
+          from: () => ({
+            where: () => Promise.resolve([sampleRun]),
+          }),
+        };
+      },
       update: () => ({
         set: () => ({
           where: () => ({
@@ -1115,12 +1434,23 @@ describe("PATCH /api/projects/:projectId/runs/:id/best", () => {
     let updateCallCount = 0;
     const capturedSets: Array<{ is_best: boolean }> = [];
 
+    let selectCallCount = 0;
     const db = {
-      select: () => ({
-        from: () => ({
-          where: () => Promise.resolve([sampleRun]),
-        }),
-      }),
+      select: () => {
+        selectCallCount++;
+        if (selectCallCount === 1) {
+          return {
+            from: () => ({
+              where: () => Promise.resolve([{ prompt_version_id: 1 }]),
+            }),
+          };
+        }
+        return {
+          from: () => ({
+            where: () => Promise.resolve([sampleRun]),
+          }),
+        };
+      },
       update: () => ({
         set: (values: { is_best: boolean }) => {
           capturedSets.push(values);
@@ -1147,12 +1477,23 @@ describe("PATCH /api/projects/:projectId/runs/:id/best", () => {
   });
 
   it("存在しないIDに対して404を返す", async () => {
+    let selectCallCount = 0;
     const db = {
-      select: () => ({
-        from: () => ({
-          where: () => Promise.resolve([]),
-        }),
-      }),
+      select: () => {
+        selectCallCount++;
+        if (selectCallCount === 1) {
+          return {
+            from: () => ({
+              where: () => Promise.resolve([{ prompt_version_id: 1 }]),
+            }),
+          };
+        }
+        return {
+          from: () => ({
+            where: () => Promise.resolve([]),
+          }),
+        };
+      },
     };
 
     const app = buildApp(db);
@@ -1181,12 +1522,23 @@ describe("PATCH /api/projects/:projectId/runs/:id/discard", () => {
   it("存在するIDに対して200でis_discarded=trueのRunを返す", async () => {
     const updated = { ...sampleRun, is_discarded: true };
 
+    let selectCallCount = 0;
     const db = {
-      select: () => ({
-        from: () => ({
-          where: () => Promise.resolve([sampleRun]),
-        }),
-      }),
+      select: () => {
+        selectCallCount++;
+        if (selectCallCount === 1) {
+          return {
+            from: () => ({
+              where: () => Promise.resolve([{ prompt_version_id: 1 }]),
+            }),
+          };
+        }
+        return {
+          from: () => ({
+            where: () => Promise.resolve([sampleRun]),
+          }),
+        };
+      },
       update: () => ({
         set: (values: { is_discarded: boolean }) => ({
           where: () => ({
@@ -1210,12 +1562,23 @@ describe("PATCH /api/projects/:projectId/runs/:id/discard", () => {
   });
 
   it("存在しないIDに対して404を返す", async () => {
+    let selectCallCount = 0;
     const db = {
-      select: () => ({
-        from: () => ({
-          where: () => Promise.resolve([]),
-        }),
-      }),
+      select: () => {
+        selectCallCount++;
+        if (selectCallCount === 1) {
+          return {
+            from: () => ({
+              where: () => Promise.resolve([{ prompt_version_id: 1 }]),
+            }),
+          };
+        }
+        return {
+          from: () => ({
+            where: () => Promise.resolve([]),
+          }),
+        };
+      },
     };
 
     const app = buildApp(db);

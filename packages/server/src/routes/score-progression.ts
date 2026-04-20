@@ -1,6 +1,13 @@
 import type { DB } from "@prompt-reviewer/core";
-import { prompt_versions, runs, scores, test_cases } from "@prompt-reviewer/core";
-import { and, eq } from "drizzle-orm";
+import {
+  prompt_version_projects,
+  prompt_versions,
+  runs,
+  scores,
+  test_case_projects,
+  test_cases,
+} from "@prompt-reviewer/core";
+import { and, eq, inArray } from "drizzle-orm";
 import { Hono } from "hono";
 
 /** Convert string or undefined to integer. Returns null when invalid or undefined. */
@@ -45,6 +52,8 @@ export type ScoreProgressionResponse = {
  * Returns aggregated score data for all versions in a project:
  * - versionSummaries: average scores per version (for the line chart)
  * - testCaseBreakdown: per-test-case scores broken down by version (for the table)
+ *
+ * project_id フィルタは prompt_version_projects / test_case_projects 基準で実装
  */
 export function createScoreProgressionRouter(db: DB) {
   const router = new Hono();
@@ -56,11 +65,26 @@ export function createScoreProgressionRouter(db: DB) {
       return c.json({ error: "Invalid projectId" }, 400);
     }
 
-    // Fetch all prompt versions for this project
+    // prompt_version_projects 経由でプロジェクトに紐づくバージョンIDを取得
+    const versionLinks = await db
+      .select({ prompt_version_id: prompt_version_projects.prompt_version_id })
+      .from(prompt_version_projects)
+      .where(eq(prompt_version_projects.project_id, projectId));
+
+    const versionIds = versionLinks.map((l) => l.prompt_version_id);
+
+    if (versionIds.length === 0) {
+      return c.json({
+        versionSummaries: [],
+        testCaseBreakdown: [],
+      } satisfies ScoreProgressionResponse);
+    }
+
+    // バージョン詳細を取得
     const versions = await db
       .select()
       .from(prompt_versions)
-      .where(eq(prompt_versions.project_id, projectId));
+      .where(inArray(prompt_versions.id, versionIds));
 
     if (versions.length === 0) {
       return c.json({
@@ -69,8 +93,8 @@ export function createScoreProgressionRouter(db: DB) {
       } satisfies ScoreProgressionResponse);
     }
 
-    // Fetch all runs for this project
-    const allRuns = await db.select().from(runs).where(eq(runs.project_id, projectId));
+    // prompt_version_projects 基準でRunを取得
+    const allRuns = await db.select().from(runs).where(inArray(runs.prompt_version_id, versionIds));
 
     if (allRuns.length === 0) {
       const emptySummaries: VersionSummary[] = versions.map((v) => ({
@@ -90,14 +114,14 @@ export function createScoreProgressionRouter(db: DB) {
 
     const runIds = allRuns.map((r) => r.id);
 
-    // Fetch all non-discarded scores for runs in this project
-    const allScores = await db.select().from(scores).where(eq(scores.is_discarded, false));
-
-    // Filter by run IDs belonging to this project (application-side IN filter)
-    const projectScores = allScores.filter((s) => runIds.includes(s.run_id));
+    // 対象Runのスコアを取得
+    const allScores = await db
+      .select()
+      .from(scores)
+      .where(and(inArray(scores.run_id, runIds), eq(scores.is_discarded, false)));
 
     // Build a map: runId -> score
-    const scoreByRunId = new Map(projectScores.map((s) => [s.run_id, s]));
+    const scoreByRunId = new Map(allScores.map((s) => [s.run_id, s]));
 
     // Build version summaries
     const versionSummaries: VersionSummary[] = versions
@@ -136,11 +160,22 @@ export function createScoreProgressionRouter(db: DB) {
         };
       });
 
-    // Fetch all test cases for this project
-    const testCases = await db
-      .select()
-      .from(test_cases)
-      .where(eq(test_cases.project_id, projectId));
+    // test_case_projects 経由でプロジェクトに紐づくテストケースIDを取得
+    const testCaseLinks = await db
+      .select({ test_case_id: test_case_projects.test_case_id })
+      .from(test_case_projects)
+      .where(eq(test_case_projects.project_id, projectId));
+
+    const testCaseIds = testCaseLinks.map((l) => l.test_case_id);
+
+    if (testCaseIds.length === 0) {
+      return c.json({
+        versionSummaries,
+        testCaseBreakdown: [],
+      } satisfies ScoreProgressionResponse);
+    }
+
+    const testCases = await db.select().from(test_cases).where(inArray(test_cases.id, testCaseIds));
 
     // Build test case breakdown
     // For each test case, for each version, find the best run's score (or any run's score)
