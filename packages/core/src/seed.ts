@@ -91,7 +91,6 @@ async function seed() {
     await db
       .insert(schema.test_cases)
       .values({
-        project_id: project.id,
         title: "配送遅延の問い合わせ",
         turns: turns1,
         context_content:
@@ -111,7 +110,6 @@ async function seed() {
     await db
       .insert(schema.test_cases)
       .values({
-        project_id: project.id,
         title: "返品条件外の返品依頼（マルチターン）",
         turns: turns2,
         context_content:
@@ -126,6 +124,13 @@ async function seed() {
     "testCase2",
   );
   console.log(`テストケース2作成: id=${testCase2.id}`);
+
+  // テストケースとプロジェクトの関連付け
+  await db.insert(schema.test_case_projects).values([
+    { test_case_id: testCase1.id, project_id: project.id, created_at: now },
+    { test_case_id: testCase2.id, project_id: project.id, created_at: now },
+  ]);
+  console.log("テストケースとプロジェクトを関連付けました");
 
   // 4. プロンプトファミリー作成
   const promptFamily = getFirstOrThrow(
