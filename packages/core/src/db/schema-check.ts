@@ -4,6 +4,32 @@ import Database from "better-sqlite3";
 const expectedSchema = {
   prompt_versions: ["workflow_definition"],
   runs: ["execution_trace", "structured_output"],
+  annotation_tasks: ["name", "description", "output_mode"],
+  annotation_labels: ["annotation_task_id", "key", "name", "color", "display_order"],
+  annotation_candidates: [
+    "run_id",
+    "annotation_task_id",
+    "target_text_ref",
+    "source_type",
+    "source_step_id",
+    "label",
+    "start_line",
+    "end_line",
+    "quote",
+    "rationale",
+    "status",
+    "note",
+  ],
+  gold_annotations: [
+    "annotation_task_id",
+    "target_text_ref",
+    "label",
+    "start_line",
+    "end_line",
+    "quote",
+    "note",
+    "source_candidate_id",
+  ],
 } as const;
 
 function getColumns(db: Database.Database, tableName: string): string[] {
