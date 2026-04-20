@@ -8,9 +8,11 @@ import {
   type GoldAnnotation,
   getAnnotationCandidates,
   getAnnotationTask,
+  getAnnotationTasks,
   getGoldAnnotations,
   getProject,
   getRun,
+  getTestCases,
   updateAnnotationCandidate,
 } from "../lib/api";
 import styles from "./AnnotationReviewPage.module.css";
@@ -313,8 +315,14 @@ export function AnnotationReviewPage() {
   const { id } = useParams<{ id: string }>();
   const [searchParams] = useSearchParams();
   const projectId = Number(id);
-  const runId = Number(searchParams.get("runId"));
+  const runIdParam = searchParams.get("runId");
+  const runId = Number(runIdParam);
   const taskId = Number(searchParams.get("taskId"));
+
+  // runId が指定されていない場合は Gold Annotation ブラウズモード
+  if (!runIdParam) {
+    return <GoldAnnotationBrowse projectId={projectId} />;
+  }
   const queryClient = useQueryClient();
 
   const [activeRange, setActiveRange] = useState<{ start: number; end: number } | null>(null);
@@ -500,13 +508,23 @@ export function AnnotationReviewPage() {
 function GoldAnnotationCard({
   gold,
   labels,
+  onHover,
+  onLeave,
 }: {
   gold: GoldAnnotation;
   labels: AnnotationLabel[];
+  onHover?: (range: { start: number; end: number }) => void;
+  onLeave?: () => void;
 }) {
   const label = labels.find((l) => l.key === gold.label);
   return (
-    <div className={styles.goldCard}>
+    <div
+      className={styles.goldCard}
+      onMouseEnter={
+        onHover ? () => onHover({ start: gold.start_line, end: gold.end_line }) : undefined
+      }
+      onMouseLeave={onLeave}
+    >
       <div className={styles.candidateHeader}>
         {label && (
           <span
@@ -530,6 +548,164 @@ function GoldAnnotationCard({
       </div>
       <p className={styles.candidateQuote}>&ldquo;{gold.quote}&rdquo;</p>
       {gold.note && <p className={styles.candidateNote}>{gold.note}</p>}
+    </div>
+  );
+}
+
+function GoldAnnotationBrowse({ projectId }: { projectId: number }) {
+  const [selectedTaskId, setSelectedTaskId] = useState<number | null>(null);
+  const [selectedTestCaseId, setSelectedTestCaseId] = useState<number | null>(null);
+  const [activeRange, setActiveRange] = useState<{ start: number; end: number } | null>(null);
+
+  const { data: tasks = [] } = useQuery({
+    queryKey: ["annotation-tasks"],
+    queryFn: () => getAnnotationTasks(),
+  });
+
+  const { data: selectedTaskDetail } = useQuery({
+    queryKey: ["annotation-task", selectedTaskId],
+    queryFn: () => getAnnotationTask(selectedTaskId as number),
+    enabled: selectedTaskId !== null,
+  });
+
+  const { data: testCases = [] } = useQuery({
+    queryKey: ["test-cases", projectId],
+    queryFn: () => getTestCases(projectId),
+    enabled: !Number.isNaN(projectId),
+  });
+
+  const selectedTestCase = testCases.find((tc) => tc.id === selectedTestCaseId) ?? null;
+
+  const { data: goldAnnotations = [], isLoading: isGoldLoading } = useQuery({
+    queryKey: [
+      "gold-annotations",
+      { annotation_task_id: selectedTaskId, test_case_id: selectedTestCaseId },
+    ],
+    queryFn: () =>
+      getGoldAnnotations({
+        annotation_task_id: selectedTaskId ?? undefined,
+        test_case_id: selectedTestCaseId ?? undefined,
+      }),
+    enabled: selectedTaskId !== null && selectedTestCaseId !== null,
+  });
+
+  // GoldAnnotation を LineNumberedText の candidates 形式に変換
+  const goldAsCandidates: AnnotationCandidate[] = goldAnnotations.map((g) => ({
+    id: g.id,
+    run_id: null,
+    annotation_task_id: g.annotation_task_id,
+    target_text_ref: g.target_text_ref,
+    label: g.label,
+    start_line: g.start_line,
+    end_line: g.end_line,
+    quote: g.quote,
+    note: g.note,
+    status: "accepted" as CandidateStatus,
+    created_at: g.created_at,
+    updated_at: g.updated_at,
+  }));
+
+  const labels = selectedTaskDetail?.labels ?? [];
+
+  return (
+    <div className={styles.root}>
+      <div className={styles.pageHeader}>
+        <h2 className={styles.pageTitle}>Gold Annotation 一覧</h2>
+      </div>
+
+      <div className={styles.layout}>
+        {/* 左パネル: 行番号付きテキスト */}
+        <div className={styles.leftPanel}>
+          <h3 className={styles.panelTitle}>コンテキスト</h3>
+          {selectedTestCase ? (
+            <LineNumberedText
+              text={selectedTestCase.context_content}
+              candidates={goldAsCandidates}
+              labels={labels}
+              activeRange={activeRange}
+            />
+          ) : (
+            <p className={styles.emptyMsg}>テストケースを選択してください</p>
+          )}
+        </div>
+
+        {/* 右パネル */}
+        <div className={styles.rightPanel}>
+          {/* タスクセレクター */}
+          <div className={styles.rightSection}>
+            <h3 className={styles.panelTitle}>フィルター</h3>
+            <div className={styles.browseSelectors}>
+              <select
+                className={styles.taskSelector}
+                value={selectedTaskId ?? ""}
+                onChange={(e) => {
+                  const val = e.target.value;
+                  setSelectedTaskId(val === "" ? null : Number(val));
+                }}
+              >
+                <option value="">タスクを選択...</option>
+                {tasks.map((t) => (
+                  <option key={t.id} value={t.id}>
+                    {t.name}
+                  </option>
+                ))}
+              </select>
+
+              {/* テストケース一覧 */}
+              <div className={styles.testCaseList}>
+                {testCases.length === 0 ? (
+                  <p className={styles.emptyMsg}>テストケースがありません</p>
+                ) : (
+                  testCases.map((tc) => (
+                    <div
+                      key={tc.id}
+                      className={`${styles.testCaseItem} ${selectedTestCaseId === tc.id ? styles.testCaseItemActive : ""}`}
+                      onClick={() => setSelectedTestCaseId(tc.id)}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter" || e.key === " ") {
+                          setSelectedTestCaseId(tc.id);
+                        }
+                      }}
+                      // biome-ignore lint/a11y/useSemanticElements: リスト項目はdivで実装
+                      role="button"
+                      tabIndex={0}
+                    >
+                      {tc.title}
+                    </div>
+                  ))
+                )}
+              </div>
+            </div>
+          </div>
+
+          {/* Gold Annotation 一覧 */}
+          {selectedTaskId !== null && selectedTestCaseId !== null && (
+            <div className={styles.rightSection}>
+              <h3 className={styles.panelTitle}>
+                Gold Annotation
+                <span className={styles.countBadge}>{goldAnnotations.length}</span>
+              </h3>
+              {isGoldLoading ? (
+                <p className={styles.loadingMsg}>読み込み中...</p>
+              ) : goldAnnotations.length === 0 ? (
+                <p className={styles.emptyMsg}>Gold Annotation がありません</p>
+              ) : (
+                <div className={styles.goldList}>
+                  {goldAnnotations.map((g) => (
+                    <GoldAnnotationCard
+                      key={g.id}
+                      gold={g}
+                      labels={labels}
+                      onHover={(range) => setActiveRange(range)}
+                      onLeave={() => setActiveRange(null)}
+                    />
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+      </div>
     </div>
   );
 }

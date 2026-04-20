@@ -404,6 +404,64 @@
   border-bottom: none;
 }
 
+/* ==================== Browse mode ==================== */
+.browseSelectors {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 12px;
+}
+
+.taskSelector {
+  width: 100%;
+  padding: 8px 10px;
+  background: var(--c-surface);
+  color: var(--c-text);
+  border: 1px solid var(--c-border);
+  border-radius: 6px;
+  font-size: 13px;
+  outline: none;
+  cursor: pointer;
+}
+
+.taskSelector:focus {
+  border-color: var(--c-accent);
+}
+
+.testCaseList {
+  max-height: 240px;
+  overflow-y: auto;
+  border: 1px solid var(--c-border);
+  border-radius: 6px;
+}
+
+.testCaseItem {
+  padding: 8px 12px;
+  font-size: 13px;
+  color: var(--c-text);
+  cursor: pointer;
+  border-bottom: 1px solid var(--c-border);
+  transition: background-color 0.1s ease;
+  user-select: none;
+}
+
+.testCaseItem:last-child {
+  border-bottom: none;
+}
+
+.testCaseItem:hover {
+  background: rgba(137, 180, 250, 0.06);
+}
+
+.testCaseItemActive {
+  background: rgba(203, 166, 247, 0.12);
+  color: var(--c-accent);
+}
+
+.testCaseItemActive:hover {
+  background: rgba(203, 166, 247, 0.18);
+}
+
 /* ==================== Misc ==================== */
 .loadingMsg {
   margin: 16px;
