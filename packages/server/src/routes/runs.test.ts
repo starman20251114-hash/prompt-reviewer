@@ -167,6 +167,44 @@ describe("GET /api/projects/:projectId/runs", () => {
     expect(body.at(0)?.conversation).toEqual(sampleConversation);
   });
 
+  it("共有ラベルの別プロジェクトRunは一覧に含めない", async () => {
+    let selectCallCount = 0;
+    const projectScopedRuns = [sampleRun];
+
+    const db = {
+      select: () => {
+        selectCallCount++;
+        if (selectCallCount === 1) {
+          return {
+            from: () => ({
+              where: () => Promise.resolve([{ prompt_version_id: 1 }]),
+            }),
+          };
+        }
+        return {
+          from: () => ({
+            where: (condition: unknown) => {
+              expect(condition).toBeDefined();
+              return Promise.resolve(projectScopedRuns);
+            },
+          }),
+        };
+      },
+    };
+
+    const app = buildApp(db);
+    const res = await app.request("/api/projects/1/runs");
+
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as Array<MockRun & { conversation: MockConversationMessage[] }>;
+    expect(body).toEqual([
+      expect.objectContaining({
+        id: sampleRun.id,
+        project_id: 1,
+      }),
+    ]);
+  });
+
   it("prompt_version_idでフィルタリングできる", async () => {
     const filteredRuns = [sampleRun];
 
@@ -1428,6 +1466,48 @@ describe("PATCH /api/projects/:projectId/runs/:id/best", () => {
     expect(body.is_best).toBe(true);
   });
 
+  it("ベスト解除・設定は同一プロジェクトのRunだけを更新する", async () => {
+    const updated = { ...sampleRun, is_best: true };
+    const whereArgs: unknown[] = [];
+
+    let selectCallCount = 0;
+    const db = {
+      select: () => {
+        selectCallCount++;
+        if (selectCallCount === 1) {
+          return {
+            from: () => ({
+              where: () => Promise.resolve([{ prompt_version_id: 1 }]),
+            }),
+          };
+        }
+        return {
+          from: () => ({
+            where: () => Promise.resolve([sampleRun]),
+          }),
+        };
+      },
+      update: () => ({
+        set: () => ({
+          where: (condition: unknown) => {
+            whereArgs.push(condition);
+            return {
+              returning: () => Promise.resolve([updated]),
+            };
+          },
+        }),
+      }),
+    };
+
+    const app = buildApp(db);
+    const res = await app.request("/api/projects/1/runs/1/best", {
+      method: "PATCH",
+    });
+
+    expect(res.status).toBe(200);
+    expect(whereArgs).toHaveLength(2);
+  });
+
   it("同一バージョン×テストケースの既存フラグが解除される", async () => {
     const updated = { ...sampleRun, is_best: true };
 
@@ -1559,6 +1639,48 @@ describe("PATCH /api/projects/:projectId/runs/:id/discard", () => {
     expect(res.status).toBe(200);
     const body = (await res.json()) as MockRun & { conversation: MockConversationMessage[] };
     expect(body.is_discarded).toBe(true);
+  });
+
+  it("破棄更新は同一プロジェクトのRunだけを対象にする", async () => {
+    const updated = { ...sampleRun, is_discarded: true };
+    const whereArgs: unknown[] = [];
+
+    let selectCallCount = 0;
+    const db = {
+      select: () => {
+        selectCallCount++;
+        if (selectCallCount === 1) {
+          return {
+            from: () => ({
+              where: () => Promise.resolve([{ prompt_version_id: 1 }]),
+            }),
+          };
+        }
+        return {
+          from: () => ({
+            where: () => Promise.resolve([sampleRun]),
+          }),
+        };
+      },
+      update: () => ({
+        set: () => ({
+          where: (condition: unknown) => {
+            whereArgs.push(condition);
+            return {
+              returning: () => Promise.resolve([updated]),
+            };
+          },
+        }),
+      }),
+    };
+
+    const app = buildApp(db);
+    const res = await app.request("/api/projects/1/runs/1/discard", {
+      method: "PATCH",
+    });
+
+    expect(res.status).toBe(200);
+    expect(whereArgs).toHaveLength(1);
   });
 
   it("存在しないIDに対して404を返す", async () => {

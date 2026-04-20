@@ -94,7 +94,10 @@ export function createScoreProgressionRouter(db: DB) {
     }
 
     // prompt_version_projects 基準でRunを取得
-    const allRuns = await db.select().from(runs).where(inArray(runs.prompt_version_id, versionIds));
+    const allRuns = await db
+      .select()
+      .from(runs)
+      .where(and(eq(runs.project_id, projectId), inArray(runs.prompt_version_id, versionIds)));
 
     if (allRuns.length === 0) {
       const emptySummaries: VersionSummary[] = versions.map((v) => ({

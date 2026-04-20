@@ -306,7 +306,11 @@ export function createRunsRouter(db: DB, options: RunsRouterOptions = {}) {
       return c.json([]);
     }
 
-    const conditions = [inArray(runs.prompt_version_id, versionIds), eq(runs.is_discarded, false)];
+    const conditions = [
+      eq(runs.project_id, projectId),
+      inArray(runs.prompt_version_id, versionIds),
+      eq(runs.is_discarded, false),
+    ];
 
     if (promptVersionIdParam !== undefined) {
       const promptVersionId = parseIntParam(promptVersionIdParam);
@@ -653,7 +657,13 @@ export function createRunsRouter(db: DB, options: RunsRouterOptions = {}) {
     const [run] = await db
       .select()
       .from(runs)
-      .where(and(eq(runs.id, id), inArray(runs.prompt_version_id, versionIds)));
+      .where(
+        and(
+          eq(runs.id, id),
+          eq(runs.project_id, projectId),
+          inArray(runs.prompt_version_id, versionIds),
+        ),
+      );
 
     if (!run) {
       return c.json({ error: "Run not found" }, 404);
@@ -696,7 +706,7 @@ export function createRunsRouter(db: DB, options: RunsRouterOptions = {}) {
       const updateResult = await db
         .update(runs)
         .set({ is_best: false })
-        .where(eq(runs.id, id))
+        .where(and(eq(runs.id, id), eq(runs.project_id, projectId)))
         .returning();
       const updated = updateResult[0];
       if (!updated) return c.json({ error: "Failed to update Run" }, 500);
@@ -709,6 +719,7 @@ export function createRunsRouter(db: DB, options: RunsRouterOptions = {}) {
       .set({ is_best: false })
       .where(
         and(
+          eq(runs.project_id, projectId),
           eq(runs.prompt_version_id, existing.prompt_version_id),
           eq(runs.test_case_id, existing.test_case_id),
         ),
@@ -718,7 +729,7 @@ export function createRunsRouter(db: DB, options: RunsRouterOptions = {}) {
     const updateResult = await db
       .update(runs)
       .set({ is_best: true })
-      .where(eq(runs.id, id))
+      .where(and(eq(runs.id, id), eq(runs.project_id, projectId)))
       .returning();
 
     const updated = updateResult[0];
@@ -757,7 +768,7 @@ export function createRunsRouter(db: DB, options: RunsRouterOptions = {}) {
     const updateResult = await db
       .update(runs)
       .set({ is_discarded: true })
-      .where(eq(runs.id, id))
+      .where(and(eq(runs.id, id), eq(runs.project_id, projectId)))
       .returning();
 
     const updated = updateResult[0];
