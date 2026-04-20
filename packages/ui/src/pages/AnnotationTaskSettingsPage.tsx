@@ -727,11 +727,12 @@ export function AnnotationTaskSettingsPage() {
 
                           <div className={styles.fieldGrid}>
                             <div className={styles.fieldGroup}>
-                              <label className={styles.fieldLabel}>
+                              <label htmlFor="label-key-input" className={styles.fieldLabel}>
                                 分類ラベル
                                 <span className={styles.requiredMark}>必須</span>
                               </label>
                               <input
+                                id="label-key-input"
                                 className={styles.fieldInput}
                                 value={currentForm.key}
                                 disabled={!isEditing}
@@ -750,8 +751,11 @@ export function AnnotationTaskSettingsPage() {
                             </div>
 
                             <div className={styles.fieldGroup}>
-                              <label className={styles.fieldLabel}>表示名</label>
+                              <label htmlFor="label-name-input" className={styles.fieldLabel}>
+                                表示名
+                              </label>
                               <input
+                                id="label-name-input"
                                 className={styles.fieldInput}
                                 value={currentForm.name}
                                 disabled={!isEditing}
@@ -765,9 +769,12 @@ export function AnnotationTaskSettingsPage() {
                             </div>
 
                             <div className={styles.fieldGroup}>
-                              <label className={styles.fieldLabel}>色</label>
+                              <label htmlFor="label-color-input" className={styles.fieldLabel}>
+                                色
+                              </label>
                               <div className={styles.colorFieldRow}>
                                 <input
+                                  id="label-color-input"
                                   className={styles.fieldInput}
                                   value={currentForm.color}
                                   disabled={!isEditing}
@@ -788,8 +795,11 @@ export function AnnotationTaskSettingsPage() {
                             </div>
 
                             <div className={styles.fieldGroup}>
-                              <label className={styles.fieldLabel}>並び順</label>
+                              <label htmlFor="label-order-input" className={styles.fieldLabel}>
+                                並び順
+                              </label>
                               <input
+                                id="label-order-input"
                                 className={styles.fieldInput}
                                 type="number"
                                 value={currentForm.displayOrder}
