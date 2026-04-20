@@ -5,6 +5,10 @@ import { assertRequiredSchema, db } from "@prompt-reviewer/core";
 import { Hono } from "hono";
 import { cors } from "hono/cors";
 import {
+  createAnnotationCandidatesRouter,
+  createGoldAnnotationsRouter,
+} from "./routes/annotation-review.js";
+import {
   createAnnotationLabelsRouter,
   createAnnotationTasksRouter,
 } from "./routes/annotation-tasks.js";
@@ -78,6 +82,8 @@ app.get("/api/health", (c) => {
 
 app.route("/api/annotation-tasks", createAnnotationTasksRouter(db));
 app.route("/api/annotation-labels", createAnnotationLabelsRouter(db));
+app.route("/api/annotation-candidates", createAnnotationCandidatesRouter(db));
+app.route("/api/gold-annotations", createGoldAnnotationsRouter(db));
 app.route("/api/context-assets", createContextAssetsRouter(db));
 app.route("/api/projects", createProjectsRouter(db));
 app.route("/api/execution-profiles", createExecutionProfilesRouter(db));
