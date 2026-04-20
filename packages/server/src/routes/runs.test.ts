@@ -35,6 +35,7 @@ type MockRun = {
   test_case_id: number;
   conversation: string;
   execution_trace: string | null;
+  structured_output: string | null;
   is_best: boolean;
   is_discarded: boolean;
   created_at: number;
@@ -66,6 +67,7 @@ const sampleRun: MockRun = {
   test_case_id: 1,
   conversation: JSON.stringify(sampleConversation),
   execution_trace: null,
+  structured_output: null,
   is_best: false,
   is_discarded: false,
   created_at: 1000000,
@@ -84,6 +86,18 @@ const sampleProfile = {
   api_provider: "anthropic" as const,
   created_at: 1000000,
   updated_at: 1000000,
+};
+
+const sampleStructuredOutput = {
+  items: [
+    {
+      label: "insight",
+      start_line: 1,
+      end_line: 2,
+      quote: "今日は晴れです。",
+      rationale: "主要な内容を表しているため",
+    },
+  ],
 };
 
 // ---- テスト ----
@@ -481,6 +495,50 @@ describe("POST /api/projects/:projectId/runs", () => {
     expect(body.execution_profile_id).toBe(1);
   });
 
+  it("structured_output を保存してレスポンスでは JSON として返す", async () => {
+    const created = {
+      ...sampleRun,
+      structured_output: JSON.stringify(sampleStructuredOutput),
+    };
+
+    const db = {
+      select: () => ({
+        from: () => ({
+          where: () => Promise.resolve([{ prompt_version_id: 1, project_id: 1, created_at: 0 }]),
+        }),
+      }),
+      insert: () => ({
+        values: (values: { structured_output: string | null }) => ({
+          returning: () => {
+            expect(values.structured_output).toBe(JSON.stringify(sampleStructuredOutput));
+            return Promise.resolve([created]);
+          },
+        }),
+      }),
+    };
+
+    const app = buildApp(db);
+    const res = await app.request("/api/projects/1/runs", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        prompt_version_id: 1,
+        test_case_id: 1,
+        conversation: sampleConversation,
+        structured_output: sampleStructuredOutput,
+        model: "claude-sonnet-4-6",
+        temperature: 0.7,
+        api_provider: "anthropic",
+      }),
+    });
+
+    expect(res.status).toBe(201);
+    const body = (await res.json()) as MockRun & {
+      structured_output: typeof sampleStructuredOutput;
+    };
+    expect(body.structured_output).toEqual(sampleStructuredOutput);
+  });
+
   it("プロジェクトに紐づかないバージョンで404を返す", async () => {
     const db = {
       select: () => ({
@@ -746,6 +804,118 @@ describe("POST /api/projects/:projectId/runs/execute", () => {
       temperature: sampleProfile.temperature,
       systemPrompt: "あなたは親切なアシスタントです。\n\n入力文: 今日は晴れです。",
     });
+  });
+
+  it("runs/execute でも structured_output を保存して run イベントで返す", async () => {
+    const version = {
+      id: 1,
+      project_id: 1,
+      content: "あなたは親切なアシスタントです。",
+      workflow_definition: null,
+    };
+    const testCase = {
+      id: 1,
+      project_id: 1,
+      turns: JSON.stringify([{ role: "user", content: "要約してください" }]),
+      context_content: "",
+      title: "テストケース",
+      expected_description: null,
+      display_order: 0,
+      created_at: 0,
+      updated_at: 0,
+    };
+    const created = {
+      ...sampleRun,
+      conversation: JSON.stringify([
+        { role: "user", content: "要約してください" },
+        { role: "assistant", content: "今日は晴れです。" },
+      ]),
+      structured_output: JSON.stringify(sampleStructuredOutput),
+      model: sampleProfile.model,
+      temperature: sampleProfile.temperature,
+      api_provider: sampleProfile.api_provider,
+      execution_profile_id: sampleProfile.id,
+    };
+
+    const capturedInsertValues: Array<{ structured_output: string | null }> = [];
+    let selectCallCount = 0;
+
+    const db = {
+      select: () => {
+        selectCallCount++;
+        if (selectCallCount === 1) {
+          return {
+            from: () => ({
+              where: () =>
+                Promise.resolve([{ prompt_version_id: 1, project_id: 1, created_at: 0 }]),
+            }),
+          };
+        }
+        if (selectCallCount === 2) {
+          return {
+            from: () => ({
+              where: () => Promise.resolve([{ test_case_id: 1, project_id: 1, created_at: 0 }]),
+            }),
+          };
+        }
+        if (selectCallCount === 3) {
+          return { from: () => ({ where: () => Promise.resolve([version]) }) };
+        }
+        if (selectCallCount === 4) {
+          return { from: () => ({ where: () => Promise.resolve([testCase]) }) };
+        }
+        return { from: () => ({ where: () => Promise.resolve([sampleProfile]) }) };
+      },
+      insert: () => ({
+        values: (values: { structured_output: string | null }) => {
+          capturedInsertValues.push(values);
+          return {
+            returning: () => Promise.resolve([created]),
+          };
+        },
+      }),
+    };
+
+    const app = new Hono();
+    app.route(
+      "/api/projects/:projectId/runs",
+      createRunsRouter(db as unknown as DB, {
+        llmClientFactory: () => ({
+          async sendMessage() {
+            throw new Error("sendMessage should not be used for streaming execute");
+          },
+          async *stream() {
+            yield { type: "text-delta" as const, text: "今日は晴れです。" };
+            yield {
+              type: "response" as const,
+              response: {
+                content: "今日は晴れです。",
+                stopReason: "end_turn",
+                raw: {},
+              },
+            };
+          },
+        }),
+      }),
+    );
+
+    const res = await app.request("/api/projects/1/runs/execute", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        prompt_version_id: 1,
+        test_case_id: 1,
+        api_key: "sk-ant-test",
+        execution_profile_id: 1,
+        structured_output: sampleStructuredOutput,
+      }),
+    });
+
+    expect(res.status).toBe(200);
+    expect(capturedInsertValues[0]?.structured_output).toBe(JSON.stringify(sampleStructuredOutput));
+
+    const streamText = await res.text();
+    expect(streamText).toContain(`"structured_output":${JSON.stringify(sampleStructuredOutput)}`);
   });
 
   it("text-delta より完全な最終 response があるときは response.content を保存する", async () => {

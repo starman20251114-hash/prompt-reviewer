@@ -272,6 +272,18 @@ export type ExecutionTraceStep = {
   output: string;
 };
 
+export type StructuredOutputItem = {
+  label: string;
+  start_line: number;
+  end_line: number;
+  quote: string;
+  rationale?: string;
+};
+
+export type StructuredOutput = {
+  items: StructuredOutputItem[];
+};
+
 export type Run = {
   id: number;
   project_id: number;
@@ -279,6 +291,7 @@ export type Run = {
   test_case_id: number;
   conversation: ConversationMessage[];
   execution_trace: ExecutionTraceStep[] | null;
+  structured_output: StructuredOutput | null;
   is_best: boolean;
   is_discarded: boolean;
   model: string;
@@ -314,6 +327,7 @@ export function createRun(
     test_case_id: number;
     conversation: ConversationMessage[];
     execution_trace?: ExecutionTraceStep[];
+    structured_output?: StructuredOutput | null;
     model: string;
     temperature: number;
     api_provider: string;
@@ -326,6 +340,7 @@ type ExecuteRunStreamOptions = {
   prompt_version_id: number;
   test_case_id: number;
   api_key: string;
+  structured_output?: StructuredOutput | null;
   onDelta: (text: string) => void;
   onStepStart?: (step: Omit<ExecutionTraceStep, "output">) => void;
   onStepDelta?: (input: { id: string; title: string; text: string }) => void;
@@ -397,6 +412,7 @@ export async function executeRunStream(
       prompt_version_id: options.prompt_version_id,
       test_case_id: options.test_case_id,
       api_key: options.api_key,
+      structured_output: options.structured_output,
     }),
   });
 

@@ -3,7 +3,7 @@ import Database from "better-sqlite3";
 
 const expectedSchema = {
   prompt_versions: ["workflow_definition"],
-  runs: ["execution_trace"],
+  runs: ["execution_trace", "structured_output"],
 } as const;
 
 function getColumns(db: Database.Database, tableName: string): string[] {

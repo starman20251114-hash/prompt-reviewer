@@ -26,6 +26,7 @@ export const runs = sqliteTable("runs", {
     .references(() => test_cases.id),
   conversation: text("conversation").notNull(),
   execution_trace: text("execution_trace"),
+  structured_output: text("structured_output"),
   is_best: integer("is_best", { mode: "boolean" }).notNull().default(false),
   is_discarded: integer("is_discarded", { mode: "boolean" }).notNull().default(false),
   created_at: integer("created_at").notNull(),
@@ -55,4 +56,16 @@ export type ExecutionTraceStep = {
   renderedPrompt: string;
   inputConversation: ConversationMessage[];
   output: string;
+};
+
+export type StructuredOutputItem = {
+  label: string;
+  start_line: number;
+  end_line: number;
+  quote: string;
+  rationale?: string;
+};
+
+export type StructuredOutput = {
+  items: StructuredOutputItem[];
 };
