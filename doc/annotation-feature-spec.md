@@ -308,11 +308,44 @@ Labels:
 - AI の抽出結果は JSON 契約に寄せる
 - 初期 Task は `会話価値抽出` を基本とする
 
+## annotation対象本文の責務
+
+### annotation 一次対象
+
+`test_cases.context_content` を annotation の一次対象とする。
+
+理由:
+
+- Run で実際に使われるテキストは `context_content` であり、`context_assets.content` ではない
+- annotation は Run の評価に紐づくため、Run 時点で確定していた本文を参照すべきである
+- `context_assets` がその後更新されても、過去の annotation に影響しない
+
+### `context_assets` と `test_cases` の責務分担
+
+- `context_assets`: 素材置き場。編集・再利用可能なオリジナル。annotation の直接対象ではない。
+- `test_cases.context_content`: 取り込み後のスナップショット。**これが annotation の本文**。取り込み後は `context_assets` と独立して管理する。
+
+### 取り込み後の本文変化の扱い
+
+スナップショット固定方式を採用する。
+
+- `context_assets` を更新しても `test_cases.context_content` は自動同期しない
+- 再同期が必要な場合はユーザーが明示的に再取り込みを行う
+- 再取り込み後は `context_content` が更新され、以前の annotation の行番号が無効になる可能性があるため、UI で警告する（将来課題）
+
+### 行番号ルール
+
+annotation の行番号は以下のルールで採番する。
+
+- **改行コード正規化**: annotation 処理前に CRLF → LF に正規化する
+- **先頭行番号**: 1-indexed（1行目 = line 1）
+- **空行の扱い**: 空行もカウントする（行番号をスキップしない）
+- **再現性保証**: `context_content` の内容と行番号ルールが定まっていれば、いつでも同じ行番号が再現できる
+
 ## 未確定事項
 
 以下は移行計画の進行後に確定する。
 
-- どの既存資産 ID に紐づけるか
 - DB テーブル名と外部キー設計
 - REST API の最終パス設計
 - 既存 Runs / Test Cases / Context Assets との接続方法
