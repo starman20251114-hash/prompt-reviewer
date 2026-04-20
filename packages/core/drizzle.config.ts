@@ -25,6 +25,7 @@ export default defineConfig({
     "./src/schema/prompt-versions.ts",
     "./src/schema/runs.ts",
     "./src/schema/scores.ts",
+    "./src/schema/annotations.ts",
   ],
   out: "./drizzle",
   dbCredentials: {

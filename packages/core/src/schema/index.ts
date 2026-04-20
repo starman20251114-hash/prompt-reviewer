@@ -11,3 +11,4 @@ export * from "./test-cases";
 export * from "./prompt-versions";
 export * from "./runs";
 export * from "./scores";
+export * from "./annotations";
