@@ -216,8 +216,11 @@ describe("PATCH /api/annotation-candidates/:id", () => {
 
     const db = {
       select: () => ({
-        from: () => ({
-          where: () => Promise.resolve([sampleCandidate]),
+        from: (table?: { key?: unknown }) => ({
+          where: () =>
+            Promise.resolve(
+              table && "key" in table ? [{ key: "bug" }, { key: "feature" }] : [sampleCandidate],
+            ),
         }),
       }),
       update: () => ({
@@ -246,13 +249,24 @@ describe("PATCH /api/annotation-candidates/:id", () => {
 
   it("status='accepted' に変更するとgold_annotationを作成して {candidate, gold} を返す", async () => {
     const accepted: MockCandidate = { ...sampleCandidate, status: "accepted", updated_at: 2000000 };
+    let selectCallCount = 0;
 
     const db = {
-      select: () => ({
-        from: () => ({
-          where: () => Promise.resolve([sampleCandidate]),
-        }),
-      }),
+      select: () => {
+        selectCallCount++;
+        if (selectCallCount === 1) {
+          return {
+            from: () => ({
+              where: () => Promise.resolve([sampleCandidate]),
+            }),
+          };
+        }
+        return {
+          from: () => ({
+            where: () => Promise.resolve([]),
+          }),
+        };
+      },
       update: () => ({
         set: () => ({
           where: () => ({
@@ -280,6 +294,64 @@ describe("PATCH /api/annotation-candidates/:id", () => {
     expect(body.gold).toBeDefined();
     expect(body.gold.source_candidate_id).toBe(1);
     expect(body.gold.label).toBe("bug");
+  });
+
+  it("すでに同じcandidate由来のgoldがある場合は再作成せず既存goldを返す", async () => {
+    const accepted: MockCandidate = { ...sampleCandidate, status: "accepted", updated_at: 2000000 };
+    let selectCallCount = 0;
+    let insertCalled = false;
+
+    const existingGold: MockGoldAnnotation = {
+      ...sampleGold,
+      id: 99,
+      source_candidate_id: 1,
+    };
+
+    const db = {
+      select: () => {
+        selectCallCount++;
+        if (selectCallCount === 1) {
+          return {
+            from: () => ({
+              where: () => Promise.resolve([sampleCandidate]),
+            }),
+          };
+        }
+        return {
+          from: () => ({
+            where: () => Promise.resolve([existingGold]),
+          }),
+        };
+      },
+      update: () => ({
+        set: () => ({
+          where: () => ({
+            returning: () => Promise.resolve([accepted]),
+          }),
+        }),
+      }),
+      insert: () => {
+        insertCalled = true;
+        return {
+          values: () => ({
+            returning: () => Promise.resolve([sampleGold]),
+          }),
+        };
+      },
+    };
+
+    const app = buildApp(db);
+    const res = await app.request("/api/annotation-candidates/1", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ status: "accepted" }),
+    });
+
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as { candidate: MockCandidate; gold: MockGoldAnnotation };
+    expect(body.candidate.status).toBe("accepted");
+    expect(body.gold.id).toBe(99);
+    expect(insertCalled).toBe(false);
   });
 
   it("status='rejected' に変更してもgold_annotationは作成されず {candidate} のみ返す", async () => {
@@ -343,6 +415,38 @@ describe("PATCH /api/annotation-candidates/:id", () => {
     expect(res.status).toBe(404);
     const body = (await res.json()) as { error: string };
     expect(body.error).toBe("Annotation candidate not found");
+  });
+
+  it("annotation_task に存在しない label へ更新しようとすると400を返す", async () => {
+    let selectCallCount = 0;
+    const db = {
+      select: () => {
+        selectCallCount++;
+        if (selectCallCount === 1) {
+          return {
+            from: () => ({
+              where: () => Promise.resolve([sampleCandidate]),
+            }),
+          };
+        }
+        return {
+          from: () => ({
+            where: () => Promise.resolve([{ key: "bug" }, { key: "question" }]),
+          }),
+        };
+      },
+    };
+
+    const app = buildApp(db);
+    const res = await app.request("/api/annotation-candidates/1", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ label: "feature" }),
+    });
+
+    expect(res.status).toBe(400);
+    const body = (await res.json()) as { error: string };
+    expect(body.error).toContain("feature");
   });
 });
 

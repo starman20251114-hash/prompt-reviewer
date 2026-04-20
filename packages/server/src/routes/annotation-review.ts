@@ -1,6 +1,6 @@
 import { zValidator } from "@hono/zod-validator";
 import type { DB } from "@prompt-reviewer/core";
-import { annotation_candidates, gold_annotations } from "@prompt-reviewer/core";
+import { annotation_candidates, annotation_labels, gold_annotations } from "@prompt-reviewer/core";
 import { and, eq } from "drizzle-orm";
 import { Hono } from "hono";
 import { z } from "zod";
@@ -100,6 +100,21 @@ export function createAnnotationCandidatesRouter(db: DB) {
       return c.json({ error: "Annotation candidate not found" }, 404);
     }
 
+    if (body.label !== undefined) {
+      const labels = await db
+        .select({ key: annotation_labels.key })
+        .from(annotation_labels)
+        .where(eq(annotation_labels.annotation_task_id, existing.annotation_task_id));
+      const validLabelKeys = new Set(labels.map((label) => label.key));
+
+      if (!validLabelKeys.has(body.label)) {
+        return c.json(
+          { error: `Label "${body.label}" is not valid for this annotation task` },
+          400,
+        );
+      }
+    }
+
     // 片方のみ指定された場合の start_line > end_line チェック
     const resolvedStartLine = body.start_line ?? existing.start_line;
     const resolvedEndLine = body.end_line ?? existing.end_line;
@@ -139,6 +154,15 @@ export function createAnnotationCandidatesRouter(db: DB) {
 
     // status が "accepted" に変更された場合は gold_annotation を作成する
     if (body.status === "accepted") {
+      const [existingGold] = await db
+        .select()
+        .from(gold_annotations)
+        .where(eq(gold_annotations.source_candidate_id, updatedCandidate.id));
+
+      if (existingGold) {
+        return c.json({ candidate: updatedCandidate, gold: existingGold });
+      }
+
       const inserted = await db
         .insert(gold_annotations)
         .values({
