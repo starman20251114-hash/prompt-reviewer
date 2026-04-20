@@ -1933,6 +1933,30 @@ const sampleRunWithFinalAnswer: MockRun = {
   ]),
 };
 
+const sampleRunWithTraceStep: MockRun = {
+  ...sampleRun,
+  execution_trace: JSON.stringify([
+    {
+      id: "step-1",
+      title: "抽出ステップ",
+      prompt: "候補を抽出する",
+      renderedPrompt: "候補を抽出する",
+      inputConversation: sampleConversation,
+      output: JSON.stringify({
+        items: [
+          {
+            label: "insight",
+            start_line: 3,
+            end_line: 5,
+            quote: "途中ステップからの候補",
+            rationale: "trace_step由来",
+          },
+        ],
+      }),
+    },
+  ]),
+};
+
 /**
  * candidates/extract エンドポイント用のDBモック構築ヘルパー
  *
@@ -1949,6 +1973,7 @@ function buildExtractDb(params: {
   labels?: Array<{ key: string }>;
   existingCandidate?: { id: number } | null;
   insertReturns?: unknown[];
+  insertedValues?: Record<string, unknown>[] | null;
 }) {
   const {
     run = sampleRunWithStructuredOutput,
@@ -1956,6 +1981,7 @@ function buildExtractDb(params: {
     labels = sampleAnnotationLabels,
     existingCandidate = null,
     insertReturns = [],
+    insertedValues = null,
   } = params;
 
   let selectCallCount = 0;
@@ -2003,34 +2029,22 @@ function buildExtractDb(params: {
       };
     },
     insert: () => ({
-      values: () => ({
-        returning: () => Promise.resolve(insertReturns),
-      }),
+      values: (values: Record<string, unknown>[]) => {
+        if (insertedValues) {
+          insertedValues.push(...values);
+        }
+        return {
+          returning: () => Promise.resolve(insertReturns),
+        };
+      },
     }),
   };
 }
 
 describe("POST /api/projects/:projectId/runs/:id/candidates/extract", () => {
   it("structured_output から Candidate を生成して 201 を返す", async () => {
-    const insertedCandidate = {
-      id: 1,
-      run_id: 1,
-      annotation_task_id: 1,
-      target_text_ref: "test_case:1",
-      source_type: "structured_json",
-      source_step_id: null,
-      label: "insight",
-      start_line: 1,
-      end_line: 3,
-      quote: "今日は晴れです。",
-      rationale: "天気についての洞察",
-      status: "pending",
-      note: null,
-      created_at: 1000000,
-      updated_at: 1000000,
-    };
-
-    const db = buildExtractDb({ insertReturns: [insertedCandidate] });
+    const insertedValues: Record<string, unknown>[] = [];
+    const db = buildExtractDb({ insertReturns: [{ id: 1 }], insertedValues });
 
     const app = buildApp(db);
     const res = await app.request("/api/projects/1/runs/1/candidates/extract", {
@@ -2040,36 +2054,32 @@ describe("POST /api/projects/:projectId/runs/:id/candidates/extract", () => {
     });
 
     expect(res.status).toBe(201);
-    const body = (await res.json()) as (typeof insertedCandidate)[];
-    expect(body).toHaveLength(1);
-    expect(body[0]?.source_type).toBe("structured_json");
-    expect(body[0]?.label).toBe("insight");
-    expect(body[0]?.target_text_ref).toBe("test_case:1");
-    expect(body[0]?.status).toBe("pending");
+    const body = (await res.json()) as {
+      candidates_created: number;
+      run_id: number;
+      annotation_task_id: number;
+    };
+    expect(body).toEqual({
+      candidates_created: 1,
+      run_id: 1,
+      annotation_task_id: 1,
+    });
+    expect(insertedValues).toEqual([
+      expect.objectContaining({
+        source_type: "structured_json",
+        label: "insight",
+        target_text_ref: "test_case:1",
+        status: "pending",
+      }),
+    ]);
   });
 
-  it("final_answer（最後の assistant メッセージの JSON）からフォールバックして 201 を返す", async () => {
-    const insertedCandidate = {
-      id: 2,
-      run_id: 1,
-      annotation_task_id: 1,
-      target_text_ref: "test_case:1",
-      source_type: "final_answer",
-      source_step_id: null,
-      label: "question",
-      start_line: 2,
-      end_line: 4,
-      quote: "何か問題がありますか？",
-      rationale: null,
-      status: "pending",
-      note: null,
-      created_at: 1000000,
-      updated_at: 1000000,
-    };
-
+  it("source_type を省略した場合は final_answer にフォールバックして 201 を返す", async () => {
+    const insertedValues: Record<string, unknown>[] = [];
     const db = buildExtractDb({
       run: sampleRunWithFinalAnswer,
-      insertReturns: [insertedCandidate],
+      insertReturns: [{ id: 2 }],
+      insertedValues,
     });
 
     const app = buildApp(db);
@@ -2080,10 +2090,79 @@ describe("POST /api/projects/:projectId/runs/:id/candidates/extract", () => {
     });
 
     expect(res.status).toBe(201);
-    const body = (await res.json()) as (typeof insertedCandidate)[];
-    expect(body).toHaveLength(1);
-    expect(body[0]?.source_type).toBe("final_answer");
-    expect(body[0]?.label).toBe("question");
+    const body = (await res.json()) as {
+      candidates_created: number;
+      run_id: number;
+      annotation_task_id: number;
+    };
+    expect(body).toEqual({
+      candidates_created: 1,
+      run_id: 1,
+      annotation_task_id: 1,
+    });
+    expect(insertedValues).toEqual([
+      expect.objectContaining({
+        source_type: "final_answer",
+        label: "question",
+      }),
+    ]);
+  });
+
+  it("source_type=final_answer を明示すると structured_output があっても final_answer を使う", async () => {
+    const runWithBothSources: MockRun = {
+      ...sampleRunWithStructuredOutput,
+      conversation: sampleRunWithFinalAnswer.conversation,
+    };
+    const insertedValues: Record<string, unknown>[] = [];
+    const db = buildExtractDb({
+      run: runWithBothSources,
+      insertReturns: [{ id: 3 }],
+      insertedValues,
+    });
+
+    const app = buildApp(db);
+    const res = await app.request("/api/projects/1/runs/1/candidates/extract", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ annotation_task_id: 1, source_type: "final_answer" }),
+    });
+
+    expect(res.status).toBe(201);
+    expect(insertedValues).toEqual([
+      expect.objectContaining({
+        source_type: "final_answer",
+        label: "question",
+      }),
+    ]);
+  });
+
+  it("source_type=trace_step と source_step_id を指定すると対象 step から抽出する", async () => {
+    const insertedValues: Record<string, unknown>[] = [];
+    const db = buildExtractDb({
+      run: sampleRunWithTraceStep,
+      insertReturns: [{ id: 4 }],
+      insertedValues,
+    });
+
+    const app = buildApp(db);
+    const res = await app.request("/api/projects/1/runs/1/candidates/extract", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        annotation_task_id: 1,
+        source_type: "trace_step",
+        source_step_id: "step-1",
+      }),
+    });
+
+    expect(res.status).toBe(201);
+    expect(insertedValues).toEqual([
+      expect.objectContaining({
+        source_type: "trace_step",
+        source_step_id: "step-1",
+        label: "insight",
+      }),
+    ]);
   });
 
   it("存在しない label を含む場合は 400 を返す", async () => {
@@ -2187,6 +2266,21 @@ describe("POST /api/projects/:projectId/runs/:id/candidates/extract", () => {
     expect(res.status).toBe(409);
     const body = (await res.json()) as { error: string };
     expect(body.error).toContain("already extracted");
+  });
+
+  it("source_type=trace_step で source_step_id がない場合は 400 を返す", async () => {
+    const db = buildExtractDb({ run: sampleRunWithTraceStep });
+
+    const app = buildApp(db);
+    const res = await app.request("/api/projects/1/runs/1/candidates/extract", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ annotation_task_id: 1, source_type: "trace_step" }),
+    });
+
+    expect(res.status).toBe(400);
+    const body = (await res.json()) as { error: string };
+    expect(body.error).toContain("source_step_id");
   });
 
   it("run が存在しない場合は 404 を返す", async () => {

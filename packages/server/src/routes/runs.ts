@@ -80,6 +80,31 @@ const executeRunSchema = z.object({
 });
 
 type ExecuteRunBody = z.infer<typeof executeRunSchema>;
+type CandidateSourceType = "structured_json" | "final_answer" | "trace_step";
+
+const extractCandidatesSchema = z
+  .object({
+    annotation_task_id: z.number().int().positive(),
+    source_type: z.enum(["structured_json", "final_answer", "trace_step"]).optional(),
+    source_step_id: z.string().min(1).optional(),
+  })
+  .superRefine((value, ctx) => {
+    if (value.source_type === "trace_step" && !value.source_step_id) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "source_step_id is required when source_type is trace_step",
+        path: ["source_step_id"],
+      });
+    }
+
+    if (value.source_type !== "trace_step" && value.source_step_id !== undefined) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "source_step_id can only be used when source_type is trace_step",
+        path: ["source_step_id"],
+      });
+    }
+  });
 
 type RunExecutionClientFactoryInput = {
   apiProvider: string;
@@ -153,6 +178,17 @@ function parseStructuredOutput(json: string | null): StructuredOutput | null {
   }
 
   return JSON.parse(json) as StructuredOutput;
+}
+
+function parseStructuredItems(
+  value: unknown,
+): z.infer<typeof structuredOutputSchema>["items"] | null {
+  const parsed = structuredOutputSchema.safeParse(value);
+  if (!parsed.success) {
+    return null;
+  }
+
+  return parsed.data.items;
 }
 
 function buildSystemPrompt(version: StoredPromptVersion, testCase: StoredTestCase): string {
@@ -783,20 +819,18 @@ export function createRunsRouter(db: DB, options: RunsRouterOptions = {}) {
       return c.json({ error: "Invalid ID" }, 400);
     }
 
-    let body: { annotation_task_id: number };
+    let body: z.infer<typeof extractCandidatesSchema>;
     try {
-      body = (await c.req.json()) as { annotation_task_id: number };
+      body = (await c.req.json()) as z.infer<typeof extractCandidatesSchema>;
     } catch {
       return c.json({ error: "Invalid JSON body" }, 400);
     }
 
-    const parsedBody = z
-      .object({ annotation_task_id: z.number().int().positive() })
-      .safeParse(body);
+    const parsedBody = extractCandidatesSchema.safeParse(body);
     if (!parsedBody.success) {
-      return c.json({ error: "annotation_task_id must be a positive integer" }, 400);
+      return c.json({ error: parsedBody.error.issues[0]?.message ?? "Invalid request body" }, 400);
     }
-    const { annotation_task_id } = parsedBody.data;
+    const { annotation_task_id, source_type, source_step_id } = parsedBody.data;
 
     // run が存在し、該当プロジェクトに属することを確認
     const versionIds = await fetchVersionIdsByProject(db, projectId);
@@ -837,21 +871,25 @@ export function createRunsRouter(db: DB, options: RunsRouterOptions = {}) {
     const validLabelKeys = new Set(labels.map((l) => l.key));
 
     // ソースタイプ決定とアイテム抽出
-    let sourceType: "structured_json" | "final_answer";
+    let sourceType: CandidateSourceType;
+    let resolvedSourceStepId: string | null = null;
     let items: z.infer<typeof structuredOutputSchema>["items"];
+    const requestedSourceType =
+      source_type ?? (run.structured_output !== null ? "structured_json" : "final_answer");
 
-    const parsedStructuredOutput = parseStructuredOutput(run.structured_output);
-
-    if (parsedStructuredOutput !== null) {
-      // structured_output が存在する場合
+    if (requestedSourceType === "structured_json") {
       sourceType = "structured_json";
-      const parsed = structuredOutputSchema.safeParse(parsedStructuredOutput);
-      if (!parsed.success) {
+      const parsedStructuredOutput = parseStructuredOutput(run.structured_output);
+      if (parsedStructuredOutput === null) {
+        return c.json({ error: "structured_output is not available for this run" }, 400);
+      }
+
+      const parsedItems = parseStructuredItems(parsedStructuredOutput);
+      if (parsedItems === null) {
         return c.json({ error: "structured_output has invalid format" }, 400);
       }
-      items = parsed.data.items;
-    } else {
-      // final_answer: 最後の assistant メッセージを JSON としてパース
+      items = parsedItems;
+    } else if (requestedSourceType === "final_answer") {
       sourceType = "final_answer";
       const conversation = parseConversation(run.conversation);
       const lastAssistantMessage = [...conversation].reverse().find((m) => m.role === "assistant");
@@ -859,15 +897,15 @@ export function createRunsRouter(db: DB, options: RunsRouterOptions = {}) {
         return c.json({ error: "No assistant message found in conversation" }, 400);
       }
 
-      let parsed: unknown;
+      let parsedFinalAnswer: unknown;
       try {
-        parsed = JSON.parse(lastAssistantMessage.content);
+        parsedFinalAnswer = JSON.parse(lastAssistantMessage.content);
       } catch {
         return c.json({ error: "Failed to parse assistant message as JSON" }, 400);
       }
 
-      const parsedItems = structuredOutputSchema.safeParse(parsed);
-      if (!parsedItems.success) {
+      const parsedItems = parseStructuredItems(parsedFinalAnswer);
+      if (parsedItems === null) {
         return c.json(
           {
             error:
@@ -876,7 +914,33 @@ export function createRunsRouter(db: DB, options: RunsRouterOptions = {}) {
           400,
         );
       }
-      items = parsedItems.data.items;
+      items = parsedItems;
+    } else {
+      sourceType = "trace_step";
+      resolvedSourceStepId = source_step_id ?? null;
+
+      const executionTrace = parseExecutionTrace(run.execution_trace);
+      if (executionTrace === null) {
+        return c.json({ error: "execution_trace is not available for this run" }, 400);
+      }
+
+      const traceStep = executionTrace.find((step) => step.id === source_step_id);
+      if (!traceStep) {
+        return c.json({ error: `Trace step "${source_step_id}" not found` }, 400);
+      }
+
+      let parsedTraceStepOutput: unknown;
+      try {
+        parsedTraceStepOutput = JSON.parse(traceStep.output);
+      } catch {
+        return c.json({ error: "Failed to parse trace_step output as JSON" }, 400);
+      }
+
+      const parsedItems = parseStructuredItems(parsedTraceStepOutput);
+      if (parsedItems === null) {
+        return c.json({ error: "trace_step output has invalid format" }, 400);
+      }
+      items = parsedItems;
     }
 
     // label の存在チェック
@@ -931,7 +995,7 @@ export function createRunsRouter(db: DB, options: RunsRouterOptions = {}) {
           annotation_task_id,
           target_text_ref: targetTextRef,
           source_type: sourceType,
-          source_step_id: null,
+          source_step_id: resolvedSourceStepId,
           label: item.label,
           start_line: item.start_line,
           end_line: item.end_line,
@@ -945,7 +1009,14 @@ export function createRunsRouter(db: DB, options: RunsRouterOptions = {}) {
       )
       .returning();
 
-    return c.json(inserted, 201);
+    return c.json(
+      {
+        candidates_created: inserted.length,
+        run_id: id,
+        annotation_task_id,
+      },
+      201,
+    );
   });
 
   // PATCH /api/projects/:projectId/runs/:id/discard - Run破棄
