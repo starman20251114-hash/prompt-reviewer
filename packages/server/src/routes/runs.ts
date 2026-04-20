@@ -8,6 +8,9 @@ import {
   type PromptExecutionStepDefinition,
   type PromptWorkflowDefinition,
   type StructuredOutput,
+  annotation_candidates,
+  annotation_labels,
+  annotation_tasks,
   execution_profiles,
   prompt_version_projects,
   prompt_versions,
@@ -77,6 +80,31 @@ const executeRunSchema = z.object({
 });
 
 type ExecuteRunBody = z.infer<typeof executeRunSchema>;
+type CandidateSourceType = "structured_json" | "final_answer" | "trace_step";
+
+const extractCandidatesSchema = z
+  .object({
+    annotation_task_id: z.number().int().positive(),
+    source_type: z.enum(["structured_json", "final_answer", "trace_step"]).optional(),
+    source_step_id: z.string().min(1).optional(),
+  })
+  .superRefine((value, ctx) => {
+    if (value.source_type === "trace_step" && !value.source_step_id) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "source_step_id is required when source_type is trace_step",
+        path: ["source_step_id"],
+      });
+    }
+
+    if (value.source_type !== "trace_step" && value.source_step_id !== undefined) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "source_step_id can only be used when source_type is trace_step",
+        path: ["source_step_id"],
+      });
+    }
+  });
 
 type RunExecutionClientFactoryInput = {
   apiProvider: string;
@@ -150,6 +178,17 @@ function parseStructuredOutput(json: string | null): StructuredOutput | null {
   }
 
   return JSON.parse(json) as StructuredOutput;
+}
+
+function parseStructuredItems(
+  value: unknown,
+): z.infer<typeof structuredOutputSchema>["items"] | null {
+  const parsed = structuredOutputSchema.safeParse(value);
+  if (!parsed.success) {
+    return null;
+  }
+
+  return parsed.data.items;
 }
 
 function buildSystemPrompt(version: StoredPromptVersion, testCase: StoredTestCase): string {
@@ -769,6 +808,215 @@ export function createRunsRouter(db: DB, options: RunsRouterOptions = {}) {
     }
 
     return c.json(serializeRun(updated));
+  });
+
+  // POST /api/projects/:projectId/runs/:id/candidates/extract - annotation_candidates を抽出して保存
+  router.post("/:id/candidates/extract", async (c) => {
+    const projectId = parseIntParam(c.req.param("projectId"));
+    const id = parseIntParam(c.req.param("id"));
+
+    if (projectId === null || id === null) {
+      return c.json({ error: "Invalid ID" }, 400);
+    }
+
+    let body: z.infer<typeof extractCandidatesSchema>;
+    try {
+      body = (await c.req.json()) as z.infer<typeof extractCandidatesSchema>;
+    } catch {
+      return c.json({ error: "Invalid JSON body" }, 400);
+    }
+
+    const parsedBody = extractCandidatesSchema.safeParse(body);
+    if (!parsedBody.success) {
+      return c.json({ error: parsedBody.error.issues[0]?.message ?? "Invalid request body" }, 400);
+    }
+    const { annotation_task_id, source_type, source_step_id } = parsedBody.data;
+
+    // run が存在し、該当プロジェクトに属することを確認
+    const versionIds = await fetchVersionIdsByProject(db, projectId);
+    if (versionIds.length === 0) {
+      return c.json({ error: "Run not found" }, 404);
+    }
+
+    const [run] = await db
+      .select()
+      .from(runs)
+      .where(
+        and(
+          eq(runs.id, id),
+          eq(runs.project_id, projectId),
+          inArray(runs.prompt_version_id, versionIds),
+        ),
+      );
+
+    if (!run) {
+      return c.json({ error: "Run not found" }, 404);
+    }
+
+    // annotation_task が存在することを確認
+    const [task] = await db
+      .select()
+      .from(annotation_tasks)
+      .where(eq(annotation_tasks.id, annotation_task_id));
+
+    if (!task) {
+      return c.json({ error: "Annotation task not found" }, 404);
+    }
+
+    // annotation_task に紐づく有効な label keys を取得
+    const labels = await db
+      .select({ key: annotation_labels.key })
+      .from(annotation_labels)
+      .where(eq(annotation_labels.annotation_task_id, annotation_task_id));
+    const validLabelKeys = new Set(labels.map((l) => l.key));
+
+    // ソースタイプ決定とアイテム抽出
+    let sourceType: CandidateSourceType;
+    let resolvedSourceStepId: string | null = null;
+    let items: z.infer<typeof structuredOutputSchema>["items"];
+    const requestedSourceType =
+      source_type ?? (run.structured_output !== null ? "structured_json" : "final_answer");
+
+    if (requestedSourceType === "structured_json") {
+      sourceType = "structured_json";
+      const parsedStructuredOutput = parseStructuredOutput(run.structured_output);
+      if (parsedStructuredOutput === null) {
+        return c.json({ error: "structured_output is not available for this run" }, 400);
+      }
+
+      const parsedItems = parseStructuredItems(parsedStructuredOutput);
+      if (parsedItems === null) {
+        return c.json({ error: "structured_output has invalid format" }, 400);
+      }
+      items = parsedItems;
+    } else if (requestedSourceType === "final_answer") {
+      sourceType = "final_answer";
+      const conversation = parseConversation(run.conversation);
+      const lastAssistantMessage = [...conversation].reverse().find((m) => m.role === "assistant");
+      if (!lastAssistantMessage) {
+        return c.json({ error: "No assistant message found in conversation" }, 400);
+      }
+
+      let parsedFinalAnswer: unknown;
+      try {
+        parsedFinalAnswer = JSON.parse(lastAssistantMessage.content);
+      } catch {
+        return c.json({ error: "Failed to parse assistant message as JSON" }, 400);
+      }
+
+      const parsedItems = parseStructuredItems(parsedFinalAnswer);
+      if (parsedItems === null) {
+        return c.json(
+          {
+            error:
+              "Assistant message JSON has invalid format (missing items field or invalid schema)",
+          },
+          400,
+        );
+      }
+      items = parsedItems;
+    } else {
+      sourceType = "trace_step";
+      resolvedSourceStepId = source_step_id ?? null;
+
+      const executionTrace = parseExecutionTrace(run.execution_trace);
+      if (executionTrace === null) {
+        return c.json({ error: "execution_trace is not available for this run" }, 400);
+      }
+
+      const traceStep = executionTrace.find((step) => step.id === source_step_id);
+      if (!traceStep) {
+        return c.json({ error: `Trace step "${source_step_id}" not found` }, 400);
+      }
+
+      let parsedTraceStepOutput: unknown;
+      try {
+        parsedTraceStepOutput = JSON.parse(traceStep.output);
+      } catch {
+        return c.json({ error: "Failed to parse trace_step output as JSON" }, 400);
+      }
+
+      const parsedItems = parseStructuredItems(parsedTraceStepOutput);
+      if (parsedItems === null) {
+        return c.json({ error: "trace_step output has invalid format" }, 400);
+      }
+      items = parsedItems;
+    }
+
+    // label の存在チェック
+    for (const item of items) {
+      if (!validLabelKeys.has(item.label)) {
+        return c.json(
+          { error: `Label "${item.label}" is not valid for this annotation task` },
+          400,
+        );
+      }
+    }
+
+    // line range チェック
+    for (const item of items) {
+      if (item.start_line > item.end_line) {
+        return c.json(
+          {
+            error: `start_line (${item.start_line}) must not be greater than end_line (${item.end_line})`,
+          },
+          400,
+        );
+      }
+    }
+
+    // 重複チェック: 同一 run / task / source からの重複取り込みを防ぐ
+    const [existing] = await db
+      .select({ id: annotation_candidates.id })
+      .from(annotation_candidates)
+      .where(
+        and(
+          eq(annotation_candidates.run_id, id),
+          eq(annotation_candidates.annotation_task_id, annotation_task_id),
+          eq(annotation_candidates.source_type, sourceType),
+        ),
+      );
+
+    if (existing) {
+      return c.json(
+        { error: "Candidates already extracted for this run/task/source combination" },
+        409,
+      );
+    }
+
+    const targetTextRef = `test_case:${run.test_case_id}`;
+    const now = Date.now();
+
+    const inserted = await db
+      .insert(annotation_candidates)
+      .values(
+        items.map((item) => ({
+          run_id: id,
+          annotation_task_id,
+          target_text_ref: targetTextRef,
+          source_type: sourceType,
+          source_step_id: resolvedSourceStepId,
+          label: item.label,
+          start_line: item.start_line,
+          end_line: item.end_line,
+          quote: item.quote,
+          rationale: item.rationale ?? null,
+          status: "pending" as const,
+          note: null,
+          created_at: now,
+          updated_at: now,
+        })),
+      )
+      .returning();
+
+    return c.json(
+      {
+        candidates_created: inserted.length,
+        run_id: id,
+        annotation_task_id,
+      },
+      201,
+    );
   });
 
   // PATCH /api/projects/:projectId/runs/:id/discard - Run破棄

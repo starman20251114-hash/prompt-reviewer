@@ -1883,3 +1883,433 @@ describe("PATCH /api/projects/:projectId/runs/:id/discard", () => {
     expect(body.error).toBe("Run not found");
   });
 });
+
+// ---- candidates/extract テスト用データ ----
+
+const sampleAnnotationTask = {
+  id: 1,
+  name: "テストアノテーションタスク",
+  description: null,
+  output_mode: "span_label" as const,
+  created_at: 1000000,
+  updated_at: 1000000,
+};
+
+const sampleAnnotationLabels = [{ key: "insight" }, { key: "question" }];
+
+const sampleRunWithStructuredOutput: MockRun = {
+  ...sampleRun,
+  structured_output: JSON.stringify({
+    items: [
+      {
+        label: "insight",
+        start_line: 1,
+        end_line: 3,
+        quote: "今日は晴れです。",
+        rationale: "天気についての洞察",
+      },
+    ],
+  }),
+};
+
+const sampleRunWithFinalAnswer: MockRun = {
+  ...sampleRun,
+  structured_output: null,
+  conversation: JSON.stringify([
+    { role: "user", content: "文章を分析してください" },
+    {
+      role: "assistant",
+      content: JSON.stringify({
+        items: [
+          {
+            label: "question",
+            start_line: 2,
+            end_line: 4,
+            quote: "何か問題がありますか？",
+          },
+        ],
+      }),
+    },
+  ]),
+};
+
+const sampleRunWithTraceStep: MockRun = {
+  ...sampleRun,
+  execution_trace: JSON.stringify([
+    {
+      id: "step-1",
+      title: "抽出ステップ",
+      prompt: "候補を抽出する",
+      renderedPrompt: "候補を抽出する",
+      inputConversation: sampleConversation,
+      output: JSON.stringify({
+        items: [
+          {
+            label: "insight",
+            start_line: 3,
+            end_line: 5,
+            quote: "途中ステップからの候補",
+            rationale: "trace_step由来",
+          },
+        ],
+      }),
+    },
+  ]),
+};
+
+/**
+ * candidates/extract エンドポイント用のDBモック構築ヘルパー
+ *
+ * selectCallCount に対応するレスポンスを配列で指定する:
+ * 1. prompt_version_projects (versionIds)
+ * 2. runs (run取得)
+ * 3. annotation_tasks (task確認)
+ * 4. annotation_labels (labelキー一覧)
+ * 5. annotation_candidates (重複チェック)
+ */
+function buildExtractDb(params: {
+  run?: MockRun | null;
+  task?: typeof sampleAnnotationTask | null;
+  labels?: Array<{ key: string }>;
+  existingCandidate?: { id: number } | null;
+  insertReturns?: unknown[];
+  insertedValues?: Record<string, unknown>[] | null;
+}) {
+  const {
+    run = sampleRunWithStructuredOutput,
+    task = sampleAnnotationTask,
+    labels = sampleAnnotationLabels,
+    existingCandidate = null,
+    insertReturns = [],
+    insertedValues = null,
+  } = params;
+
+  let selectCallCount = 0;
+
+  return {
+    select: () => {
+      selectCallCount++;
+      if (selectCallCount === 1) {
+        // prompt_version_projects
+        return {
+          from: () => ({
+            where: () => Promise.resolve(run !== null ? [{ prompt_version_id: 1 }] : []),
+          }),
+        };
+      }
+      if (selectCallCount === 2) {
+        // runs
+        return {
+          from: () => ({
+            where: () => Promise.resolve(run !== null ? [run] : []),
+          }),
+        };
+      }
+      if (selectCallCount === 3) {
+        // annotation_tasks
+        return {
+          from: () => ({
+            where: () => Promise.resolve(task !== null ? [task] : []),
+          }),
+        };
+      }
+      if (selectCallCount === 4) {
+        // annotation_labels
+        return {
+          from: () => ({
+            where: () => Promise.resolve(labels),
+          }),
+        };
+      }
+      // annotation_candidates 重複チェック
+      return {
+        from: () => ({
+          where: () => Promise.resolve(existingCandidate !== null ? [existingCandidate] : []),
+        }),
+      };
+    },
+    insert: () => ({
+      values: (values: Record<string, unknown>[]) => {
+        if (insertedValues) {
+          insertedValues.push(...values);
+        }
+        return {
+          returning: () => Promise.resolve(insertReturns),
+        };
+      },
+    }),
+  };
+}
+
+describe("POST /api/projects/:projectId/runs/:id/candidates/extract", () => {
+  it("structured_output から Candidate を生成して 201 を返す", async () => {
+    const insertedValues: Record<string, unknown>[] = [];
+    const db = buildExtractDb({ insertReturns: [{ id: 1 }], insertedValues });
+
+    const app = buildApp(db);
+    const res = await app.request("/api/projects/1/runs/1/candidates/extract", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ annotation_task_id: 1 }),
+    });
+
+    expect(res.status).toBe(201);
+    const body = (await res.json()) as {
+      candidates_created: number;
+      run_id: number;
+      annotation_task_id: number;
+    };
+    expect(body).toEqual({
+      candidates_created: 1,
+      run_id: 1,
+      annotation_task_id: 1,
+    });
+    expect(insertedValues).toEqual([
+      expect.objectContaining({
+        source_type: "structured_json",
+        label: "insight",
+        target_text_ref: "test_case:1",
+        status: "pending",
+      }),
+    ]);
+  });
+
+  it("source_type を省略した場合は final_answer にフォールバックして 201 を返す", async () => {
+    const insertedValues: Record<string, unknown>[] = [];
+    const db = buildExtractDb({
+      run: sampleRunWithFinalAnswer,
+      insertReturns: [{ id: 2 }],
+      insertedValues,
+    });
+
+    const app = buildApp(db);
+    const res = await app.request("/api/projects/1/runs/1/candidates/extract", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ annotation_task_id: 1 }),
+    });
+
+    expect(res.status).toBe(201);
+    const body = (await res.json()) as {
+      candidates_created: number;
+      run_id: number;
+      annotation_task_id: number;
+    };
+    expect(body).toEqual({
+      candidates_created: 1,
+      run_id: 1,
+      annotation_task_id: 1,
+    });
+    expect(insertedValues).toEqual([
+      expect.objectContaining({
+        source_type: "final_answer",
+        label: "question",
+      }),
+    ]);
+  });
+
+  it("source_type=final_answer を明示すると structured_output があっても final_answer を使う", async () => {
+    const runWithBothSources: MockRun = {
+      ...sampleRunWithStructuredOutput,
+      conversation: sampleRunWithFinalAnswer.conversation,
+    };
+    const insertedValues: Record<string, unknown>[] = [];
+    const db = buildExtractDb({
+      run: runWithBothSources,
+      insertReturns: [{ id: 3 }],
+      insertedValues,
+    });
+
+    const app = buildApp(db);
+    const res = await app.request("/api/projects/1/runs/1/candidates/extract", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ annotation_task_id: 1, source_type: "final_answer" }),
+    });
+
+    expect(res.status).toBe(201);
+    expect(insertedValues).toEqual([
+      expect.objectContaining({
+        source_type: "final_answer",
+        label: "question",
+      }),
+    ]);
+  });
+
+  it("source_type=trace_step と source_step_id を指定すると対象 step から抽出する", async () => {
+    const insertedValues: Record<string, unknown>[] = [];
+    const db = buildExtractDb({
+      run: sampleRunWithTraceStep,
+      insertReturns: [{ id: 4 }],
+      insertedValues,
+    });
+
+    const app = buildApp(db);
+    const res = await app.request("/api/projects/1/runs/1/candidates/extract", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        annotation_task_id: 1,
+        source_type: "trace_step",
+        source_step_id: "step-1",
+      }),
+    });
+
+    expect(res.status).toBe(201);
+    expect(insertedValues).toEqual([
+      expect.objectContaining({
+        source_type: "trace_step",
+        source_step_id: "step-1",
+        label: "insight",
+      }),
+    ]);
+  });
+
+  it("存在しない label を含む場合は 400 を返す", async () => {
+    const runWithInvalidLabel: MockRun = {
+      ...sampleRun,
+      structured_output: JSON.stringify({
+        items: [
+          {
+            label: "nonexistent_label",
+            start_line: 1,
+            end_line: 2,
+            quote: "テスト",
+          },
+        ],
+      }),
+    };
+
+    const db = buildExtractDb({ run: runWithInvalidLabel });
+
+    const app = buildApp(db);
+    const res = await app.request("/api/projects/1/runs/1/candidates/extract", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ annotation_task_id: 1 }),
+    });
+
+    expect(res.status).toBe(400);
+    const body = (await res.json()) as { error: string };
+    expect(body.error).toContain("nonexistent_label");
+  });
+
+  it("start_line > end_line の不正 line range で 400 を返す", async () => {
+    const runWithInvalidRange: MockRun = {
+      ...sampleRun,
+      structured_output: JSON.stringify({
+        items: [
+          {
+            label: "insight",
+            start_line: 5,
+            end_line: 2,
+            quote: "テスト",
+          },
+        ],
+      }),
+    };
+
+    const db = buildExtractDb({ run: runWithInvalidRange });
+
+    const app = buildApp(db);
+    const res = await app.request("/api/projects/1/runs/1/candidates/extract", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ annotation_task_id: 1 }),
+    });
+
+    expect(res.status).toBe(400);
+    const body = (await res.json()) as { error: string };
+    expect(body.error).toContain("start_line");
+    expect(body.error).toContain("end_line");
+  });
+
+  it("final_answer で JSON パース失敗の場合は 400 を返す（items フィールドなし）", async () => {
+    const runWithInvalidJson: MockRun = {
+      ...sampleRun,
+      structured_output: null,
+      conversation: JSON.stringify([
+        { role: "user", content: "分析してください" },
+        {
+          role: "assistant",
+          content: JSON.stringify({ result: "no_items_field" }),
+        },
+      ]),
+    };
+
+    const db = buildExtractDb({ run: runWithInvalidJson });
+
+    const app = buildApp(db);
+    const res = await app.request("/api/projects/1/runs/1/candidates/extract", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ annotation_task_id: 1 }),
+    });
+
+    expect(res.status).toBe(400);
+    const body = (await res.json()) as { error: string };
+    expect(body.error).toContain("invalid format");
+  });
+
+  it("重複抽出時に 409 を返す", async () => {
+    const db = buildExtractDb({
+      existingCandidate: { id: 99 },
+    });
+
+    const app = buildApp(db);
+    const res = await app.request("/api/projects/1/runs/1/candidates/extract", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ annotation_task_id: 1 }),
+    });
+
+    expect(res.status).toBe(409);
+    const body = (await res.json()) as { error: string };
+    expect(body.error).toContain("already extracted");
+  });
+
+  it("source_type=trace_step で source_step_id がない場合は 400 を返す", async () => {
+    const db = buildExtractDb({ run: sampleRunWithTraceStep });
+
+    const app = buildApp(db);
+    const res = await app.request("/api/projects/1/runs/1/candidates/extract", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ annotation_task_id: 1, source_type: "trace_step" }),
+    });
+
+    expect(res.status).toBe(400);
+    const body = (await res.json()) as { error: string };
+    expect(body.error).toContain("source_step_id");
+  });
+
+  it("run が存在しない場合は 404 を返す", async () => {
+    const db = buildExtractDb({ run: null });
+
+    const app = buildApp(db);
+    const res = await app.request("/api/projects/1/runs/999/candidates/extract", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ annotation_task_id: 1 }),
+    });
+
+    expect(res.status).toBe(404);
+    const body = (await res.json()) as { error: string };
+    expect(body.error).toBe("Run not found");
+  });
+
+  it("annotation_task が存在しない場合は 404 を返す", async () => {
+    const db = buildExtractDb({ task: null });
+
+    const app = buildApp(db);
+    const res = await app.request("/api/projects/1/runs/1/candidates/extract", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ annotation_task_id: 999 }),
+    });
+
+    expect(res.status).toBe(404);
+    const body = (await res.json()) as { error: string };
+    expect(body.error).toBe("Annotation task not found");
+  });
+});
