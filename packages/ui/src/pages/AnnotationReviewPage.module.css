@@ -462,6 +462,43 @@
   background: rgba(203, 166, 247, 0.18);
 }
 
+/* ==================== Gold annotation actions ==================== */
+.btnDelete {
+  padding: 2px 8px;
+  border-radius: 5px;
+  font-size: 11px;
+  cursor: pointer;
+  background: transparent;
+  color: var(--c-danger);
+  border: 1px solid rgba(243, 139, 168, 0.35);
+  margin-left: auto;
+}
+
+.btnDelete:hover:not(:disabled) {
+  background: rgba(243, 139, 168, 0.12);
+}
+
+.addGoldForm {
+  padding: 12px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  border-top: 1px solid var(--c-border);
+}
+
+.btnAddGold {
+  margin: 8px 16px;
+  padding: 5px 12px;
+  border-radius: 5px;
+  font-size: 12px;
+  cursor: pointer;
+  background: rgba(166, 227, 161, 0.1);
+  color: var(--c-green);
+  border: 1px solid rgba(166, 227, 161, 0.35);
+  font-weight: 600;
+  align-self: flex-start;
+}
+
 /* ==================== Misc ==================== */
 .loadingMsg {
   margin: 16px;

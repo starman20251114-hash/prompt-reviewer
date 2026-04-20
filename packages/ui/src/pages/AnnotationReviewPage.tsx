@@ -6,6 +6,8 @@ import {
   type AnnotationLabel,
   type CandidateStatus,
   type GoldAnnotation,
+  createGoldAnnotation,
+  deleteGoldAnnotation,
   getAnnotationCandidates,
   getAnnotationTask,
   getAnnotationTasks,
@@ -396,6 +398,14 @@ export function AnnotationReviewPage() {
     },
   });
 
+  const deleteGoldMutation = useMutation({
+    mutationFn: (goldId: number) => deleteGoldAnnotation(goldId),
+    onSuccess: () => {
+      void refetchGold();
+      void queryClient.invalidateQueries({ queryKey: ["gold-annotations"] });
+    },
+  });
+
   const labels = annotationTask?.labels ?? [];
   const isLoading = isRunLoading || isTaskLoading || isCandidatesLoading || isTestCaseLoading;
 
@@ -494,7 +504,12 @@ export function AnnotationReviewPage() {
             ) : (
               <div className={styles.goldList}>
                 {goldAnnotations.map((g) => (
-                  <GoldAnnotationCard key={g.id} gold={g} labels={labels} />
+                  <GoldAnnotationCard
+                    key={g.id}
+                    gold={g}
+                    labels={labels}
+                    onDelete={() => deleteGoldMutation.mutate(g.id)}
+                  />
                 ))}
               </div>
             )}
@@ -510,11 +525,13 @@ function GoldAnnotationCard({
   labels,
   onHover,
   onLeave,
+  onDelete,
 }: {
   gold: GoldAnnotation;
   labels: AnnotationLabel[];
   onHover?: (range: { start: number; end: number }) => void;
   onLeave?: () => void;
+  onDelete?: () => void;
 }) {
   const label = labels.find((l) => l.key === gold.label);
   return (
@@ -545,6 +562,11 @@ function GoldAnnotationCard({
         <span className={styles.candidateLines}>
           L{gold.start_line}–L{gold.end_line}
         </span>
+        {onDelete && (
+          <button type="button" className={styles.btnDelete} onClick={onDelete}>
+            削除
+          </button>
+        )}
       </div>
       <p className={styles.candidateQuote}>&ldquo;{gold.quote}&rdquo;</p>
       {gold.note && <p className={styles.candidateNote}>{gold.note}</p>}
@@ -553,9 +575,18 @@ function GoldAnnotationCard({
 }
 
 function GoldAnnotationBrowse({ projectId }: { projectId: number }) {
+  const queryClient = useQueryClient();
   const [selectedTaskId, setSelectedTaskId] = useState<number | null>(null);
   const [selectedTestCaseId, setSelectedTestCaseId] = useState<number | null>(null);
   const [activeRange, setActiveRange] = useState<{ start: number; end: number } | null>(null);
+  const [showAddForm, setShowAddForm] = useState(false);
+
+  // 追加フォームの状態
+  const [formLabel, setFormLabel] = useState("");
+  const [formStartLine, setFormStartLine] = useState("");
+  const [formEndLine, setFormEndLine] = useState("");
+  const [formQuote, setFormQuote] = useState("");
+  const [formNote, setFormNote] = useState("");
 
   const { data: tasks = [] } = useQuery({
     queryKey: ["annotation-tasks"],
@@ -589,6 +620,41 @@ function GoldAnnotationBrowse({ projectId }: { projectId: number }) {
     enabled: selectedTaskId !== null && selectedTestCaseId !== null,
   });
 
+  const deleteGoldMutation = useMutation({
+    mutationFn: (goldId: number) => deleteGoldAnnotation(goldId),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: ["gold-annotations"] });
+    },
+  });
+
+  const createGoldMutation = useMutation({
+    mutationFn: (data: Parameters<typeof createGoldAnnotation>[0]) => createGoldAnnotation(data),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: ["gold-annotations"] });
+      setShowAddForm(false);
+      setFormLabel("");
+      setFormStartLine("");
+      setFormEndLine("");
+      setFormQuote("");
+      setFormNote("");
+    },
+  });
+
+  const labels = selectedTaskDetail?.labels ?? [];
+
+  function handleAddFormSave() {
+    if (!selectedTaskId || !selectedTestCaseId || !formLabel) return;
+    createGoldMutation.mutate({
+      annotation_task_id: selectedTaskId,
+      target_text_ref: `test_case:${selectedTestCaseId}`,
+      label: formLabel,
+      start_line: Number(formStartLine),
+      end_line: Number(formEndLine),
+      quote: formQuote,
+      note: formNote.trim() || null,
+    });
+  }
+
   // GoldAnnotation を LineNumberedText の candidates 形式に変換
   const goldAsCandidates: AnnotationCandidate[] = goldAnnotations.map((g) => ({
     id: g.id,
@@ -604,8 +670,6 @@ function GoldAnnotationBrowse({ projectId }: { projectId: number }) {
     created_at: g.created_at,
     updated_at: g.updated_at,
   }));
-
-  const labels = selectedTaskDetail?.labels ?? [];
 
   return (
     <div className={styles.root}>
@@ -641,6 +705,7 @@ function GoldAnnotationBrowse({ projectId }: { projectId: number }) {
                 onChange={(e) => {
                   const val = e.target.value;
                   setSelectedTaskId(val === "" ? null : Number(val));
+                  setFormLabel("");
                 }}
               >
                 <option value="">タスクを選択...</option>
@@ -678,7 +743,7 @@ function GoldAnnotationBrowse({ projectId }: { projectId: number }) {
             </div>
           </div>
 
-          {/* Gold Annotation 一覧 */}
+          {/* Gold Annotation 一覧 + 手動追加 */}
           {selectedTaskId !== null && selectedTestCaseId !== null && (
             <div className={styles.rightSection}>
               <h3 className={styles.panelTitle}>
@@ -698,8 +763,121 @@ function GoldAnnotationBrowse({ projectId }: { projectId: number }) {
                       labels={labels}
                       onHover={(range) => setActiveRange(range)}
                       onLeave={() => setActiveRange(null)}
+                      onDelete={() => deleteGoldMutation.mutate(g.id)}
                     />
                   ))}
+                </div>
+              )}
+
+              {/* 手動追加ボタン / フォーム */}
+              {!showAddForm ? (
+                <button
+                  type="button"
+                  className={styles.btnAddGold}
+                  onClick={() => {
+                    setShowAddForm(true);
+                    if (labels.length > 0 && labels[0]) {
+                      setFormLabel(labels[0].key);
+                    }
+                  }}
+                >
+                  + 追加
+                </button>
+              ) : (
+                <div className={styles.addGoldForm}>
+                  <div className={styles.editRow}>
+                    <label htmlFor="add-gold-label" className={styles.editLabel}>
+                      ラベル
+                    </label>
+                    <select
+                      id="add-gold-label"
+                      value={formLabel}
+                      onChange={(e) => setFormLabel(e.target.value)}
+                      className={styles.editSelect}
+                      disabled={createGoldMutation.isPending}
+                    >
+                      <option value="">選択...</option>
+                      {labels.map((l) => (
+                        <option key={l.id} value={l.key}>
+                          {l.name}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                  <div className={styles.editRow}>
+                    <label htmlFor="add-gold-start" className={styles.editLabel}>
+                      開始行
+                    </label>
+                    <input
+                      id="add-gold-start"
+                      type="number"
+                      value={formStartLine}
+                      onChange={(e) => setFormStartLine(e.target.value)}
+                      className={styles.editInput}
+                      min={1}
+                      disabled={createGoldMutation.isPending}
+                    />
+                    <label htmlFor="add-gold-end" className={styles.editLabel}>
+                      終了行
+                    </label>
+                    <input
+                      id="add-gold-end"
+                      type="number"
+                      value={formEndLine}
+                      onChange={(e) => setFormEndLine(e.target.value)}
+                      className={styles.editInput}
+                      min={1}
+                      disabled={createGoldMutation.isPending}
+                    />
+                  </div>
+                  <div className={styles.editRow}>
+                    <label htmlFor="add-gold-quote" className={styles.editLabel}>
+                      引用
+                    </label>
+                    <input
+                      id="add-gold-quote"
+                      type="text"
+                      value={formQuote}
+                      onChange={(e) => setFormQuote(e.target.value)}
+                      className={styles.editInputWide}
+                      placeholder="対象テキストの引用"
+                      disabled={createGoldMutation.isPending}
+                    />
+                  </div>
+                  <div className={styles.editRow}>
+                    <label htmlFor="add-gold-note" className={styles.editLabel}>
+                      ノート
+                    </label>
+                    <input
+                      id="add-gold-note"
+                      type="text"
+                      value={formNote}
+                      onChange={(e) => setFormNote(e.target.value)}
+                      className={styles.editInputWide}
+                      placeholder="任意のメモ"
+                      disabled={createGoldMutation.isPending}
+                    />
+                  </div>
+                  <div className={styles.editActions}>
+                    <button
+                      type="button"
+                      className={styles.btnSave}
+                      onClick={handleAddFormSave}
+                      disabled={
+                        createGoldMutation.isPending || !formLabel || !formStartLine || !formEndLine
+                      }
+                    >
+                      {createGoldMutation.isPending ? "保存中..." : "保存"}
+                    </button>
+                    <button
+                      type="button"
+                      className={styles.btnCancel}
+                      onClick={() => setShowAddForm(false)}
+                      disabled={createGoldMutation.isPending}
+                    >
+                      キャンセル
+                    </button>
+                  </div>
                 </div>
               )}
             </div>

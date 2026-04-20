@@ -1,11 +1,31 @@
 import { zValidator } from "@hono/zod-validator";
 import type { DB } from "@prompt-reviewer/core";
-import { annotation_candidates, annotation_labels, gold_annotations } from "@prompt-reviewer/core";
+import {
+  annotation_candidates,
+  annotation_labels,
+  annotation_tasks,
+  gold_annotations,
+} from "@prompt-reviewer/core";
 import { and, eq } from "drizzle-orm";
 import { Hono } from "hono";
 import { z } from "zod";
 
 // ---- スキーマ定義 ----
+
+const createGoldAnnotationSchema = z
+  .object({
+    annotation_task_id: z.number().int().positive(),
+    target_text_ref: z.string().min(1),
+    label: z.string().min(1),
+    start_line: z.number().int().min(1),
+    end_line: z.number().int().min(1),
+    quote: z.string(),
+    note: z.string().nullable().optional(),
+  })
+  .refine((data) => data.end_line >= data.start_line, {
+    message: "end_line は start_line 以上でなければなりません",
+    path: ["end_line"],
+  });
 
 const patchCandidateSchema = z
   .object({
@@ -226,6 +246,74 @@ export function createGoldAnnotationsRouter(db: DB) {
           : await query.where(and(...conditions)).orderBy(gold_annotations.id);
 
     return c.json(result);
+  });
+
+  // DELETE /api/gold-annotations/:id
+  router.delete("/:id", async (c) => {
+    const id = Number(c.req.param("id"));
+
+    if (Number.isNaN(id)) {
+      return c.json({ error: "Invalid ID" }, 400);
+    }
+
+    const [existing] = await db.select().from(gold_annotations).where(eq(gold_annotations.id, id));
+
+    if (!existing) {
+      return c.json({ error: "Gold annotation not found" }, 404);
+    }
+
+    await db.delete(gold_annotations).where(eq(gold_annotations.id, id));
+
+    return c.json({ success: true });
+  });
+
+  // POST /api/gold-annotations
+  router.post("/", zValidator("json", createGoldAnnotationSchema), async (c) => {
+    const body = c.req.valid("json");
+
+    // annotation_task の存在確認
+    const [task] = await db
+      .select()
+      .from(annotation_tasks)
+      .where(eq(annotation_tasks.id, body.annotation_task_id));
+
+    if (!task) {
+      return c.json({ error: "Annotation task not found" }, 404);
+    }
+
+    // ラベルの有効性確認
+    const labels = await db
+      .select({ key: annotation_labels.key })
+      .from(annotation_labels)
+      .where(eq(annotation_labels.annotation_task_id, body.annotation_task_id));
+
+    const validLabelKeys = new Set(labels.map((l) => l.key));
+
+    if (!validLabelKeys.has(body.label)) {
+      return c.json({ error: `Label "${body.label}" is not valid for this annotation task` }, 400);
+    }
+
+    const now = Date.now();
+
+    const inserted = await db
+      .insert(gold_annotations)
+      .values({
+        annotation_task_id: body.annotation_task_id,
+        target_text_ref: body.target_text_ref,
+        label: body.label,
+        start_line: body.start_line,
+        end_line: body.end_line,
+        quote: body.quote,
+        note: body.note ?? null,
+        source_candidate_id: null,
+        created_at: now,
+        updated_at: now,
+      })
+      .returning();
+
+    const created = inserted[0];
+
+    return c.json(created, 201);
   });
 
   return router;

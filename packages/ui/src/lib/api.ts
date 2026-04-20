@@ -769,6 +769,22 @@ export function getGoldAnnotations(filters?: {
   return api.get<GoldAnnotation[]>(query ? `/gold-annotations?${query}` : "/gold-annotations");
 }
 
+export function deleteGoldAnnotation(id: number): Promise<{ success: boolean }> {
+  return api.delete<{ success: boolean }>(`/gold-annotations/${id}`);
+}
+
+export function createGoldAnnotation(data: {
+  annotation_task_id: number;
+  target_text_ref: string;
+  label: string;
+  start_line: number;
+  end_line: number;
+  quote: string;
+  note?: string | null;
+}): Promise<GoldAnnotation> {
+  return api.post<GoldAnnotation>("/gold-annotations", data);
+}
+
 export function extractAnnotationCandidates(
   projectId: number,
   runId: number,
