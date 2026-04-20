@@ -11,6 +11,7 @@ import type { Turn } from "@prompt-reviewer/core";
 import { eq } from "drizzle-orm";
 import { Hono } from "hono";
 import { z } from "zod";
+import { hasAnnotationData } from "../lib/annotation-guard.js";
 
 const turnSchema = z.object({
   role: z.enum(["user", "assistant"]),
@@ -184,6 +185,15 @@ export function createTestCasesRouter(db: DB) {
     }
 
     const body = c.req.valid("json");
+
+    // context_content を更新しようとしている場合、annotation データの存在確認
+    if (body.context_content !== undefined) {
+      const frozen = await hasAnnotationData(db, id);
+      if (frozen) {
+        return c.json({ error: "annotation済みのtest caseのcontext_contentは更新できません" }, 409);
+      }
+    }
+
     const updateData: {
       title?: string;
       turns?: string;

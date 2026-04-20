@@ -549,6 +549,152 @@ describe("PATCH /api/test-cases/:id", () => {
     const body = (await res.json()) as { error: string };
     expect(body.error).toBe("Invalid ID");
   });
+
+  it("Candidateが存在するtest caseのcontext_content更新は409を返す", async () => {
+    let fromCallCount = 0;
+    const db = {
+      select: () => ({
+        from: () => {
+          fromCallCount++;
+          if (fromCallCount === 1) {
+            return {
+              where: () => Promise.resolve([sampleTestCase]),
+            };
+          }
+          // annotation_candidates チェック
+          return {
+            where: () => ({
+              limit: () => Promise.resolve([{ id: 99 }]),
+            }),
+          };
+        },
+      }),
+    };
+
+    const app = buildApp(db);
+    const res = await app.request("/api/test-cases/1", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ context_content: "新しいコンテンツ" }),
+    });
+
+    expect(res.status).toBe(409);
+    const body = (await res.json()) as { error: string };
+    expect(body.error).toContain("annotation済み");
+  });
+
+  it("Gold Annotationが存在するtest caseのcontext_content更新は409を返す", async () => {
+    let fromCallCount = 0;
+    const db = {
+      select: () => ({
+        from: () => {
+          fromCallCount++;
+          if (fromCallCount === 1) {
+            return {
+              where: () => Promise.resolve([sampleTestCase]),
+            };
+          }
+          if (fromCallCount === 2) {
+            // annotation_candidates チェック（空）
+            return {
+              where: () => ({
+                limit: () => Promise.resolve([]),
+              }),
+            };
+          }
+          // gold_annotations チェック
+          return {
+            where: () => ({
+              limit: () => Promise.resolve([{ id: 55 }]),
+            }),
+          };
+        },
+      }),
+    };
+
+    const app = buildApp(db);
+    const res = await app.request("/api/test-cases/1", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ context_content: "新しいコンテンツ" }),
+    });
+
+    expect(res.status).toBe(409);
+    const body = (await res.json()) as { error: string };
+    expect(body.error).toContain("annotation済み");
+  });
+
+  it("annotationが存在しないtest caseのcontext_contentは更新できる", async () => {
+    const updated = { ...sampleTestCase, context_content: "新しいコンテンツ", updated_at: 2000000 };
+
+    let fromCallCount = 0;
+    const db = {
+      select: () => ({
+        from: () => {
+          fromCallCount++;
+          if (fromCallCount === 1) {
+            return {
+              where: () => Promise.resolve([sampleTestCase]),
+            };
+          }
+          // annotation チェック（空 = annotationなし）
+          return {
+            where: () => ({
+              limit: () => Promise.resolve([]),
+            }),
+          };
+        },
+      }),
+      update: () => ({
+        set: () => ({
+          where: () => ({
+            returning: () => Promise.resolve([updated]),
+          }),
+        }),
+      }),
+    };
+
+    const app = buildApp(db);
+    const res = await app.request("/api/test-cases/1", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ context_content: "新しいコンテンツ" }),
+    });
+
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as ParsedTestCase;
+    expect(body.context_content).toBe("新しいコンテンツ");
+  });
+
+  it("Candidateありでもcontext_content以外のフィールド更新は許可される", async () => {
+    const updated = { ...sampleTestCase, title: "新しいタイトル", updated_at: 2000000 };
+
+    const db = {
+      select: () => ({
+        from: () => ({
+          where: () => Promise.resolve([sampleTestCase]),
+        }),
+      }),
+      update: () => ({
+        set: () => ({
+          where: () => ({
+            returning: () => Promise.resolve([updated]),
+          }),
+        }),
+      }),
+    };
+
+    const app = buildApp(db);
+    const res = await app.request("/api/test-cases/1", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ title: "新しいタイトル" }),
+    });
+
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as ParsedTestCase;
+    expect(body.title).toBe("新しいタイトル");
+  });
 });
 
 // ---- DELETE /api/test-cases/:id ----
