@@ -10,10 +10,9 @@ import type { NewTestCase, TestCase, Turn } from "./test-cases.js";
 
 describe("test_cases スキーマ型定義", () => {
   describe("TestCase 型", () => {
-    it("TestCase 型は必須フィールドを持つ", () => {
+    it("TestCase 型は必須フィールドを持つ（project_idを除く独立資産構造）", () => {
       type RequiredFields = {
         id: number;
-        project_id: number;
         title: string;
         turns: string;
         context_content: string;
@@ -25,7 +24,6 @@ describe("test_cases スキーマ型定義", () => {
         Pick<
           TestCase,
           | "id"
-          | "project_id"
           | "title"
           | "turns"
           | "context_content"
@@ -34,6 +32,12 @@ describe("test_cases スキーマ型定義", () => {
           | "updated_at"
         >
       >().toMatchTypeOf<RequiredFields>();
+    });
+
+    it("TestCase 型は project_id フィールドを持たない（独立資産モデル）", () => {
+      // project_id は test_case_projects 中間テーブルで管理する
+      type HasNoProjectId = "project_id" extends keyof TestCase ? true : false;
+      expectTypeOf<HasNoProjectId>().toEqualTypeOf<false>();
     });
 
     it("TestCase の expected_description はオプショナル（null許容）", () => {
@@ -60,7 +64,6 @@ describe("test_cases スキーマ型定義", () => {
   describe("NewTestCase 型", () => {
     it("NewTestCase は id なしで作成できる（AutoIncrement）", () => {
       const newTestCase: NewTestCase = {
-        project_id: 1,
         title: "マルチターンテストケース",
         turns: JSON.stringify([
           { role: "user", content: "こんにちは" },
@@ -70,6 +73,11 @@ describe("test_cases スキーマ型定義", () => {
         updated_at: Date.now(),
       };
       expectTypeOf(newTestCase).toMatchTypeOf<NewTestCase>();
+    });
+
+    it("NewTestCase は project_id を持たない（独立資産モデル）", () => {
+      type HasNoProjectId = "project_id" extends keyof NewTestCase ? true : false;
+      expectTypeOf<HasNoProjectId>().toEqualTypeOf<false>();
     });
 
     it("NewTestCase の context_content はデフォルト値があるためオプショナル", () => {

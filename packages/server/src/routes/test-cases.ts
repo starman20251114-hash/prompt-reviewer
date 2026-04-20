@@ -1,8 +1,14 @@
 import { zValidator } from "@hono/zod-validator";
 import type { DB } from "@prompt-reviewer/core";
-import { test_cases } from "@prompt-reviewer/core";
+import {
+  context_assets,
+  projects,
+  test_case_context_assets,
+  test_case_projects,
+  test_cases,
+} from "@prompt-reviewer/core";
 import type { Turn } from "@prompt-reviewer/core";
-import { and, asc, eq } from "drizzle-orm";
+import { eq } from "drizzle-orm";
 import { Hono } from "hono";
 import { z } from "zod";
 
@@ -27,46 +33,109 @@ const updateTestCaseSchema = z.object({
   display_order: z.number().int().optional(),
 });
 
+const updateTestCaseProjectsSchema = z.object({
+  project_ids: z.array(z.number().int().positive("project_idは正の整数が必要です")),
+});
+
+const updateTestCaseContextAssetsSchema = z.object({
+  context_asset_ids: z.array(z.number().int().positive("context_asset_idは正の整数が必要です")),
+});
+
+function parseIdParam(value: string): number | null {
+  const parsed = Number(value);
+  return Number.isInteger(parsed) ? parsed : null;
+}
+
+function parseOptionalInt(value: string | undefined): number | null | undefined {
+  if (value === undefined || value === "") {
+    return undefined;
+  }
+  const parsed = Number(value);
+  return Number.isInteger(parsed) ? parsed : null;
+}
+
+function parseBooleanQuery(value: string | undefined): boolean | null | undefined {
+  if (value === undefined || value === "") {
+    return undefined;
+  }
+  if (value === "true") return true;
+  if (value === "false") return false;
+  return null;
+}
+
+type TestCaseRecord = typeof test_cases.$inferSelect;
+type ParsedTestCase = Omit<TestCaseRecord, "turns"> & { turns: Turn[] };
+
+function parseTurns(raw: string): Turn[] {
+  return JSON.parse(raw) as Turn[];
+}
+
+function serializeTestCase(tc: TestCaseRecord): ParsedTestCase {
+  return {
+    ...tc,
+    turns: parseTurns(tc.turns),
+  };
+}
+
 export function createTestCasesRouter(db: DB) {
   const router = new Hono();
 
-  // GET /api/projects/:projectId/test-cases - テストケース一覧取得（display_order順）
+  // GET /api/test-cases - テストケース一覧取得
+  // クエリパラメータ: project_id / unclassified / q
   router.get("/", async (c) => {
-    const projectId = Number(c.req.param("projectId"));
-
-    if (Number.isNaN(projectId)) {
-      return c.json({ error: "Invalid projectId" }, 400);
+    const projectId = parseOptionalInt(c.req.query("project_id"));
+    if (projectId === null) {
+      return c.json({ error: "Invalid project_id" }, 400);
     }
 
-    const result = await db
-      .select()
-      .from(test_cases)
-      .where(eq(test_cases.project_id, projectId))
-      .orderBy(asc(test_cases.display_order), asc(test_cases.id));
+    const unclassified = parseBooleanQuery(c.req.query("unclassified"));
+    if (unclassified === null) {
+      return c.json({ error: "Invalid unclassified" }, 400);
+    }
 
-    return c.json(
-      result.map((tc) => ({
-        ...tc,
-        turns: JSON.parse(tc.turns) as Turn[],
-      })),
-    );
+    const q = c.req.query("q")?.trim();
+
+    // 全テストケースを取得
+    let allCases = await db.select().from(test_cases);
+
+    // qフィルタ（タイトル部分一致）
+    if (q) {
+      allCases = allCases.filter((tc) => tc.title.toLocaleLowerCase().includes(q.toLocaleLowerCase()));
+    }
+
+    // project_idフィルタ: 指定プロジェクトに紐づくテストケースのみ
+    if (projectId !== undefined) {
+      const links = await db
+        .select({ test_case_id: test_case_projects.test_case_id })
+        .from(test_case_projects)
+        .where(eq(test_case_projects.project_id, projectId));
+      const linkedIds = new Set(links.map((l) => l.test_case_id));
+      allCases = allCases.filter((tc) => linkedIds.has(tc.id));
+    }
+
+    // unclassifiedフィルタ: どのプロジェクトにも紐づかないテストケースのみ
+    if (unclassified === true) {
+      const links = await db
+        .select({ test_case_id: test_case_projects.test_case_id })
+        .from(test_case_projects);
+      const classifiedIds = new Set(links.map((l) => l.test_case_id));
+      allCases = allCases.filter((tc) => !classifiedIds.has(tc.id));
+    }
+
+    // display_order, id でソート
+    allCases.sort((a, b) => a.display_order - b.display_order || a.id - b.id);
+
+    return c.json(allCases.map(serializeTestCase));
   });
 
-  // POST /api/projects/:projectId/test-cases - 新規テストケース作成
+  // POST /api/test-cases - 新規テストケース作成
   router.post("/", zValidator("json", createTestCaseSchema), async (c) => {
-    const projectId = Number(c.req.param("projectId"));
-
-    if (Number.isNaN(projectId)) {
-      return c.json({ error: "Invalid projectId" }, 400);
-    }
-
     const body = c.req.valid("json");
     const now = Date.now();
 
-    const result = await db
+    const [testCase] = await db
       .insert(test_cases)
       .values({
-        project_id: projectId,
         title: body.title,
         turns: JSON.stringify(body.turns),
         context_content: body.context_content ?? "",
@@ -77,58 +146,37 @@ export function createTestCasesRouter(db: DB) {
       })
       .returning();
 
-    const testCase = result[0];
     if (!testCase) {
       return c.json({ error: "Failed to create TestCase" }, 500);
     }
 
-    return c.json(
-      {
-        ...testCase,
-        turns: JSON.parse(testCase.turns) as Turn[],
-      },
-      201,
-    );
+    return c.json(serializeTestCase(testCase), 201);
   });
 
-  // GET /api/projects/:projectId/test-cases/:id - 特定テストケース取得
+  // GET /api/test-cases/:id - 特定テストケース取得
   router.get("/:id", async (c) => {
-    const projectId = Number(c.req.param("projectId"));
-    const id = Number(c.req.param("id"));
-
-    if (Number.isNaN(projectId) || Number.isNaN(id)) {
+    const id = parseIdParam(c.req.param("id"));
+    if (id === null) {
       return c.json({ error: "Invalid ID" }, 400);
     }
 
-    const [testCase] = await db
-      .select()
-      .from(test_cases)
-      .where(and(eq(test_cases.id, id), eq(test_cases.project_id, projectId)));
+    const [testCase] = await db.select().from(test_cases).where(eq(test_cases.id, id));
 
     if (!testCase) {
       return c.json({ error: "TestCase not found" }, 404);
     }
 
-    return c.json({
-      ...testCase,
-      turns: JSON.parse(testCase.turns) as Turn[],
-    });
+    return c.json(serializeTestCase(testCase));
   });
 
-  // PATCH /api/projects/:projectId/test-cases/:id - テストケース更新
+  // PATCH /api/test-cases/:id - テストケース更新
   router.patch("/:id", zValidator("json", updateTestCaseSchema), async (c) => {
-    const projectId = Number(c.req.param("projectId"));
-    const id = Number(c.req.param("id"));
-
-    if (Number.isNaN(projectId) || Number.isNaN(id)) {
+    const id = parseIdParam(c.req.param("id"));
+    if (id === null) {
       return c.json({ error: "Invalid ID" }, 400);
     }
 
-    const [existing] = await db
-      .select()
-      .from(test_cases)
-      .where(and(eq(test_cases.id, id), eq(test_cases.project_id, projectId)));
-
+    const [existing] = await db.select().from(test_cases).where(eq(test_cases.id, id));
     if (!existing) {
       return c.json({ error: "TestCase not found" }, 404);
     }
@@ -152,47 +200,121 @@ export function createTestCasesRouter(db: DB) {
       updateData.expected_description = body.expected_description;
     if (body.display_order !== undefined) updateData.display_order = body.display_order;
 
-    const updateResult = await db
+    const [updated] = await db
       .update(test_cases)
       .set(updateData)
-      .where(and(eq(test_cases.id, id), eq(test_cases.project_id, projectId)))
+      .where(eq(test_cases.id, id))
       .returning();
 
-    const updated = updateResult[0];
     if (!updated) {
       return c.json({ error: "Failed to update TestCase" }, 500);
     }
 
-    return c.json({
-      ...updated,
-      turns: JSON.parse(updated.turns) as Turn[],
-    });
+    return c.json(serializeTestCase(updated));
   });
 
-  // DELETE /api/projects/:projectId/test-cases/:id - テストケース削除
+  // DELETE /api/test-cases/:id - テストケース削除
   router.delete("/:id", async (c) => {
-    const projectId = Number(c.req.param("projectId"));
-    const id = Number(c.req.param("id"));
-
-    if (Number.isNaN(projectId) || Number.isNaN(id)) {
+    const id = parseIdParam(c.req.param("id"));
+    if (id === null) {
       return c.json({ error: "Invalid ID" }, 400);
     }
 
-    const [existing] = await db
-      .select()
-      .from(test_cases)
-      .where(and(eq(test_cases.id, id), eq(test_cases.project_id, projectId)));
-
+    const [existing] = await db.select().from(test_cases).where(eq(test_cases.id, id));
     if (!existing) {
       return c.json({ error: "TestCase not found" }, 404);
     }
 
-    await db
-      .delete(test_cases)
-      .where(and(eq(test_cases.id, id), eq(test_cases.project_id, projectId)));
+    // 中間テーブルのレコードを先に削除
+    await db.delete(test_case_projects).where(eq(test_case_projects.test_case_id, id));
+    await db.delete(test_case_context_assets).where(eq(test_case_context_assets.test_case_id, id));
+    await db.delete(test_cases).where(eq(test_cases.id, id));
 
     return c.body(null, 204);
   });
+
+  // PUT /api/test-cases/:id/projects - プロジェクトへのラベル付け（全置換）
+  router.put("/:id/projects", zValidator("json", updateTestCaseProjectsSchema), async (c) => {
+    const id = parseIdParam(c.req.param("id"));
+    if (id === null) {
+      return c.json({ error: "Invalid ID" }, 400);
+    }
+
+    const [existing] = await db.select().from(test_cases).where(eq(test_cases.id, id));
+    if (!existing) {
+      return c.json({ error: "TestCase not found" }, 404);
+    }
+
+    const body = c.req.valid("json");
+    const projectIds = [...new Set(body.project_ids)];
+
+    // 各project_idの存在確認
+    for (const projectId of projectIds) {
+      const [project] = await db.select().from(projects).where(eq(projects.id, projectId));
+      if (!project) {
+        return c.json({ error: "Project not found" }, 404);
+      }
+    }
+
+    // 既存の関連を全削除してから新規挿入
+    await db.delete(test_case_projects).where(eq(test_case_projects.test_case_id, id));
+
+    for (const projectId of projectIds) {
+      await db.insert(test_case_projects).values({
+        test_case_id: id,
+        project_id: projectId,
+        created_at: Date.now(),
+      });
+    }
+
+    return c.json(serializeTestCase(existing));
+  });
+
+  // PUT /api/test-cases/:id/context-assets - context asset関連付け（全置換）
+  router.put(
+    "/:id/context-assets",
+    zValidator("json", updateTestCaseContextAssetsSchema),
+    async (c) => {
+      const id = parseIdParam(c.req.param("id"));
+      if (id === null) {
+        return c.json({ error: "Invalid ID" }, 400);
+      }
+
+      const [existing] = await db.select().from(test_cases).where(eq(test_cases.id, id));
+      if (!existing) {
+        return c.json({ error: "TestCase not found" }, 404);
+      }
+
+      const body = c.req.valid("json");
+      const contextAssetIds = [...new Set(body.context_asset_ids)];
+
+      // 各context_asset_idの存在確認
+      for (const contextAssetId of contextAssetIds) {
+        const [asset] = await db
+          .select()
+          .from(context_assets)
+          .where(eq(context_assets.id, contextAssetId));
+        if (!asset) {
+          return c.json({ error: "ContextAsset not found" }, 404);
+        }
+      }
+
+      // 既存の関連を全削除してから新規挿入
+      await db
+        .delete(test_case_context_assets)
+        .where(eq(test_case_context_assets.test_case_id, id));
+
+      for (const contextAssetId of contextAssetIds) {
+        await db.insert(test_case_context_assets).values({
+          test_case_id: id,
+          context_asset_id: contextAssetId,
+          created_at: Date.now(),
+        });
+      }
+
+      return c.json(serializeTestCase(existing));
+    },
+  );
 
   return router;
 }
