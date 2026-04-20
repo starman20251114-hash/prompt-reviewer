@@ -24,6 +24,7 @@ const createTestCaseSchema = z.object({
   context_content: z.string().optional(),
   expected_description: z.string().optional(),
   display_order: z.number().int().optional(),
+  project_ids: z.array(z.number().int().positive("project_idは正の整数が必要です")).optional(),
 });
 
 const updateTestCaseSchema = z.object({
@@ -135,6 +136,14 @@ export function createTestCasesRouter(db: DB) {
   router.post("/", zValidator("json", createTestCaseSchema), async (c) => {
     const body = c.req.valid("json");
     const now = Date.now();
+    const projectIds = [...new Set(body.project_ids ?? [])];
+
+    for (const projectId of projectIds) {
+      const [project] = await db.select().from(projects).where(eq(projects.id, projectId));
+      if (!project) {
+        return c.json({ error: "Project not found" }, 404);
+      }
+    }
 
     const [testCase] = await db
       .insert(test_cases)
@@ -151,6 +160,14 @@ export function createTestCasesRouter(db: DB) {
 
     if (!testCase) {
       return c.json({ error: "Failed to create TestCase" }, 500);
+    }
+
+    for (const projectId of projectIds) {
+      await db.insert(test_case_projects).values({
+        test_case_id: testCase.id,
+        project_id: projectId,
+        created_at: now,
+      });
     }
 
     return c.json(serializeTestCase(testCase), 201);

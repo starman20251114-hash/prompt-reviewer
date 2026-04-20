@@ -12,6 +12,7 @@ import {
   annotation_labels,
   annotation_tasks,
   execution_profiles,
+  project_settings,
   prompt_version_projects,
   prompt_versions,
   runs,
@@ -529,8 +530,20 @@ export function createRunsRouter(db: DB, options: RunsRouterOptions = {}) {
       };
       resolvedExecutionProfileId = profile.id;
     } else {
-      // execution_profile_id 未指定の場合はデフォルト設定を使用
-      return c.json({ error: "execution_profile_id is required" }, 400);
+      const [projectSettings] = await db
+        .select()
+        .from(project_settings)
+        .where(eq(project_settings.project_id, projectId));
+
+      if (!projectSettings) {
+        return c.json({ error: "Project settings not found" }, 404);
+      }
+
+      settings = {
+        model: projectSettings.model,
+        temperature: projectSettings.temperature,
+        api_provider: projectSettings.api_provider,
+      };
     }
 
     const client = llmClientFactory({
