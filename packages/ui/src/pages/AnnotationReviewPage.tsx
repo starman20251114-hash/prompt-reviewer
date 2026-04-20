@@ -92,6 +92,7 @@ function LineNumberedText({
               // biome-ignore lint/suspicious/noArrayIndexKey: 行番号は順序で管理
               index
             }`}
+            id={`context-line-${index + 1}`}
             className={styles.lineRow}
             style={bg ? { backgroundColor: bg } : undefined}
           >
@@ -243,6 +244,20 @@ function CandidateCard({
       className={`${styles.candidateCard} ${isActive ? styles.candidateCardActive : ""}`}
       onMouseEnter={() => onHover({ start: candidate.start_line, end: candidate.end_line })}
       onMouseLeave={() => onHover(null)}
+      onClick={() =>
+        document
+          .getElementById(`context-line-${candidate.start_line}`)
+          ?.scrollIntoView({ behavior: "smooth", block: "center" })
+      }
+      onKeyDown={(e) => {
+        if (e.key === "Enter" || e.key === " ")
+          document
+            .getElementById(`context-line-${candidate.start_line}`)
+            ?.scrollIntoView({ behavior: "smooth", block: "center" });
+      }}
+      // biome-ignore lint/a11y/useSemanticElements: カード全体のクリック領域
+      role="button"
+      tabIndex={0}
     >
       <div className={styles.candidateHeader}>
         <span className={`${styles.badge} ${statusClassName(candidate.status, styles)}`}>
@@ -541,6 +556,20 @@ function GoldAnnotationCard({
         onHover ? () => onHover({ start: gold.start_line, end: gold.end_line }) : undefined
       }
       onMouseLeave={onLeave}
+      onClick={() =>
+        document
+          .getElementById(`context-line-${gold.start_line}`)
+          ?.scrollIntoView({ behavior: "smooth", block: "center" })
+      }
+      onKeyDown={(e) => {
+        if (e.key === "Enter" || e.key === " ")
+          document
+            .getElementById(`context-line-${gold.start_line}`)
+            ?.scrollIntoView({ behavior: "smooth", block: "center" });
+      }}
+      // biome-ignore lint/a11y/useSemanticElements: カード全体のクリック領域
+      role="button"
+      tabIndex={0}
     >
       <div className={styles.candidateHeader}>
         {label && (

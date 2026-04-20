@@ -165,6 +165,7 @@
   padding: 12px 16px;
   border-bottom: 1px solid var(--c-border);
   transition: background-color 0.1s ease;
+  cursor: pointer;
 }
 
 .candidateCard:last-child {
@@ -398,6 +399,7 @@
 .goldCard {
   padding: 12px 16px;
   border-bottom: 1px solid var(--c-border);
+  cursor: pointer;
 }
 
 .goldCard:last-child {
