@@ -199,6 +199,8 @@ erDiagram
 - 1つのテストケースに複数の素材を関連付けできる
 - 1つの素材を複数のテストケースで使い回せる
 - 取り込み後の最終テキストは引き続き `test_cases.context_content` に保存する
+- `test_cases.context_content` は annotation の一次対象本文であり、行番号採番の基準となる
+- Candidate / Gold が作成された後の `test_cases.context_content` は固定し、差し替えたい場合は新しい test case として扱う
 - 実装時は `UNIQUE(test_case_id, context_asset_id)` を付ける前提
 
 ### prompt_version_projects

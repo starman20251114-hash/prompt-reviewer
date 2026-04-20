@@ -308,6 +308,43 @@ Labels:
 - AI の抽出結果は JSON 契約に寄せる
 - 初期 Task は `会話価値抽出` を基本とする
 
+## annotation対象本文の責務
+
+### annotation 一次対象
+
+`test_cases.context_content` を annotation の一次対象とする。
+
+理由:
+
+- Run で実際に使われるテキストは `context_content` であり、`context_assets.content` ではない
+- annotation は Run の評価に紐づくため、Run 時点で確定していた本文を参照すべきである
+- `context_assets` がその後更新されても、過去の annotation に影響しない
+
+### `context_assets` と `test_cases` の責務分担
+
+- `context_assets`: 素材置き場。編集・再利用可能なオリジナル。annotation の直接対象ではない。
+- `test_cases.context_content`: 取り込み後のスナップショット。**これが annotation の本文**。取り込み後は `context_assets` と独立して管理する。
+
+### 取り込み後の本文変化の扱い
+
+スナップショット固定方式を採用する。
+
+- `context_assets` を更新しても `test_cases.context_content` は自動同期しない
+- annotation が一度も作成されていない test case では、必要に応じてユーザーが明示的に再取り込みしてよい
+- Candidate / Gold のいずれかが作成された後は、その test case の `context_content` を annotation の参照本文として固定し、再取り込みを禁止する
+- annotation 済み本文を差し替えたい場合は既存 test case を更新せず、複製した新しい test case として扱う
+
+このルールにより、annotation は常に「その test case で確定していた本文」に紐づき、後から元素材や取り込み操作が変わっても過去データの意味が変わらないようにする。
+
+### 行番号ルール
+
+annotation の行番号は以下のルールで採番する。
+
+- **改行コード正規化**: annotation 処理前に CRLF → LF に正規化する
+- **先頭行番号**: 1-indexed（1行目 = line 1）
+- **空行の扱い**: 空行もカウントする（行番号をスキップしない）
+- **再現性保証**: 固定済みの `context_content` と行番号ルールが定まっていれば、いつでも同じ行番号が再現できる
+
 ## runs と Candidate の接続設計
 
 ### Candidate 生成元の種類
