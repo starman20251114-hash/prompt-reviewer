@@ -188,10 +188,12 @@ function extractJsonFromText(text: string): unknown {
   } catch {
     // ignore
   }
-  // ```json ... ``` または ``` ... ``` のコードブロックを除去してパース
-  const codeBlockMatch = text.match(/```(?:json)?\s*([\s\S]*?)```/);
-  if (codeBlockMatch?.[1]) {
-    return JSON.parse(codeBlockMatch[1].trim());
+  // テキスト内の最初の { から最後の } を抽出してパース
+  // （コードブロック内に ``` が含まれる場合でも対応できる）
+  const firstBrace = text.indexOf("{");
+  const lastBrace = text.lastIndexOf("}");
+  if (firstBrace !== -1 && lastBrace > firstBrace) {
+    return JSON.parse(text.slice(firstBrace, lastBrace + 1));
   }
   throw new SyntaxError("Failed to parse as JSON");
 }

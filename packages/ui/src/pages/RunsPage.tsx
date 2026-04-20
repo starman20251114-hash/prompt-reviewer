@@ -229,8 +229,18 @@ function AnnotationExtractPanel({
       JSON.parse(text);
       return true;
     } catch {
-      // コードブロック内のJSONも許容
-      return /```(?:json)?\s*[\s\S]*?```/.test(text);
+      // 最初の { から最後の } を抽出して試みる
+      const first = text.indexOf("{");
+      const last = text.lastIndexOf("}");
+      if (first !== -1 && last > first) {
+        try {
+          JSON.parse(text.slice(first, last + 1));
+          return true;
+        } catch {
+          // ignore
+        }
+      }
+      return false;
     }
   })();
   const canExtract = hasStructuredOutput || lastMsgIsJson;
