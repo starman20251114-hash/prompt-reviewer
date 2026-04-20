@@ -308,6 +308,82 @@ Labels:
 - AI の抽出結果は JSON 契約に寄せる
 - 初期 Task は `会話価値抽出` を基本とする
 
+## 設計キックオフ条件
+
+annotation の本格設計を開始してよいのは、次の前提がすべて文書として確認できる状態になってからとする。
+
+1. `context_assets` / `test_cases` / `runs` の責務境界が固まっている
+2. annotation 対象本文の source of truth が決まっている
+3. run から Candidate を作る接続点が決まっている
+
+この文書では、以下の節でその前提を固定する。
+
+- `annotation対象本文の責務`
+- `runs と Candidate の接続設計`
+
+なお、旧 project 親子モデルの互換レイヤ削除（Issue #21）はこの開始条件に含めない。annotation の設計は、旧導線が残っていても上記前提が固まっていれば始めてよい。
+
+## 初回設計スコープ
+
+初回 annotation 設計は、最小限の review ループを成立させることに集中する。
+
+固定するスコープ:
+
+- `span_label`
+- Candidate / Gold Annotation の分離
+- Review 画面
+
+初回設計に含めるもの:
+
+- Task / Label の最小モデル
+- line range ベースの annotation
+- run 出力からの Candidate 生成
+- Candidate の採用 / 却下 / 修正
+- Gold Annotation の保存
+- 本文表示とハイライト
+
+初回設計に含めないもの:
+
+- 文書全体分類専用モード
+- 階層構造や relation 抽出
+- 文字単位の厳密な offset 編集
+- annotator 複数人対応
+- annotation versioning
+- 高度な export / analytics
+- `context_assets.content` 直接 annotation
+
+## 実装 Issue の切り方
+
+annotation 実装は、少なくとも次の 4 系統に分けて Issue 化する。
+
+### 1. schema / migration
+
+- Task / Label / Candidate / Gold Annotation の永続化モデル
+- `run_id` / `target_text_ref` / review status の保持
+- 必要なら将来拡張に備えた最小限の履歴カラム
+
+### 2. API
+
+- Task / Label CRUD
+- Candidate 一覧取得
+- Candidate の採用 / 却下 / 修正
+- Gold Annotation の作成 / 更新
+- Runs から Candidate 生成を呼び出す接続
+
+### 3. UI
+
+- Task Settings 画面
+- Annotation Review 画面
+- Runs 画面から Review 画面への導線
+
+### 4. import / review
+
+- `structured_json` / `final_answer` から Candidate JSON を解釈する処理
+- 行番号と quote の整合チェック
+- Review 画面での本文ハイライト
+
+この 4 分割を先に固定しておくことで、annotation の本格設計を開始する時点で実装 Issue の粒度を揃えやすくする。
+
 ## annotation対象本文の責務
 
 ### annotation 一次対象

@@ -1113,3 +1113,86 @@ annotation 機能の本格設計は、少なくとも次が終わってから始
 逆に、Issue 21 の完了は annotation 設計開始の必須条件ではない。
 
 旧互換レイヤが残っていても、上記の前提が固まっていれば annotation の本格設計には着手できる。
+
+## annotation 設計キックオフ条件
+
+annotation の本格設計を開始してよい条件は、次の 3 つが文書として固定されていること。
+
+1. `context_assets` / `test_cases` / `runs` の責務境界が説明できる
+2. annotation 対象本文の source of truth が決まっている
+3. run から Candidate を作る接続点が決まっている
+
+それぞれの確認先:
+
+- 責務境界
+  - `context_assets` は素材置き場
+  - `test_cases.context_content` は annotation 対象本文のスナップショット
+  - `runs` は run 出力保存と Candidate 生成トリガーを担う
+- source of truth
+  - annotation 一次対象は `test_cases.context_content`
+  - 改行正規化と行番号ルールが定義済み
+- Candidate 接続点
+  - Candidate 生成元は `final_answer` / `structured_json` / `trace_step`
+  - 初期実装では `structured_json` 優先、なければ `final_answer`
+  - Candidate 生成トリガーは Runs 側の責務として扱う
+
+上記が固まっていれば、旧互換 UI / API の削除前でも annotation 設計を始めてよい。つまり Issue 21 の完了は annotation 設計開始条件に含めない。
+
+## annotation 初回設計スコープ
+
+Issue 24 時点で固定する初回設計スコープは次のとおり。
+
+- `span_label` のみを扱う
+- Candidate と Gold Annotation を分離して扱う
+- Review 画面を中心に操作フローを設計する
+
+初回スコープに含める具体項目:
+
+- Task / Label の最小モデル
+- Candidate の最小メタデータ
+- Gold Annotation の最小フィールド
+- Run から Candidate を生成して Review へ渡す導線
+- Review 画面での採用 / 却下 / 修正
+
+初回スコープから除外する項目:
+
+- 文書全体分類専用モード
+- 階層ラベルや関係抽出
+- 文字単位の厳密な span 編集
+- annotator 複数人対応
+- annotation の版管理
+- 高度な export / 集計機能
+- `context_assets.content` 直接 annotation
+
+## 次に起票する annotation 実装 Issue の粒度
+
+annotation の本格設計を実装へ落とす際は、少なくとも以下の 4 系統に分けて Issue を切る。
+
+1. schema / migration
+2. API
+3. UI
+4. import / review
+
+想定する粒度:
+
+- schema / migration
+  - `annotation_tasks`
+  - `annotation_labels`
+  - `annotation_candidates`
+  - `gold_annotations`
+  - 必要なら review 操作履歴や状態管理の最小カラム
+- API
+  - Task / Label CRUD
+  - Candidate 一覧、採用 / 却下 / 修正
+  - Gold Annotation の作成 / 更新
+  - Runs からの Candidate 生成トリガー接続
+- UI
+  - Task Settings 画面
+  - Annotation Review 画面
+  - Runs から Review への導線
+- import / review
+  - run 出力から Candidate JSON を解釈する処理
+  - `structured_json` / `final_answer` のフォールバック方針実装
+  - 本文ハイライトと行番号整合の確認
+
+この分け方により、annotation 設計を始める時点で「どこまでを 1 Issue に閉じ込めるか」が先に見えるようにする。
