@@ -211,6 +211,83 @@ describe("POST /api/test-cases", () => {
     expect(body.turns).toEqual(sampleTurns);
   });
 
+  it("project_ids を指定すると作成後にプロジェクト関連付けを保存する", async () => {
+    const created = { ...sampleTestCase };
+    const insertCalls: unknown[] = [];
+    let insertCount = 0;
+
+    const db = {
+      select: () => ({
+        from: () => ({
+          where: () => Promise.resolve([{ id: 10, name: "対象プロジェクト" }]),
+        }),
+      }),
+      insert: () => {
+        insertCount++;
+        if (insertCount === 1) {
+          return {
+            values: (payload: unknown) => {
+              insertCalls.push(payload);
+              return {
+                returning: () => Promise.resolve([created]),
+              };
+            },
+          };
+        }
+
+        return {
+          values: (payload: unknown) => {
+            insertCalls.push(payload);
+            return Promise.resolve();
+          },
+        };
+      },
+    };
+
+    const app = buildApp(db);
+    const res = await app.request("/api/test-cases", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        title: "プロジェクト紐付きテストケース",
+        turns: sampleTurns,
+        project_ids: [10],
+      }),
+    });
+
+    expect(res.status).toBe(201);
+    expect(insertCalls).toHaveLength(2);
+    expect(insertCalls[1]).toMatchObject({
+      test_case_id: created.id,
+      project_id: 10,
+    });
+  });
+
+  it("存在しない project_id が含まれるとき404を返す", async () => {
+    const db = {
+      select: () => ({
+        from: () => ({
+          where: () => Promise.resolve([]),
+        }),
+      }),
+    };
+
+    const app = buildApp(db);
+    const res = await app.request("/api/test-cases", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        title: "テスト",
+        turns: sampleTurns,
+        project_ids: [999],
+      }),
+    });
+
+    expect(res.status).toBe(404);
+    const body = (await res.json()) as { error: string };
+    expect(body.error).toBe("Project not found");
+  });
+
   it("レスポンスに project_id が含まれない（独立資産モデル）", async () => {
     const created = { ...sampleTestCase };
 

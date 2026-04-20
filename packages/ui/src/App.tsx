@@ -1,6 +1,7 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Route, Routes } from "react-router";
 import { Layout } from "./components/Layout";
+import { AnnotationTaskSettingsPage } from "./pages/AnnotationTaskSettingsPage";
 import { ContextFilesPage } from "./pages/ContextFilesPage";
 import { HealthPage } from "./pages/HealthPage";
 import { NotFoundPage } from "./pages/NotFoundPage";
@@ -38,6 +39,10 @@ export function App() {
             <Route path="projects/:id/runs" element={<RunsPage />} />
             <Route path="projects/:id/score" element={<ScorePage />} />
             <Route path="projects/:id/score-progression" element={<ScoreProgressionPage />} />
+            <Route
+              path="projects/:id/annotation-tasks"
+              element={<AnnotationTaskSettingsPage />}
+            />
             <Route path="projects/:id/settings" element={<ProjectSettingsPage />} />
             {/* ユーティリティ */}
             <Route path="health" element={<HealthPage />} />

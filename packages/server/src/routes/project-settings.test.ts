@@ -92,31 +92,51 @@ function makeReturning(rows: unknown[]) {
 
 function makeInsertTxMock(options: {
   projectSettingsRows?: unknown[];
-  onExecutionProfileUpsert?: (values: Record<string, unknown>) => void;
+  executionProfileRows?: unknown[];
+  onExecutionProfileInsert?: (values: Record<string, unknown>) => void;
+  onExecutionProfileUpdate?: (values: Record<string, unknown>) => void;
   onProjectSettingsValues?: (values: Record<string, unknown>) => void;
-  onProjectSettingsConflict?: (config: { target: unknown; set: Record<string, unknown> }) => void;
 }) {
   return {
+    select: () => ({
+      from: (table: unknown) => ({
+        where: () => ({
+          all: () => (table === execution_profiles ? (options.executionProfileRows ?? []) : []),
+        }),
+      }),
+    }),
     insert: (table: unknown) => ({
-      values: (values: Record<string, unknown>) => ({
-        onConflictDoUpdate: (config: { target: unknown; set: Record<string, unknown> }) => {
+      values: (values: Record<string, unknown>) => {
+        if (table === execution_profiles) {
+          return {
+            run: () => options.onExecutionProfileInsert?.(values),
+          };
+        }
+
+        if (table === project_settings) {
+          options.onProjectSettingsValues?.(values);
+          return {
+            returning: () => makeReturning(options.projectSettingsRows ?? []),
+          };
+        }
+
+        return {
+          run: () => {},
+          returning: () => makeReturning([]),
+        };
+      },
+    }),
+    update: (table: unknown) => ({
+      set: (values: Record<string, unknown>) => ({
+        where: () => {
           if (table === execution_profiles) {
             return {
-              run: () => options.onExecutionProfileUpsert?.(values),
-            };
-          }
-
-          if (table === project_settings) {
-            options.onProjectSettingsValues?.(values);
-            options.onProjectSettingsConflict?.(config);
-            return {
-              returning: () => makeReturning(options.projectSettingsRows ?? []),
+              run: () => options.onExecutionProfileUpdate?.(values),
             };
           }
 
           return {
-            run: () => {},
-            returning: () => makeReturning([]),
+            returning: () => makeReturning(options.projectSettingsRows ?? []),
           };
         },
       }),
@@ -233,18 +253,39 @@ describe("PUT /api/projects/:projectId/settings", () => {
 
     // トランザクション内の tx モック
     const tx = {
-      insert: () => ({
-        values: () => ({
-          onConflictDoUpdate: () => ({
-            run: () => {},
+      select: () => ({
+        from: (table: unknown) => ({
+          where: () => ({
+            all: () =>
+              table === execution_profiles
+                ? [
+                    {
+                      id: 77,
+                      name: "project-1-default",
+                    },
+                  ]
+                : [],
           }),
         }),
       }),
+      insert: () => ({
+        values: () => ({
+          run: () => {},
+        }),
+      }),
       update: (table: unknown) => ({
-        set: () => ({
-          where: () => ({
-            returning: () => makeReturning(table === project_settings ? [updated] : []),
-          }),
+        set: (data: Record<string, unknown>) => ({
+          where: () => {
+            if (table === execution_profiles) {
+              return {
+                run: () => {},
+              };
+            }
+
+            return {
+              returning: () => makeReturning(table === project_settings ? [updated] : []),
+            };
+          },
         }),
       }),
     };
@@ -409,24 +450,45 @@ describe("PUT /api/projects/:projectId/settings", () => {
     };
 
     const tx = {
+      select: () => ({
+        from: (table: unknown) => ({
+          where: () => ({
+            all: () =>
+              table === execution_profiles
+                ? [
+                    {
+                      id: 88,
+                      name: "project-1-default",
+                    },
+                  ]
+                : [],
+          }),
+        }),
+      }),
       insert: () => ({
         values: () => ({
-          onConflictDoUpdate: () => ({
-            run: () => {},
-          }),
+          run: () => {},
         }),
       }),
       update: (table: unknown) => ({
         set: (data: Record<string, unknown>) => ({
-          where: () => ({
-            returning: () => {
-              if (table === project_settings) {
-                capturedUpdateData = data;
-                return makeReturning([updated]);
-              }
-              return makeReturning([]);
-            },
-          }),
+          where: () => {
+            if (table === execution_profiles) {
+              return {
+                run: () => {},
+              };
+            }
+
+            return {
+              returning: () => {
+                if (table === project_settings) {
+                  capturedUpdateData = data;
+                  return makeReturning([updated]);
+                }
+                return makeReturning([]);
+              },
+            };
+          },
         }),
       }),
     };
@@ -517,7 +579,7 @@ describe("PUT /api/projects/:projectId/settings", () => {
 // ---- 新旧整合テスト ----
 
 describe("PUT /api/projects/:projectId/settings - execution_profiles 同期", () => {
-  it("settings 新規作成時に execution_profiles への insert(upsert) が実行される", async () => {
+  it("settings 新規作成時に execution_profiles へ insert が実行される", async () => {
     const created: MockSettings = {
       id: 1,
       project_id: 1,
@@ -533,7 +595,7 @@ describe("PUT /api/projects/:projectId/settings - execution_profiles 同期", ()
 
     const tx = makeInsertTxMock({
       projectSettingsRows: [created],
-      onExecutionProfileUpsert: (values) => {
+      onExecutionProfileInsert: (values) => {
         executionProfileInsertCalled = true;
         executionProfileInsertValues = values;
       },
@@ -563,34 +625,53 @@ describe("PUT /api/projects/:projectId/settings - execution_profiles 同期", ()
     expect(executionProfileInsertValues.api_provider).toBe("anthropic");
   });
 
-  it("settings 更新時に execution_profiles の upsert が実行される", async () => {
+  it("settings 更新時に既存 execution_profiles を更新する", async () => {
     const updatedSettings: MockSettings = {
       ...sampleSettings,
       model: "claude-haiku-4-5",
       updated_at: 6000000,
     };
 
-    let executionProfileUpsertCalled = false;
-    let executionProfileUpsertValues: Record<string, unknown> = {};
+    let executionProfileUpdateCalled = false;
+    let executionProfileUpdateValues: Record<string, unknown> = {};
 
     const tx = {
-      insert: (table: unknown) => ({
-        values: (values: Record<string, unknown>) => ({
-          onConflictDoUpdate: () => ({
-            run: () => {
-              if (table === execution_profiles) {
-                executionProfileUpsertCalled = true;
-                executionProfileUpsertValues = values;
-              }
-            },
+      select: () => ({
+        from: (table: unknown) => ({
+          where: () => ({
+            all: () =>
+              table === execution_profiles
+                ? [
+                    {
+                      id: 55,
+                      name: "project-1-default",
+                    },
+                  ]
+                : [],
           }),
         }),
       }),
+      insert: () => ({
+        values: () => ({
+          run: () => {},
+        }),
+      }),
       update: (table: unknown) => ({
-        set: () => ({
-          where: () => ({
-            returning: () => makeReturning(table === project_settings ? [updatedSettings] : []),
-          }),
+        set: (values: Record<string, unknown>) => ({
+          where: () => {
+            if (table === execution_profiles) {
+              return {
+                run: () => {
+                  executionProfileUpdateCalled = true;
+                  executionProfileUpdateValues = values;
+                },
+              };
+            }
+
+            return {
+              returning: () => makeReturning(table === project_settings ? [updatedSettings] : []),
+            };
+          },
         }),
       }),
     };
@@ -612,8 +693,8 @@ describe("PUT /api/projects/:projectId/settings - execution_profiles 同期", ()
     });
 
     expect(res.status).toBe(200);
-    expect(executionProfileUpsertCalled).toBe(true);
-    expect(executionProfileUpsertValues.model).toBe("claude-haiku-4-5");
+    expect(executionProfileUpdateCalled).toBe(true);
+    expect(executionProfileUpdateValues.model).toBe("claude-haiku-4-5");
   });
 
   it("project-{projectId}-default という名前で execution_profile を識別する", async () => {
@@ -631,7 +712,7 @@ describe("PUT /api/projects/:projectId/settings - execution_profiles 同期", ()
 
     const tx = makeInsertTxMock({
       projectSettingsRows: [created],
-      onExecutionProfileUpsert: (values) => {
+      onExecutionProfileInsert: (values) => {
         capturedProfileName = values.name as string;
       },
     });
@@ -655,7 +736,7 @@ describe("PUT /api/projects/:projectId/settings - execution_profiles 同期", ()
     expect(capturedProfileName).toBe("project-42-default");
   });
 
-  it("settings 新規作成時に project_settings.project_id を conflict target に使う", async () => {
+  it("settings 新規作成時に project_settings へ project_id を含めて保存する", async () => {
     const created: MockSettings = {
       id: 1,
       project_id: 7,
@@ -666,14 +747,12 @@ describe("PUT /api/projects/:projectId/settings - execution_profiles 同期", ()
       updated_at: 7100000,
     };
 
-    let conflictTarget: unknown;
-    let conflictSet: Record<string, unknown> | undefined;
+    let capturedValues: Record<string, unknown> = {};
 
     const tx = makeInsertTxMock({
       projectSettingsRows: [created],
-      onProjectSettingsConflict: (config) => {
-        conflictTarget = config.target;
-        conflictSet = config.set;
+      onProjectSettingsValues: (values) => {
+        capturedValues = values;
       },
     });
 
@@ -694,8 +773,8 @@ describe("PUT /api/projects/:projectId/settings - execution_profiles 同期", ()
     });
 
     expect(res.status).toBe(201);
-    expect(conflictTarget).toBe(project_settings.project_id);
-    expect(conflictSet).toMatchObject({
+    expect(capturedValues).toMatchObject({
+      project_id: 7,
       model: "gpt-4o",
       temperature: 0.4,
       api_provider: "openai",

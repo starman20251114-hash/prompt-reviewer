@@ -28,7 +28,7 @@ type ProjectSettingsRouterOptions = {
   modelClientFactory?: ExecutionProfileModelClientFactory;
 };
 
-type ProjectSettingsWriteTx = Pick<DB, "insert" | "update">;
+type ProjectSettingsWriteTx = Pick<DB, "select" | "insert" | "update">;
 
 function parseIntParam(value: string | undefined): number | null {
   if (value === undefined) return null;
@@ -50,24 +50,35 @@ function upsertDefaultExecutionProfile(
   body: UpsertBody,
   now: number,
 ) {
+  const profileName = defaultProfileName(projectId);
+  const [existing] = tx
+    .select()
+    .from(execution_profiles)
+    .where(eq(execution_profiles.name, profileName))
+    .all();
+
+  if (existing) {
+    tx.update(execution_profiles)
+      .set({
+        model: body.model,
+        temperature: body.temperature,
+        api_provider: body.api_provider,
+        updated_at: now,
+      })
+      .where(eq(execution_profiles.id, existing.id))
+      .run();
+    return;
+  }
+
   tx.insert(execution_profiles)
     .values({
-      name: defaultProfileName(projectId),
+      name: profileName,
       description: null,
       model: body.model,
       temperature: body.temperature,
       api_provider: body.api_provider,
       created_at: now,
       updated_at: now,
-    })
-    .onConflictDoUpdate({
-      target: execution_profiles.name,
-      set: {
-        model: body.model,
-        temperature: body.temperature,
-        api_provider: body.api_provider,
-        updated_at: now,
-      },
     })
     .run();
 }
@@ -154,15 +165,6 @@ export function createProjectSettingsRouter(db: DB, options: ProjectSettingsRout
           api_provider: body.api_provider,
           created_at: now,
           updated_at: now,
-        })
-        .onConflictDoUpdate({
-          target: project_settings.project_id,
-          set: {
-            model: body.model,
-            temperature: body.temperature,
-            api_provider: body.api_provider,
-            updated_at: now,
-          },
         })
         .returning()
         .all();
