@@ -6,7 +6,13 @@
  * マイグレーションの動作検証は `pnpm run migrate` で別途確認済み。
  */
 import { describe, expectTypeOf, it } from "vitest";
-import type { ConversationMessage, NewRun, Run } from "./runs.js";
+import type {
+  ConversationMessage,
+  NewRun,
+  Run,
+  StructuredOutput,
+  StructuredOutputItem,
+} from "./runs.js";
 
 describe("runs スキーマ型定義", () => {
   describe("Run 型", () => {
@@ -19,6 +25,7 @@ describe("runs スキーマ型定義", () => {
         test_case_id: number;
         conversation: string;
         execution_trace: string | null;
+        structured_output: string | null;
         is_best: boolean;
         created_at: number;
         model: string;
@@ -35,6 +42,7 @@ describe("runs スキーマ型定義", () => {
           | "test_case_id"
           | "conversation"
           | "execution_trace"
+          | "structured_output"
           | "is_best"
           | "created_at"
           | "model"
@@ -54,6 +62,10 @@ describe("runs スキーマ型定義", () => {
 
     it("Run の execution_trace は string | null 型", () => {
       expectTypeOf<Run["execution_trace"]>().toEqualTypeOf<string | null>();
+    });
+
+    it("Run の structured_output は string | null 型", () => {
+      expectTypeOf<Run["structured_output"]>().toEqualTypeOf<string | null>();
     });
 
     it("Run の is_best は boolean 型", () => {
@@ -96,6 +108,7 @@ describe("runs スキーマ型定義", () => {
           { role: "assistant", content: "こんにちは！" },
         ]),
         execution_trace: JSON.stringify([]),
+        structured_output: JSON.stringify({ items: [] }),
         created_at: Date.now(),
         model: "claude-opus-4-5",
         temperature: 0.7,
@@ -122,6 +135,7 @@ describe("runs スキーマ型定義", () => {
           { role: "assistant", content: "詳細な回答です" },
         ]),
         execution_trace: JSON.stringify([]),
+        structured_output: JSON.stringify({ items: [] }),
         is_best: true,
         created_at: Date.now(),
         model: "claude-opus-4-5",
@@ -153,6 +167,33 @@ describe("runs スキーマ型定義", () => {
         { role: "assistant", content: "速達オプションをご利用ください" },
       ];
       expectTypeOf(conversation).toEqualTypeOf<ConversationMessage[]>();
+    });
+  });
+
+  describe("StructuredOutput 型", () => {
+    it("StructuredOutputItem は annotation 候補の最小情報を表現できる", () => {
+      const item: StructuredOutputItem = {
+        label: "insight",
+        start_line: 12,
+        end_line: 15,
+        quote: "新しい認識です",
+        rationale: "重要な洞察のため",
+      };
+      expectTypeOf(item).toMatchTypeOf<StructuredOutputItem>();
+    });
+
+    it("StructuredOutput は items 配列を持つ", () => {
+      const structuredOutput: StructuredOutput = {
+        items: [
+          {
+            label: "insight",
+            start_line: 1,
+            end_line: 2,
+            quote: "要点",
+          },
+        ],
+      };
+      expectTypeOf(structuredOutput).toMatchTypeOf<StructuredOutput>();
     });
   });
 });

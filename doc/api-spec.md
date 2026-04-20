@@ -808,11 +808,11 @@ Run に対する評価スコアを管理する API。
 - `structured_output`（annotation 向け構造化 JSON 出力）の保存
 - Candidate 生成のトリガー
 
-#### `POST /runs/:id/candidates/extract`
+#### `POST /runs/:id/candidates/extract`（追加予定）
 
-指定した run の出力を解析して Candidate を生成し、annotation API へ投入する。
+指定した run の出力を解析して Candidate を生成し、annotation API へ投入する想定のエンドポイント。現時点では責務境界の整理のみを行い、API 自体は未実装。
 
-**リクエストボディ**
+**実装時の想定リクエストボディ**
 
 ```json
 {
@@ -827,7 +827,7 @@ Run に対する評価スコアを管理する API。
 | `source_type` | string | | `final_answer` \| `structured_json` \| `trace_step`。省略時は `structured_output` が存在すれば `structured_json`、なければ `final_answer` |
 | `source_step_id` | string | | `trace_step` を指定した場合の step ID |
 
-**レスポンス `201`**
+**実装時の想定レスポンス `201`**
 
 ```json
 {
@@ -845,7 +845,7 @@ Run に対する評価スコアを管理する API。
 |---|---|---|---|
 | `structured_output` | object \| null | | annotation 向け JSON フォーマットの構造化出力。`{ "items": [...] }` 形式 |
 
-`structured_output` を保存することで `POST /runs/:id/candidates/extract` が `structured_json` ソースを参照できるようになる。
+`structured_output` を保存することで、将来 `POST /runs/:id/candidates/extract` を実装した際に `structured_json` ソースを参照できるようになる。
 
 ### annotation API の責務（将来追加）
 

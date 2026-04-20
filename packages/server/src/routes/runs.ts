@@ -7,6 +7,7 @@ import {
   LLMConfigurationError,
   type PromptExecutionStepDefinition,
   type PromptWorkflowDefinition,
+  type StructuredOutput,
   execution_profiles,
   prompt_version_projects,
   prompt_versions,
@@ -22,6 +23,18 @@ import { z } from "zod";
 const conversationMessageSchema = z.object({
   role: z.enum(["user", "assistant"]),
   content: z.string().min(1, "contentは1文字以上必要です"),
+});
+
+const structuredOutputSchema = z.object({
+  items: z.array(
+    z.object({
+      label: z.string().min(1, "labelは1文字以上必要です"),
+      start_line: z.number().int(),
+      end_line: z.number().int(),
+      quote: z.string().min(1, "quoteは1文字以上必要です"),
+      rationale: z.string().min(1).optional(),
+    }),
+  ),
 });
 
 const createRunSchema = z.object({
@@ -40,6 +53,7 @@ const createRunSchema = z.object({
       }),
     )
     .optional(),
+  structured_output: structuredOutputSchema.nullable().optional(),
   model: z.string().min(1, "modelは1文字以上必要です"),
   temperature: z.number().min(0).max(2),
   api_provider: z.string().min(1, "api_providerは1文字以上必要です"),
@@ -54,6 +68,7 @@ const executeRunSchema = z.object({
   prompt_version_id: z.number().int().positive("prompt_version_idは正の整数が必要です"),
   test_case_id: z.number().int().positive("test_case_idは正の整数が必要です"),
   api_key: z.string().min(1, "api_keyは1文字以上必要です"),
+  structured_output: structuredOutputSchema.nullable().optional(),
   execution_profile_id: z
     .number()
     .int()
@@ -127,6 +142,14 @@ function parseExecutionTrace(json: string | null): ExecutionTraceStep[] | null {
   }
 
   return JSON.parse(json) as ExecutionTraceStep[];
+}
+
+function parseStructuredOutput(json: string | null): StructuredOutput | null {
+  if (!json) {
+    return null;
+  }
+
+  return JSON.parse(json) as StructuredOutput;
 }
 
 function buildSystemPrompt(version: StoredPromptVersion, testCase: StoredTestCase): string {
@@ -229,15 +252,17 @@ function buildExecutionRequest(params: {
 
 function serializeRun(run: typeof runs.$inferSelect): Omit<
   typeof run,
-  "conversation" | "execution_trace"
+  "conversation" | "execution_trace" | "structured_output"
 > & {
   conversation: ConversationMessage[];
   execution_trace: ExecutionTraceStep[] | null;
+  structured_output: StructuredOutput | null;
 } {
   return {
     ...run,
     conversation: parseConversation(run.conversation),
     execution_trace: parseExecutionTrace(run.execution_trace),
+    structured_output: parseStructuredOutput(run.structured_output),
   };
 }
 
@@ -369,6 +394,8 @@ export function createRunsRouter(db: DB, options: RunsRouterOptions = {}) {
         test_case_id: body.test_case_id,
         conversation: JSON.stringify(body.conversation),
         execution_trace: body.execution_trace ? JSON.stringify(body.execution_trace) : null,
+        structured_output:
+          body.structured_output === undefined ? null : JSON.stringify(body.structured_output),
         is_best: false,
         is_discarded: false,
         model: body.model,
@@ -602,6 +629,10 @@ export function createRunsRouter(db: DB, options: RunsRouterOptions = {}) {
                 test_case_id: body.test_case_id,
                 conversation: JSON.stringify(conversation),
                 execution_trace: executionTrace.length > 0 ? JSON.stringify(executionTrace) : null,
+                structured_output:
+                  body.structured_output === undefined
+                    ? null
+                    : JSON.stringify(body.structured_output),
                 is_best: false,
                 is_discarded: false,
                 // execution_profile からのスナップショットを保存

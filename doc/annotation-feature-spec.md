@@ -382,7 +382,7 @@ annotation の一次対象本文は `test_cases.context_content` とする（Iss
 **Runs API の責務**
 - run の作成・実行・保存（`structured_output` を含む）
 - Candidate 生成のトリガー: `POST /runs/:id/candidates/extract`
-  - このエンドポイントが run の出力を解析して Candidate を生成し annotation API へ投入する
+  - 将来このエンドポイントが run の出力を解析して Candidate を生成し annotation API へ投入する
   - `source_type` の選択ロジックはここに閉じ込める
 
 **Annotation API の責務**
