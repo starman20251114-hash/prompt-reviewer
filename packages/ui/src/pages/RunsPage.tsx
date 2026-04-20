@@ -3,7 +3,6 @@ import { useState } from "react";
 import { Link, useParams } from "react-router";
 import { RunCompareView } from "../components/RunCompareView";
 import { useApiKey } from "../hooks/useApiKey";
-import { generateAnnotationPrompt } from "../lib/annotationPrompt";
 import {
   type AnnotationTask,
   type ConversationMessage,
@@ -11,12 +10,10 @@ import {
   type PromptVersion,
   type Run,
   type TestCase,
-  createPromptVersion,
   createRun,
   discardRun,
   executeRunStream,
   extractAnnotationCandidates,
-  getAnnotationTask,
   getAnnotationTasks,
   getProject,
   getPromptVersions,
@@ -754,54 +751,6 @@ export function RunsPage() {
   }
 
   // アノテーションプロンプト生成パネルの状態（RunsPage 内）
-  const [annotGenOpen, setAnnotGenOpen] = useState(false);
-  const [annotGenTaskId, setAnnotGenTaskId] = useState<number | "">("");
-  const [annotGenTarget, setAnnotGenTarget] = useState("");
-  const [annotGenCriteria, setAnnotGenCriteria] = useState("");
-  const [annotGenResult, setAnnotGenResult] = useState<string | null>(null);
-  const [annotGenCopied, setAnnotGenCopied] = useState(false);
-
-  const { data: annotGenTaskDetail } = useQuery({
-    queryKey: ["annotation-task", annotGenTaskId],
-    queryFn: () => getAnnotationTask(annotGenTaskId as number),
-    enabled: annotGenTaskId !== "",
-  });
-
-  const saveAnnotGenVersionMutation = useMutation({
-    mutationFn: (content: string) => {
-      const task = annotationTasks.find((t) => t.id === annotGenTaskId);
-      const taskName = task?.name ?? "アノテーション";
-      return createPromptVersion(projectId, {
-        content,
-        name: `アノテーション: ${taskName}`,
-      });
-    },
-    onSuccess: (saved) => {
-      void queryClient.invalidateQueries({ queryKey: ["prompt-versions", projectId] });
-      setSelectedVersionId(saved.id);
-    },
-  });
-
-  function handleAnnotGenGenerate() {
-    if (!annotGenTaskDetail || !annotGenTarget.trim()) return;
-    const task = annotationTasks.find((t) => t.id === annotGenTaskId);
-    const prompt = generateAnnotationPrompt({
-      taskName: task?.name ?? "",
-      labels: annotGenTaskDetail.labels,
-      extractionTarget: annotGenTarget.trim(),
-      criteria: annotGenCriteria.trim() || undefined,
-    });
-    setAnnotGenResult(prompt);
-  }
-
-  function handleAnnotGenCopy() {
-    if (!annotGenResult) return;
-    navigator.clipboard.writeText(annotGenResult).then(() => {
-      setAnnotGenCopied(true);
-      setTimeout(() => setAnnotGenCopied(false), 2000);
-    });
-  }
-
   const isStartDisabled = selectedVersionId === "" || selectedTestCaseId === "" || !hasApiKey;
   const isSaveDisabled =
     !llmResponse.trim() || createRunMutation.isPending || executeRunMutation.isPending;
@@ -922,114 +871,6 @@ export function RunsPage() {
                     で入力してください。
                   </p>
                 )}
-
-                {/* アノテーション用プロンプト生成 */}
-                <div className={styles.annotGenSection}>
-                  <button
-                    type="button"
-                    className={styles.annotGenToggle}
-                    onClick={() => setAnnotGenOpen((prev) => !prev)}
-                    aria-expanded={annotGenOpen}
-                  >
-                    {annotGenOpen
-                      ? "▲ アノテーション用プロンプトテンプレートを閉じる"
-                      : "▼ アノテーション用プロンプトテンプレートを生成"}
-                  </button>
-
-                  {annotGenOpen && (
-                    <div className={styles.annotGenPanel}>
-                      <div className={styles.fieldGroup}>
-                        <label htmlFor="annot-gen-task" className={styles.fieldLabel}>
-                          アノテーションタスク
-                        </label>
-                        <select
-                          id="annot-gen-task"
-                          value={annotGenTaskId}
-                          onChange={(e) => {
-                            setAnnotGenTaskId(e.target.value === "" ? "" : Number(e.target.value));
-                            setAnnotGenResult(null);
-                          }}
-                          className={styles.fieldSelect}
-                        >
-                          <option value="">-- タスクを選択 --</option>
-                          {annotationTasks.map((task) => (
-                            <option key={task.id} value={task.id}>
-                              {task.name}
-                            </option>
-                          ))}
-                        </select>
-                      </div>
-
-                      <div className={styles.fieldGroup}>
-                        <label htmlFor="annot-gen-target" className={styles.fieldLabel}>
-                          抽出対象
-                        </label>
-                        <input
-                          id="annot-gen-target"
-                          value={annotGenTarget}
-                          onChange={(e) => setAnnotGenTarget(e.target.value)}
-                          className={styles.fieldSelect}
-                          placeholder="例: AIとの会話ログ、学習メモ、議事録"
-                        />
-                      </div>
-
-                      <div className={styles.fieldGroup}>
-                        <label htmlFor="annot-gen-criteria" className={styles.fieldLabel}>
-                          抽出判定条件の詳細（任意）
-                        </label>
-                        <textarea
-                          id="annot-gen-criteria"
-                          value={annotGenCriteria}
-                          onChange={(e) => setAnnotGenCriteria(e.target.value)}
-                          className={styles.annotGenTextarea}
-                          placeholder="例: アイデアとは新しい発見や方針転換を含む記述を指す"
-                          rows={3}
-                        />
-                      </div>
-
-                      <button
-                        type="button"
-                        className={styles.btnStart}
-                        onClick={handleAnnotGenGenerate}
-                        disabled={
-                          annotGenTaskId === "" || !annotGenTarget.trim() || !annotGenTaskDetail
-                        }
-                      >
-                        生成
-                      </button>
-
-                      {annotGenResult !== null && (
-                        <div className={styles.annotGenResult}>
-                          <textarea
-                            readOnly
-                            value={annotGenResult}
-                            className={styles.annotGenTextarea}
-                            rows={10}
-                          />
-                          <div className={styles.annotGenActions}>
-                            <button
-                              type="button"
-                              className={styles.btnSecondary}
-                              onClick={handleAnnotGenCopy}
-                            >
-                              {annotGenCopied ? "✓ コピー済み" : "コピー"}
-                            </button>
-                            <button
-                              type="button"
-                              className={styles.btnPrimary}
-                              onClick={() => saveAnnotGenVersionMutation.mutate(annotGenResult)}
-                              disabled={saveAnnotGenVersionMutation.isPending}
-                            >
-                              {saveAnnotGenVersionMutation.isPending
-                                ? "作成中..."
-                                : "このプロンプトで新しいバージョンを作成"}
-                            </button>
-                          </div>
-                        </div>
-                      )}
-                    </div>
-                  )}
-                </div>
               </div>
             )}
 
