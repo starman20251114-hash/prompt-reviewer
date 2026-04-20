@@ -85,6 +85,87 @@ export function getProject(id: number): Promise<Project> {
   return api.get<Project>(`/projects/${id}`);
 }
 
+export type AnnotationOutputMode = "span_label";
+
+export type AnnotationTask = {
+  id: number;
+  name: string;
+  description: string | null;
+  output_mode: AnnotationOutputMode;
+  created_at: number;
+  updated_at: number;
+};
+
+export type AnnotationLabel = {
+  id: number;
+  annotation_task_id: number;
+  key: string;
+  name: string;
+  color: string | null;
+  display_order: number;
+  created_at: number;
+  updated_at: number;
+};
+
+export type AnnotationTaskDetail = AnnotationTask & {
+  labels: AnnotationLabel[];
+};
+
+export function getAnnotationTasks(): Promise<AnnotationTask[]> {
+  return api.get<AnnotationTask[]>("/annotation-tasks");
+}
+
+export function getAnnotationTask(id: number): Promise<AnnotationTaskDetail> {
+  return api.get<AnnotationTaskDetail>(`/annotation-tasks/${id}`);
+}
+
+export function createAnnotationTask(data: {
+  name: string;
+  description?: string;
+  output_mode: AnnotationOutputMode;
+}): Promise<AnnotationTask> {
+  return api.post<AnnotationTask>("/annotation-tasks", data);
+}
+
+export function updateAnnotationTask(
+  id: number,
+  data: { name?: string; description?: string | null },
+): Promise<AnnotationTask> {
+  return api.patch<AnnotationTask>(`/annotation-tasks/${id}`, data);
+}
+
+export function deleteAnnotationTask(id: number): Promise<void> {
+  return api.delete<void>(`/annotation-tasks/${id}`);
+}
+
+export function createAnnotationLabel(
+  taskId: number,
+  data: {
+    key: string;
+    name: string;
+    color?: string;
+    display_order?: number;
+  },
+): Promise<AnnotationLabel> {
+  return api.post<AnnotationLabel>(`/annotation-tasks/${taskId}/labels`, data);
+}
+
+export function updateAnnotationLabel(
+  id: number,
+  data: {
+    key?: string;
+    name?: string;
+    color?: string | null;
+    display_order?: number;
+  },
+): Promise<AnnotationLabel> {
+  return api.patch<AnnotationLabel>(`/annotation-labels/${id}`, data);
+}
+
+export function deleteAnnotationLabel(id: number): Promise<void> {
+  return api.delete<void>(`/annotation-labels/${id}`);
+}
+
 export type ContextFileSummary = {
   name: string;
   path: string;
@@ -207,7 +288,6 @@ export type Turn = {
 
 export type TestCase = {
   id: number;
-  project_id: number;
   title: string;
   turns: Turn[];
   context_content: string;
@@ -218,11 +298,13 @@ export type TestCase = {
 };
 
 export function getTestCases(projectId: number): Promise<TestCase[]> {
-  return api.get<TestCase[]>(`/projects/${projectId}/test-cases`);
+  const params = new URLSearchParams({ project_id: String(projectId) });
+  return api.get<TestCase[]>(`/test-cases?${params}`);
 }
 
 export function getTestCase(projectId: number, id: number): Promise<TestCase> {
-  return api.get<TestCase>(`/projects/${projectId}/test-cases/${id}`);
+  void projectId;
+  return api.get<TestCase>(`/test-cases/${id}`);
 }
 
 export function createTestCase(
@@ -235,7 +317,10 @@ export function createTestCase(
     display_order?: number;
   },
 ): Promise<TestCase> {
-  return api.post<TestCase>(`/projects/${projectId}/test-cases`, data);
+  return api.post<TestCase>("/test-cases", {
+    ...data,
+    project_ids: [projectId],
+  });
 }
 
 export function updateTestCase(
@@ -249,11 +334,13 @@ export function updateTestCase(
     display_order?: number;
   },
 ): Promise<TestCase> {
-  return api.patch<TestCase>(`/projects/${projectId}/test-cases/${id}`, data);
+  void projectId;
+  return api.patch<TestCase>(`/test-cases/${id}`, data);
 }
 
 export function deleteTestCase(projectId: number, id: number): Promise<void> {
-  return api.delete<void>(`/projects/${projectId}/test-cases/${id}`);
+  void projectId;
+  return api.delete<void>(`/test-cases/${id}`);
 }
 
 // Run API

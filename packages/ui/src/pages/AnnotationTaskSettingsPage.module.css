@@ -1,0 +1,376 @@
+.root {
+  --c-bg: #1e1e2e;
+  --c-surface: #313244;
+  --c-border: #45475a;
+  --c-text: #cdd6f4;
+  --c-subtext: #a6adc8;
+  --c-muted: #6c7086;
+  --c-accent: #f9e2af;
+  --c-accent-strong: #fab387;
+  --c-card: #181825;
+  --c-danger: #f38ba8;
+  --c-success: #a6e3a1;
+  --c-input: #11111b;
+  --c-chip: rgba(249, 226, 175, 0.12);
+
+  color: var(--c-text);
+}
+
+.pageHeader {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  align-items: flex-start;
+  margin-bottom: 24px;
+}
+
+.eyebrow {
+  margin: 0 0 8px;
+  font-size: 11px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--c-accent);
+}
+
+.pageTitle {
+  margin: 0 0 8px;
+  font-size: 26px;
+}
+
+.pageDescription {
+  margin: 0;
+  max-width: 720px;
+  color: var(--c-subtext);
+  line-height: 1.6;
+}
+
+.layout {
+  display: grid;
+  grid-template-columns: minmax(280px, 340px) minmax(0, 1fr);
+  gap: 24px;
+  align-items: start;
+}
+
+.sidebarSection,
+.contentSection,
+.labelSection,
+.taskList,
+.labelList {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.sectionHeader {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  align-items: flex-start;
+}
+
+.sectionTitle {
+  margin: 0;
+  font-size: 18px;
+}
+
+.sectionHint {
+  margin: 6px 0 0;
+  color: var(--c-muted);
+  line-height: 1.5;
+  font-size: 13px;
+}
+
+.panel,
+.emptyState,
+.labelCard {
+  background:
+    linear-gradient(180deg, rgba(249, 226, 175, 0.06), transparent 28%),
+    var(--c-card);
+  border: 1px solid var(--c-border);
+  border-radius: 16px;
+  padding: 18px;
+}
+
+.taskCard,
+.taskCardActive {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  width: 100%;
+  text-align: left;
+  padding: 16px;
+  border-radius: 14px;
+  border: 1px solid var(--c-border);
+  background: var(--c-card);
+  color: var(--c-text);
+  cursor: pointer;
+  transition:
+    border-color 0.15s ease,
+    transform 0.15s ease,
+    background-color 0.15s ease;
+}
+
+.taskCard:hover,
+.taskCardActive:hover {
+  transform: translateY(-1px);
+}
+
+.taskCardActive {
+  border-color: var(--c-accent-strong);
+  background:
+    linear-gradient(135deg, rgba(250, 179, 135, 0.12), rgba(249, 226, 175, 0.04)),
+    var(--c-card);
+}
+
+.taskCardTitle {
+  font-size: 15px;
+  font-weight: 600;
+}
+
+.taskCardMeta,
+.taskCardMode {
+  font-size: 12px;
+  color: var(--c-muted);
+}
+
+.taskCardMode {
+  color: var(--c-accent);
+}
+
+.fieldGrid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+}
+
+.fieldGroup {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.fieldLabel {
+  font-size: 13px;
+  color: var(--c-subtext);
+}
+
+.requiredMark {
+  display: inline-flex;
+  align-items: center;
+  margin-left: 8px;
+  padding: 2px 6px;
+  border-radius: 999px;
+  background: rgba(250, 179, 135, 0.16);
+  color: var(--c-accent-strong);
+  font-size: 10px;
+  letter-spacing: 0.04em;
+  vertical-align: middle;
+}
+
+.fieldInput,
+.fieldTextarea {
+  width: 100%;
+  box-sizing: border-box;
+  border: 1px solid var(--c-border);
+  border-radius: 10px;
+  background: var(--c-input);
+  color: var(--c-text);
+  padding: 10px 12px;
+  font-size: 14px;
+  font-family: inherit;
+}
+
+.fieldInput:focus,
+.fieldTextarea:focus {
+  outline: none;
+  border-color: var(--c-accent-strong);
+}
+
+.fieldInput:disabled,
+.fieldTextarea:disabled {
+  opacity: 0.75;
+  cursor: not-allowed;
+}
+
+.fieldTextarea {
+  resize: vertical;
+  min-height: 110px;
+}
+
+.colorFieldRow {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.colorFieldRow .fieldInput {
+  flex: 1 1 auto;
+}
+
+.outputModeBox {
+  display: grid;
+  gap: 4px;
+  padding: 14px;
+  border-radius: 12px;
+  border: 1px solid var(--c-border);
+  background: var(--c-chip);
+}
+
+.outputModeLabel,
+.outputModeHint {
+  font-size: 12px;
+  color: var(--c-muted);
+}
+
+.outputModeValue {
+  font-size: 16px;
+  color: var(--c-accent);
+}
+
+.formFooter {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.primaryButton,
+.secondaryButton,
+.ghostButton,
+.dangerButton {
+  border-radius: 999px;
+  padding: 10px 16px;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition:
+    opacity 0.15s ease,
+    transform 0.15s ease,
+    border-color 0.15s ease;
+}
+
+.primaryButton:hover,
+.secondaryButton:hover,
+.ghostButton:hover,
+.dangerButton:hover {
+  transform: translateY(-1px);
+}
+
+.primaryButton {
+  background: linear-gradient(135deg, var(--c-accent), var(--c-accent-strong));
+  color: #1e1e2e;
+  border: none;
+}
+
+.secondaryButton {
+  background: var(--c-surface);
+  color: var(--c-text);
+  border: 1px solid var(--c-border);
+}
+
+.ghostButton {
+  background: transparent;
+  color: var(--c-subtext);
+  border: 1px solid var(--c-border);
+}
+
+.dangerButton {
+  background: rgba(243, 139, 168, 0.12);
+  color: var(--c-danger);
+  border: 1px solid rgba(243, 139, 168, 0.35);
+}
+
+.primaryButton:disabled,
+.secondaryButton:disabled,
+.ghostButton:disabled,
+.dangerButton:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+  transform: none;
+}
+
+.labelCard {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.labelCardHeader {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  align-items: flex-start;
+}
+
+.labelTitle {
+  margin: 0;
+  font-size: 16px;
+}
+
+.labelMeta {
+  margin: 6px 0 0;
+  color: var(--c-muted);
+  font-size: 12px;
+}
+
+.labelActions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+
+.colorChip {
+  width: 20px;
+  height: 20px;
+  border-radius: 999px;
+  border: 2px solid rgba(255, 255, 255, 0.12);
+  flex: 0 0 auto;
+}
+
+.feedbackSuccess,
+.feedbackError,
+.fieldHint,
+.stateText,
+.errorText {
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.fieldHint {
+  color: var(--c-muted);
+  font-size: 12px;
+}
+
+.feedbackSuccess {
+  color: var(--c-success);
+}
+
+.feedbackError,
+.errorText {
+  color: var(--c-danger);
+}
+
+.stateText {
+  color: var(--c-subtext);
+}
+
+@media (max-width: 960px) {
+  .layout {
+    grid-template-columns: 1fr;
+  }
+
+  .pageHeader,
+  .labelCardHeader,
+  .sectionHeader {
+    flex-direction: column;
+  }
+}
+
+@media (max-width: 640px) {
+  .fieldGrid {
+    grid-template-columns: 1fr;
+  }
+}

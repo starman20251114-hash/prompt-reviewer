@@ -41,6 +41,7 @@ export function ProjectDetailPage() {
           { to: "prompts", label: "プロンプト管理" },
           { to: "runs", label: "Run 実行・管理" },
           { to: "score", label: "採点" },
+          { to: "annotation-tasks", label: "アノテーション設定" },
           { to: "settings", label: "プロジェクト設定" },
         ].map(({ to, label }) => (
           <Link
@@ -60,6 +61,9 @@ export function ProjectDetailPage() {
           </Link>
         ))}
       </div>
+      <p style={{ marginTop: "16px", color: "#a6adc8", fontSize: "13px" }}>
+        Review 用の task / label 準備は「アノテーション設定」から行えます。
+      </p>
     </div>
   );
 }
