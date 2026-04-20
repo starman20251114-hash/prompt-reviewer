@@ -796,6 +796,61 @@ Run に対する評価スコアを管理する API。
 }
 ```
 
+## Runs API と Annotation API の責務境界
+
+この文書の現時点での対象は基盤 API（Projects / Context Assets / Test Cases / Prompt Families / Prompt Versions / Execution Profiles / Runs / Scores）に限る。annotation 関連エンドポイントは別途追加する。
+
+ただし runs API と annotation API の責務を以下のように定義する。
+
+### runs API の責務
+
+- run の作成・実行・保存
+- `structured_output`（annotation 向け構造化 JSON 出力）の保存
+- Candidate 生成のトリガー
+
+#### `POST /runs/:id/candidates/extract`
+
+指定した run の出力を解析して Candidate を生成し、annotation API へ投入する。
+
+**リクエストボディ**
+
+```json
+{
+  "annotation_task_id": 1,
+  "source_type": "structured_json"
+}
+```
+
+| フィールド | 型 | 必須 | 説明 |
+|---|---|---|---|
+| `annotation_task_id` | number | ✅ | 対象 AnnotationTask の ID |
+| `source_type` | string | | `final_answer` \| `structured_json` \| `trace_step`。省略時は `structured_output` が存在すれば `structured_json`、なければ `final_answer` |
+| `source_step_id` | string | | `trace_step` を指定した場合の step ID |
+
+**レスポンス `201`**
+
+```json
+{
+  "candidates_created": 3,
+  "run_id": 100,
+  "annotation_task_id": 1
+}
+```
+
+### `POST /runs` および `POST /runs/execute` の変更
+
+`structured_output` フィールドを追加する。
+
+| フィールド | 型 | 必須 | 説明 |
+|---|---|---|---|
+| `structured_output` | object \| null | | annotation 向け JSON フォーマットの構造化出力。`{ "items": [...] }` 形式 |
+
+`structured_output` を保存することで `POST /runs/:id/candidates/extract` が `structured_json` ソースを参照できるようになる。
+
+### annotation API の責務（将来追加）
+
+annotation 関連エンドポイント（`/annotation-tasks`、`/candidates`、`/gold-annotations` 等）は runs / test_cases / context_assets の責務整理完了後に別途この文書へ追加する。
+
 ## 互換レイヤの扱い
 
 旧 API との互換が必要な場合は、当面次のパスを互換レイヤとして残せる。

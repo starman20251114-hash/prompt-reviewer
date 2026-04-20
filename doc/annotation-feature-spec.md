@@ -308,12 +308,95 @@ Labels:
 - AI の抽出結果は JSON 契約に寄せる
 - 初期 Task は `会話価値抽出` を基本とする
 
+## runs と Candidate の接続設計
+
+### Candidate 生成元の種類
+
+run 出力から Candidate を生成する際に使う出力箇所を以下の 3 種類と定義する。
+
+| 種類 | 説明 | 利用条件 |
+|---|---|---|
+| `final_answer` | `conversation` の最後の assistant メッセージ | 常に利用可能 |
+| `structured_json` | annotation 用 JSON フォーマットに寄せた構造化出力 | `runs.structured_output` が null でない場合 |
+| `trace_step` | `execution_trace` の特定 step 出力 | `execution_trace` が null でない場合 |
+
+初期実装では `structured_json` を優先し、存在しない場合に `final_answer` へフォールバックする。
+
+### Candidate の最小メタデータ
+
+Candidate は以下のフィールドを持つ。
+
+| フィールド | 説明 |
+|---|---|
+| `run_id` | 生成元 run の ID |
+| `source_type` | 生成元の出力箇所（`final_answer` \| `structured_json` \| `trace_step`） |
+| `source_step_id` | `trace_step` の場合の step ID（nullable） |
+| `annotation_task_id` | 対象 AnnotationTask の ID |
+| `target_text_ref` | 対象本文の識別子（`test_case:{id}` 形式） |
+| `label` | Label の内部キー |
+| `start_line` | 抽出開始行 |
+| `end_line` | 抽出終了行 |
+| `quote` | 抽出箇所の抜粋 |
+| `rationale` | 抽出理由（nullable） |
+| `status` | `pending` \| `accepted` \| `rejected` |
+
+### annotation 対象本文の識別
+
+annotation の一次対象本文は `test_cases.context_content` とする（Issue #137 の方針に従う）。
+
+1 run は 1 test_case のみ参照する。test_case には複数の context_asset を関連付けられるが、annotation の対象は取り込み済みスナップショットである `context_content` とする。
+
+そのため Candidate は `test_case_id`（`target_text_ref = "test_case:{id}"` 形式）を持てば十分であり、どの context_asset から取り込まれたかは Candidate 生成時には不要となる。
+
+将来 `context_assets.content` に直接 annotation する場合は、`target_text_ref = "context_asset:{id}"` 形式で拡張する。
+
+### runs テーブルへの structured_output 追加
+
+`runs.structured_output`（nullable text）カラムを追加する。
+
+用途:
+- annotation 向け JSON フォーマットに寄せた構造化出力を保存する
+- `execution_trace` は実行ステップのデバッグログとして別管理し、annotation 責務と分離する
+- `structured_json` ソースからの Candidate 生成時にこのカラムを参照する
+
+保存フォーマット:
+
+```json
+{
+  "items": [
+    {
+      "label": "insight",
+      "start_line": 12,
+      "end_line": 15,
+      "quote": "……",
+      "rationale": "新しい認識や整理が含まれているため"
+    }
+  ]
+}
+```
+
+`structured_output` が null の場合は `final_answer`（`conversation` 最終 assistant メッセージ）をフォールバックとして使う。
+
+### runs API と annotation API の責務境界
+
+**Runs API の責務**
+- run の作成・実行・保存（`structured_output` を含む）
+- Candidate 生成のトリガー: `POST /runs/:id/candidates/extract`
+  - このエンドポイントが run の出力を解析して Candidate を生成し annotation API へ投入する
+  - `source_type` の選択ロジックはここに閉じ込める
+
+**Annotation API の責務**
+- `annotation_tasks` / `labels` の CRUD
+- `candidates` の保存・一覧・採用 / 却下 / 修正
+- `gold_annotations` の作成・管理
+- Review 画面からの操作インターフェース
+
+Runs API は run 出力の保存と Candidate 生成トリガーまでを担う。生成済み Candidate の操作はすべて Annotation API が担う。
+
 ## 未確定事項
 
 以下は移行計画の進行後に確定する。
 
-- どの既存資産 ID に紐づけるか
-- DB テーブル名と外部キー設計
-- REST API の最終パス設計
-- 既存 Runs / Test Cases / Context Assets との接続方法
+- DB テーブル名と外部キー設計（annotation_tasks / labels / candidates / gold_annotations）
+- REST API の最終パス設計（annotation 関連エンドポイント）
 - project ラベルとの関係

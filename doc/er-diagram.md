@@ -107,6 +107,7 @@ erDiagram
         integer execution_profile_id FK "NOT NULL → execution_profiles.id"
         text conversation "NOT NULL (JSON: [{role, content}])"
         text execution_trace "nullable (JSON)"
+        text structured_output "nullable (JSON: annotation向け構造化出力)"
         text model "NOT NULL (実行時スナップショット)"
         real temperature "NOT NULL (実行時スナップショット)"
         text api_provider "NOT NULL, enum: anthropic|openai (実行時スナップショット)"
@@ -229,6 +230,7 @@ Run 実行時に参照する実行条件テンプレート。旧 `project_settin
 - `model` / `temperature` / `api_provider` は `execution_profile` 参照時の値をスナップショット保存する
 - `is_best`: バージョン×ケースごとのベスト回答フラグ
 - `is_discarded`: Run の破棄フラグ
+- `structured_output`: annotation 向け構造化 JSON 出力（nullable）。`{ "items": [{label, start_line, end_line, quote, rationale}] }` 形式。存在しない場合は `conversation` の最終 assistant メッセージをフォールバックとして使う
 
 ### scores
 Run に対する評価スコアを管理する。1つの Run に対して複数のスコアを保持可能。
