@@ -1,8 +1,8 @@
 {
   "version": "6",
   "dialect": "sqlite",
-  "id": "fc76cd12-cbaf-465b-9bed-8528c8bea533",
-  "prevId": "ba577263-9a6b-48c9-88f8-c8026a37ca8f",
+  "id": "b4ca6c35-a32e-471e-b66a-bc5fb5a5181d",
+  "prevId": "fc76cd12-cbaf-465b-9bed-8528c8bea533",
   "tables": {
     "project_settings": {
       "name": "project_settings",
@@ -1136,7 +1136,16 @@
       },
       "compositePrimaryKeys": {},
       "uniqueConstraints": {},
-      "checkConstraints": {}
+      "checkConstraints": {
+        "annotation_candidates_source_type_check": {
+          "name": "annotation_candidates_source_type_check",
+          "value": "\"annotation_candidates\".\"source_type\" in ('final_answer', 'structured_json', 'trace_step')"
+        },
+        "annotation_candidates_status_check": {
+          "name": "annotation_candidates_status_check",
+          "value": "\"annotation_candidates\".\"status\" in ('pending', 'accepted', 'rejected')"
+        }
+      }
     },
     "annotation_labels": {
       "name": "annotation_labels",
@@ -1272,7 +1281,12 @@
       "foreignKeys": {},
       "compositePrimaryKeys": {},
       "uniqueConstraints": {},
-      "checkConstraints": {}
+      "checkConstraints": {
+        "annotation_tasks_output_mode_check": {
+          "name": "annotation_tasks_output_mode_check",
+          "value": "\"annotation_tasks\".\"output_mode\" in ('span_label')"
+        }
+      }
     },
     "gold_annotations": {
       "name": "gold_annotations",
