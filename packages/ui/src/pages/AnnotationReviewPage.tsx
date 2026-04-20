@@ -12,6 +12,7 @@ import {
   getGoldAnnotations,
   getProject,
   getRun,
+  getTestCase,
   getTestCases,
   updateAnnotationCandidate,
 } from "../lib/api";
@@ -369,6 +370,12 @@ export function AnnotationReviewPage() {
     enabled: !Number.isNaN(taskId) && run !== undefined,
   });
 
+  const { data: testCase, isLoading: isTestCaseLoading } = useQuery({
+    queryKey: ["test-cases", projectId, run?.test_case_id],
+    queryFn: () => getTestCase(projectId, run?.test_case_id as number),
+    enabled: run !== undefined && run.test_case_id !== undefined,
+  });
+
   const updateMutation = useMutation({
     mutationFn: ({
       candidateId,
@@ -389,15 +396,8 @@ export function AnnotationReviewPage() {
     },
   });
 
-  // Run の最後の assistant メッセージを取得
-  const assistantText = (() => {
-    if (!run) return "";
-    const msgs = [...run.conversation].reverse();
-    return msgs.find((m) => m.role === "assistant")?.content ?? "";
-  })();
-
   const labels = annotationTask?.labels ?? [];
-  const isLoading = isRunLoading || isTaskLoading || isCandidatesLoading;
+  const isLoading = isRunLoading || isTaskLoading || isCandidatesLoading || isTestCaseLoading;
 
   if (isLoading) {
     return (
@@ -435,18 +435,18 @@ export function AnnotationReviewPage() {
 
       {/* 2カラムレイアウト */}
       <div className={styles.layout}>
-        {/* 左パネル: 行番号付きテキスト */}
+        {/* 左パネル: 行番号付きコンテキスト */}
         <div className={styles.leftPanel}>
-          <h3 className={styles.panelTitle}>アシスタント応答</h3>
-          {assistantText ? (
+          <h3 className={styles.panelTitle}>コンテキスト</h3>
+          {testCase?.context_content ? (
             <LineNumberedText
-              text={assistantText}
+              text={testCase.context_content}
               candidates={candidates}
               labels={labels}
               activeRange={activeRange}
             />
           ) : (
-            <p className={styles.emptyMsg}>アシスタントの応答がありません。</p>
+            <p className={styles.emptyMsg}>コンテキストがありません。</p>
           )}
         </div>
 
