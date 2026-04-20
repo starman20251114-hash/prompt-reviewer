@@ -637,7 +637,13 @@ describe("DELETE /api/test-cases/:id", () => {
 
 describe("PUT /api/test-cases/:id/projects", () => {
   it("有効なプロジェクトIDでラベル付けすると200でテストケースを返す", async () => {
-    const project = { id: 10, name: "プロジェクト", description: null, created_at: 1000, updated_at: 1000 };
+    const project = {
+      id: 10,
+      name: "プロジェクト",
+      description: null,
+      created_at: 1000,
+      updated_at: 1000,
+    };
 
     let selectCallCount = 0;
     const db = {
@@ -765,7 +771,13 @@ describe("PUT /api/test-cases/:id/projects", () => {
   });
 
   it("重複するproject_idは1つにまとめて挿入する", async () => {
-    const project = { id: 10, name: "プロジェクト", description: null, created_at: 1000, updated_at: 1000 };
+    const project = {
+      id: 10,
+      name: "プロジェクト",
+      description: null,
+      created_at: 1000,
+      updated_at: 1000,
+    };
     const insertValues = vi.fn(() => Promise.resolve([]));
 
     let selectCallCount = 0;

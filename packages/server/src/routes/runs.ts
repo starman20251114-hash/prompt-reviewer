@@ -7,13 +7,15 @@ import {
   LLMConfigurationError,
   type PromptExecutionStepDefinition,
   type PromptWorkflowDefinition,
-  project_settings,
+  execution_profiles,
+  prompt_version_projects,
   prompt_versions,
   runs,
+  test_case_projects,
   test_cases,
 } from "@prompt-reviewer/core";
 import type { ConversationMessage, LLMClient, LLMRequest } from "@prompt-reviewer/core";
-import { and, eq } from "drizzle-orm";
+import { and, eq, inArray } from "drizzle-orm";
 import { Hono } from "hono";
 import { z } from "zod";
 
@@ -41,12 +43,22 @@ const createRunSchema = z.object({
   model: z.string().min(1, "modelは1文字以上必要です"),
   temperature: z.number().min(0).max(2),
   api_provider: z.string().min(1, "api_providerは1文字以上必要です"),
+  execution_profile_id: z
+    .number()
+    .int()
+    .positive("execution_profile_idは正の整数が必要です")
+    .optional(),
 });
 
 const executeRunSchema = z.object({
   prompt_version_id: z.number().int().positive("prompt_version_idは正の整数が必要です"),
   test_case_id: z.number().int().positive("test_case_idは正の整数が必要です"),
   api_key: z.string().min(1, "api_keyは1文字以上必要です"),
+  execution_profile_id: z
+    .number()
+    .int()
+    .positive("execution_profile_idは正の整数が必要です")
+    .optional(),
 });
 
 type ExecuteRunBody = z.infer<typeof executeRunSchema>;
@@ -69,12 +81,11 @@ type StoredPromptVersion = {
 
 type StoredTestCase = {
   id: number;
-  project_id: number;
   turns: string;
   context_content: string;
 };
 
-type StoredProjectSettings = {
+type ExecutionSettings = {
   model: string;
   temperature: number;
   api_provider: string;
@@ -250,11 +261,34 @@ function normalizeExecuteError(error: unknown): { status: number; message: strin
   return { status: 502, message: "Failed to execute Run" };
 }
 
+/**
+ * projectIdに紐づく prompt_version_id 一覧を prompt_version_projects 経由で取得する
+ */
+async function fetchVersionIdsByProject(db: DB, projectId: number): Promise<number[]> {
+  const links = await db
+    .select({ prompt_version_id: prompt_version_projects.prompt_version_id })
+    .from(prompt_version_projects)
+    .where(eq(prompt_version_projects.project_id, projectId));
+  return links.map((l) => l.prompt_version_id);
+}
+
+/**
+ * projectIdに紐づく test_case_id 一覧を test_case_projects 経由で取得する
+ */
+async function fetchTestCaseIdsByProject(db: DB, projectId: number): Promise<number[]> {
+  const links = await db
+    .select({ test_case_id: test_case_projects.test_case_id })
+    .from(test_case_projects)
+    .where(eq(test_case_projects.project_id, projectId));
+  return links.map((l) => l.test_case_id);
+}
+
 export function createRunsRouter(db: DB, options: RunsRouterOptions = {}) {
   const router = new Hono();
   const llmClientFactory = options.llmClientFactory ?? defaultLLMClientFactory;
 
   // GET /api/projects/:projectId/runs - Run一覧取得（prompt_version_id / test_case_id でフィルタ可能）
+  // project_id フィルタは prompt_version_projects 基準で実装
   router.get("/", async (c) => {
     const projectId = parseIntParam(c.req.param("projectId"));
 
@@ -264,7 +298,19 @@ export function createRunsRouter(db: DB, options: RunsRouterOptions = {}) {
 
     const promptVersionIdParam = c.req.query("prompt_version_id");
     const testCaseIdParam = c.req.query("test_case_id");
-    const conditions = [eq(runs.project_id, projectId), eq(runs.is_discarded, false)];
+
+    // prompt_version_projects 経由でプロジェクトに紐づくバージョンIDを取得
+    const versionIds = await fetchVersionIdsByProject(db, projectId);
+
+    if (versionIds.length === 0) {
+      return c.json([]);
+    }
+
+    const conditions = [
+      eq(runs.project_id, projectId),
+      inArray(runs.prompt_version_id, versionIds),
+      eq(runs.is_discarded, false),
+    ];
 
     if (promptVersionIdParam !== undefined) {
       const promptVersionId = parseIntParam(promptVersionIdParam);
@@ -300,6 +346,21 @@ export function createRunsRouter(db: DB, options: RunsRouterOptions = {}) {
 
     const body = c.req.valid("json");
 
+    // prompt_version_projects でプロジェクトへの紐づきを確認
+    const [versionLink] = await db
+      .select()
+      .from(prompt_version_projects)
+      .where(
+        and(
+          eq(prompt_version_projects.prompt_version_id, body.prompt_version_id),
+          eq(prompt_version_projects.project_id, projectId),
+        ),
+      );
+
+    if (!versionLink) {
+      return c.json({ error: "Prompt version not found in this project" }, 404);
+    }
+
     const result = await db
       .insert(runs)
       .values({
@@ -313,6 +374,7 @@ export function createRunsRouter(db: DB, options: RunsRouterOptions = {}) {
         model: body.model,
         temperature: body.temperature,
         api_provider: body.api_provider,
+        execution_profile_id: body.execution_profile_id ?? null,
         created_at: Date.now(),
       })
       .returning();
@@ -326,6 +388,7 @@ export function createRunsRouter(db: DB, options: RunsRouterOptions = {}) {
   });
 
   // POST /api/projects/:projectId/runs/execute - LLMに接続してRunを実行・保存
+  // execution_profile_id が指定された場合はそこから実行設定を取得する
   router.post("/execute", zValidator("json", executeRunSchema), async (c) => {
     const projectId = parseIntParam(c.req.param("projectId"));
 
@@ -335,21 +398,39 @@ export function createRunsRouter(db: DB, options: RunsRouterOptions = {}) {
 
     const body: ExecuteRunBody = c.req.valid("json");
 
-    const [[version], [testCase], [settings]] = await Promise.all([
-      db
-        .select()
-        .from(prompt_versions)
-        .where(
-          and(
-            eq(prompt_versions.id, body.prompt_version_id),
-            eq(prompt_versions.project_id, projectId),
-          ),
+    // prompt_version_projects 経由でバージョンの所属を確認
+    const [versionLink] = await db
+      .select()
+      .from(prompt_version_projects)
+      .where(
+        and(
+          eq(prompt_version_projects.prompt_version_id, body.prompt_version_id),
+          eq(prompt_version_projects.project_id, projectId),
         ),
-      db
-        .select()
-        .from(test_cases)
-        .where(and(eq(test_cases.id, body.test_case_id), eq(test_cases.project_id, projectId))),
-      db.select().from(project_settings).where(eq(project_settings.project_id, projectId)),
+      );
+
+    if (!versionLink) {
+      return c.json({ error: "Prompt version not found" }, 404);
+    }
+
+    // test_case_projects 経由でテストケースの所属を確認
+    const [testCaseLink] = await db
+      .select()
+      .from(test_case_projects)
+      .where(
+        and(
+          eq(test_case_projects.test_case_id, body.test_case_id),
+          eq(test_case_projects.project_id, projectId),
+        ),
+      );
+
+    if (!testCaseLink) {
+      return c.json({ error: "Test case not found" }, 404);
+    }
+
+    const [[version], [testCase]] = await Promise.all([
+      db.select().from(prompt_versions).where(eq(prompt_versions.id, body.prompt_version_id)),
+      db.select().from(test_cases).where(eq(test_cases.id, body.test_case_id)),
     ]);
 
     if (!version) {
@@ -360,8 +441,30 @@ export function createRunsRouter(db: DB, options: RunsRouterOptions = {}) {
       return c.json({ error: "Test case not found" }, 404);
     }
 
-    if (!settings) {
-      return c.json({ error: "Project settings not found" }, 404);
+    // execution_profile_id が指定された場合はそこから設定を取得（snapshotとして保存）
+    // 未指定の場合はプロジェクト設定にフォールバック
+    let settings: ExecutionSettings;
+    let resolvedExecutionProfileId: number | null = null;
+
+    if (body.execution_profile_id !== undefined) {
+      const [profile] = await db
+        .select()
+        .from(execution_profiles)
+        .where(eq(execution_profiles.id, body.execution_profile_id));
+
+      if (!profile) {
+        return c.json({ error: "Execution profile not found" }, 404);
+      }
+
+      settings = {
+        model: profile.model,
+        temperature: profile.temperature,
+        api_provider: profile.api_provider,
+      };
+      resolvedExecutionProfileId = profile.id;
+    } else {
+      // execution_profile_id 未指定の場合はデフォルト設定を使用
+      return c.json({ error: "execution_profile_id is required" }, 400);
     }
 
     const client = llmClientFactory({
@@ -373,10 +476,16 @@ export function createRunsRouter(db: DB, options: RunsRouterOptions = {}) {
       return c.json({ error: "Provider execution is not implemented" }, 501);
     }
 
+    const storedTestCase: StoredTestCase = {
+      id: testCase.id,
+      turns: testCase.turns,
+      context_content: testCase.context_content,
+    };
+
     const execution = buildExecutionRequest({
       model: settings.model,
-      messages: parseConversation(testCase.turns),
-      systemPrompt: buildSystemPrompt(version, testCase),
+      messages: parseConversation(storedTestCase.turns),
+      systemPrompt: buildSystemPrompt(version, storedTestCase),
       temperature: settings.temperature,
     });
     const workflow = parseWorkflowDefinition(version.workflow_definition);
@@ -394,7 +503,7 @@ export function createRunsRouter(db: DB, options: RunsRouterOptions = {}) {
 
           try {
             if (workflowSteps.length > 0) {
-              const baseMessages = parseConversation(testCase.turns);
+              const baseMessages = parseConversation(storedTestCase.turns);
               const stepOutputs = new Map<string, string>();
 
               for (const step of workflowSteps) {
@@ -402,7 +511,7 @@ export function createRunsRouter(db: DB, options: RunsRouterOptions = {}) {
                 const renderedPrompt = renderWorkflowPrompt({
                   step,
                   version,
-                  testCase,
+                  testCase: storedTestCase,
                   conversation: inputConversation,
                   previousOutput:
                     executionTrace.length > 0
@@ -495,9 +604,11 @@ export function createRunsRouter(db: DB, options: RunsRouterOptions = {}) {
                 execution_trace: executionTrace.length > 0 ? JSON.stringify(executionTrace) : null,
                 is_best: false,
                 is_discarded: false,
+                // execution_profile からのスナップショットを保存
                 model: settings.model,
                 temperature: settings.temperature,
                 api_provider: settings.api_provider,
+                execution_profile_id: resolvedExecutionProfileId,
                 created_at: Date.now(),
               })
               .returning();
@@ -536,10 +647,23 @@ export function createRunsRouter(db: DB, options: RunsRouterOptions = {}) {
       return c.json({ error: "Invalid ID" }, 400);
     }
 
+    // prompt_version_projects 経由でプロジェクトに紐づくバージョンIDを取得
+    const versionIds = await fetchVersionIdsByProject(db, projectId);
+
+    if (versionIds.length === 0) {
+      return c.json({ error: "Run not found" }, 404);
+    }
+
     const [run] = await db
       .select()
       .from(runs)
-      .where(and(eq(runs.id, id), eq(runs.project_id, projectId)));
+      .where(
+        and(
+          eq(runs.id, id),
+          eq(runs.project_id, projectId),
+          inArray(runs.prompt_version_id, versionIds),
+        ),
+      );
 
     if (!run) {
       return c.json({ error: "Run not found" }, 404);
@@ -559,10 +683,17 @@ export function createRunsRouter(db: DB, options: RunsRouterOptions = {}) {
       return c.json({ error: "Invalid ID" }, 400);
     }
 
+    // prompt_version_projects 経由でプロジェクトに紐づくバージョンIDを取得
+    const versionIds = await fetchVersionIdsByProject(db, projectId);
+
+    if (versionIds.length === 0) {
+      return c.json({ error: "Run not found" }, 404);
+    }
+
     const [existing] = await db
       .select()
       .from(runs)
-      .where(and(eq(runs.id, id), eq(runs.project_id, projectId)));
+      .where(and(eq(runs.id, id), inArray(runs.prompt_version_id, versionIds)));
 
     if (!existing) {
       return c.json({ error: "Run not found" }, 404);
@@ -618,10 +749,17 @@ export function createRunsRouter(db: DB, options: RunsRouterOptions = {}) {
       return c.json({ error: "Invalid ID" }, 400);
     }
 
+    // prompt_version_projects 経由でプロジェクトに紐づくバージョンIDを取得
+    const versionIds = await fetchVersionIdsByProject(db, projectId);
+
+    if (versionIds.length === 0) {
+      return c.json({ error: "Run not found" }, 404);
+    }
+
     const [existing] = await db
       .select()
       .from(runs)
-      .where(and(eq(runs.id, id), eq(runs.project_id, projectId)));
+      .where(and(eq(runs.id, id), inArray(runs.prompt_version_id, versionIds)));
 
     if (!existing) {
       return c.json({ error: "Run not found" }, 404);

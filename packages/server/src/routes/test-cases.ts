@@ -100,7 +100,9 @@ export function createTestCasesRouter(db: DB) {
 
     // qフィルタ（タイトル部分一致）
     if (q) {
-      allCases = allCases.filter((tc) => tc.title.toLocaleLowerCase().includes(q.toLocaleLowerCase()));
+      allCases = allCases.filter((tc) =>
+        tc.title.toLocaleLowerCase().includes(q.toLocaleLowerCase()),
+      );
     }
 
     // project_idフィルタ: 指定プロジェクトに紐づくテストケースのみ
