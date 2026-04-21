@@ -49,7 +49,7 @@ type MockRun = {
 
 function buildApp(db: unknown) {
   const app = new Hono();
-  app.route("/api/runs", createRunsRouter(db as DB));
+  app.route("/api/runs", createRunsRouter(db as DB, { enableCandidateExtractRoute: false }));
   app.route("/api/projects/:projectId/runs", createRunsRouter(db as DB));
   return app;
 }
@@ -516,12 +516,31 @@ describe("POST /api/projects/:projectId/runs", () => {
   it("execution_profile_idをRun作成時に保存できる", async () => {
     const created = { ...sampleRun, execution_profile_id: 1 };
 
+    let selectCallCount = 0;
     const db = {
-      select: () => ({
-        from: () => ({
-          where: () => Promise.resolve([{ prompt_version_id: 1, project_id: 1, created_at: 0 }]),
-        }),
-      }),
+      select: () => {
+        selectCallCount++;
+        if (selectCallCount === 1) {
+          return {
+            from: () => ({
+              where: () =>
+                Promise.resolve([{ prompt_version_id: 1, project_id: 1, created_at: 0 }]),
+            }),
+          };
+        }
+
+        return {
+          from: () => ({
+            where: () =>
+              Promise.resolve([
+                {
+                  ...sampleProfile,
+                  max_tokens: null,
+                },
+              ]),
+          }),
+        };
+      },
       insert: () => ({
         values: (values: { execution_profile_id: number | null }) => ({
           returning: () => {
@@ -550,6 +569,47 @@ describe("POST /api/projects/:projectId/runs", () => {
     expect(res.status).toBe(201);
     const body = (await res.json()) as MockRun;
     expect(body.execution_profile_id).toBe(1);
+  });
+
+  it("legacy create で存在しない execution_profile_id を指定した場合は 404 を返す", async () => {
+    let selectCallCount = 0;
+    const db = {
+      select: () => {
+        selectCallCount++;
+        if (selectCallCount === 1) {
+          return {
+            from: () => ({
+              where: () =>
+                Promise.resolve([{ prompt_version_id: 1, project_id: 1, created_at: 0 }]),
+            }),
+          };
+        }
+
+        return {
+          from: () => ({
+            where: () => Promise.resolve([]),
+          }),
+        };
+      },
+    };
+
+    const app = buildApp(db);
+    const res = await app.request("/api/projects/1/runs", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        prompt_version_id: 1,
+        test_case_id: 1,
+        conversation: sampleConversation,
+        execution_profile_id: 999,
+        model: "claude-sonnet-4-6",
+        temperature: 0.7,
+        api_provider: "anthropic",
+      }),
+    });
+
+    expect(res.status).toBe(404);
+    await expect(res.json()).resolves.toEqual({ error: "Execution profile not found" });
   });
 
   it("structured_output を保存してレスポンスでは JSON として返す", async () => {
@@ -2217,6 +2277,17 @@ function buildExtractDb(params: {
 }
 
 describe("POST /api/projects/:projectId/runs/:id/candidates/extract", () => {
+  it("新APIでは candidates/extract を公開しない", async () => {
+    const app = buildApp({});
+    const res = await app.request("/api/runs/1/candidates/extract", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ annotation_task_id: 1 }),
+    });
+
+    expect(res.status).toBe(404);
+  });
+
   it("structured_output から Candidate を生成して 201 を返す", async () => {
     const insertedValues: Record<string, unknown>[] = [];
     const db = buildExtractDb({ insertReturns: [{ id: 1 }], insertedValues });

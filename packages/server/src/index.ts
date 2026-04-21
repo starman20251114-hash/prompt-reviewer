@@ -95,7 +95,7 @@ app.route("/api/projects/:projectId/test-cases", createProjectTestCasesRouter(db
 app.route("/api/prompt-versions", createPromptVersionsRouter(db));
 app.route("/api/projects/:projectId/prompt-versions", createPromptVersionsRouter(db));
 app.route("/api/projects/:projectId/prompt-versions", createVersionSummaryRouter(db));
-app.route("/api/runs", createRunsRouter(db));
+app.route("/api/runs", createRunsRouter(db, { enableCandidateExtractRoute: false }));
 app.route("/api/projects/:projectId/runs", createRunsRouter(db));
 app.route("/api/runs", createScoresRouter(db));
 app.route("/api/score-progression", createScoreProgressionRouter(db));
