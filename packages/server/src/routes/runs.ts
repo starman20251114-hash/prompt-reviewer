@@ -212,7 +212,9 @@ function parseStructuredItems(
 function addLineNumbers(text: string): string {
   const lines = text.split("\n");
   const width = String(lines.length).length;
-  return lines.map((line, index) => `${String(index + 1).padStart(width, " ")}: ${line}`).join("\n");
+  return lines
+    .map((line, index) => `${String(index + 1).padStart(width, " ")}: ${line}`)
+    .join("\n");
 }
 
 function buildSystemPrompt(version: StoredPromptVersion, testCase: StoredTestCase): string {

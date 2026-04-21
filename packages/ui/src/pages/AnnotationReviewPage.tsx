@@ -1,6 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { Link, useParams, useSearchParams } from "react-router";
+import { AnnotationSectionTabs } from "../components/AnnotationSectionTabs";
 import {
   type AnnotationCandidate,
   type AnnotationLabel,
@@ -18,7 +19,6 @@ import {
   getTestCases,
   updateAnnotationCandidate,
 } from "../lib/api";
-import { AnnotationSectionTabs } from "../components/AnnotationSectionTabs";
 import styles from "./AnnotationReviewPage.module.css";
 
 function statusLabel(status: CandidateStatus): string {
