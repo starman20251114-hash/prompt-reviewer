@@ -20,6 +20,12 @@ const upsertSettingsSchema = z.object({
   api_provider: z.enum(["anthropic", "openai"], {
     error: 'api_providerは "anthropic" または "openai" である必要があります',
   }),
+  max_tokens: z
+    .number()
+    .int("max_tokensは整数が必要です")
+    .min(1, "max_tokensは1以上が必要です")
+    .nullable()
+    .optional(),
 });
 
 type UpsertBody = z.infer<typeof upsertSettingsSchema>;
@@ -63,6 +69,7 @@ function upsertDefaultExecutionProfile(
         model: body.model,
         temperature: body.temperature,
         api_provider: body.api_provider,
+        max_tokens: body.max_tokens ?? null,
         updated_at: now,
       })
       .where(eq(execution_profiles.id, existing.id))
@@ -77,6 +84,7 @@ function upsertDefaultExecutionProfile(
       model: body.model,
       temperature: body.temperature,
       api_provider: body.api_provider,
+      max_tokens: body.max_tokens ?? null,
       created_at: now,
       updated_at: now,
     })
@@ -141,6 +149,7 @@ export function createProjectSettingsRouter(db: DB, options: ProjectSettingsRout
             model: body.model,
             temperature: body.temperature,
             api_provider: body.api_provider,
+            max_tokens: body.max_tokens ?? null,
             updated_at: now,
           })
           .where(eq(project_settings.project_id, projectId))
@@ -163,6 +172,7 @@ export function createProjectSettingsRouter(db: DB, options: ProjectSettingsRout
           model: body.model,
           temperature: body.temperature,
           api_provider: body.api_provider,
+          max_tokens: body.max_tokens ?? null,
           created_at: now,
           updated_at: now,
         })

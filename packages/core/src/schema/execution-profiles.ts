@@ -13,6 +13,7 @@ export const execution_profiles = sqliteTable("execution_profiles", {
   api_provider: text("api_provider", { enum: ["anthropic", "openai"] })
     .notNull()
     .default("anthropic"),
+  max_tokens: integer("max_tokens"),
   created_at: integer("created_at").notNull(),
   updated_at: integer("updated_at").notNull(),
 });

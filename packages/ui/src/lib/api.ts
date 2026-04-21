@@ -650,6 +650,7 @@ export type ProjectSettings = {
   model: string;
   temperature: number;
   api_provider: "anthropic" | "openai";
+  max_tokens: number | null;
   created_at: number;
   updated_at: number;
 };
@@ -668,7 +669,12 @@ export function getProjectSettings(projectId: number): Promise<ProjectSettings> 
 
 export function upsertProjectSettings(
   projectId: number,
-  data: { model: string; temperature: number; api_provider: ApiProvider },
+  data: {
+    model: string;
+    temperature: number;
+    api_provider: ApiProvider;
+    max_tokens: number | null;
+  },
 ): Promise<ProjectSettings> {
   return api.put<ProjectSettings>(`/projects/${projectId}/settings`, data);
 }

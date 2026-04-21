@@ -22,6 +22,12 @@ const createExecutionProfileSchema = z.object({
   api_provider: z.enum(["anthropic", "openai"], {
     error: 'api_providerは "anthropic" または "openai" である必要があります',
   }),
+  max_tokens: z
+    .number()
+    .int("max_tokensは整数が必要です")
+    .min(1, "max_tokensは1以上が必要です")
+    .nullable()
+    .optional(),
 });
 
 const updateExecutionProfileSchema = z
@@ -38,6 +44,12 @@ const updateExecutionProfileSchema = z
       .enum(["anthropic", "openai"], {
         error: 'api_providerは "anthropic" または "openai" である必要があります',
       })
+      .optional(),
+    max_tokens: z
+      .number()
+      .int("max_tokensは整数が必要です")
+      .min(1, "max_tokensは1以上が必要です")
+      .nullable()
       .optional(),
   })
   .refine((value) => Object.keys(value).length > 0, {
@@ -160,6 +172,7 @@ function buildCreateValues(body: CreateExecutionProfileBody, now: number) {
     model: body.model,
     temperature: body.temperature,
     api_provider: body.api_provider,
+    max_tokens: body.max_tokens ?? null,
     created_at: now,
     updated_at: now,
   };
@@ -172,6 +185,7 @@ function buildUpdateValues(body: UpdateExecutionProfileBody, now: number) {
     ...(body.model !== undefined ? { model: body.model } : {}),
     ...(body.temperature !== undefined ? { temperature: body.temperature } : {}),
     ...(body.api_provider !== undefined ? { api_provider: body.api_provider } : {}),
+    ...(body.max_tokens !== undefined ? { max_tokens: body.max_tokens } : {}),
     updated_at: now,
   };
 }

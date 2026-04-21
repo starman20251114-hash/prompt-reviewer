@@ -27,6 +27,7 @@ export const project_settings = sqliteTable("project_settings", {
   api_provider: text("api_provider", { enum: ["anthropic", "openai"] })
     .notNull()
     .default("anthropic"),
+  max_tokens: integer("max_tokens"),
   created_at: integer("created_at").notNull(),
   updated_at: integer("updated_at").notNull(),
 });

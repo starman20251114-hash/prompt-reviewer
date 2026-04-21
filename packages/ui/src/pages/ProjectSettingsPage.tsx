@@ -22,6 +22,7 @@ export function ProjectSettingsPage() {
   const [model, setModel] = useState("");
   const [temperature, setTemperature] = useState(0.7);
   const [apiProvider, setApiProvider] = useState<ApiProvider>("anthropic");
+  const [maxTokens, setMaxTokens] = useState<number | null>(null);
   const [initialized, setInitialized] = useState(false);
 
   const [saveFeedback, setSaveFeedback] = useState<"success" | "error" | null>(null);
@@ -63,6 +64,7 @@ export function ProjectSettingsPage() {
       setModel(settingsData.model);
       setTemperature(settingsData.temperature);
       setApiProvider(settingsData.api_provider);
+      setMaxTokens(settingsData.max_tokens);
       setInitialized(true);
     }
   }, [settingsData, initialized]);
@@ -86,6 +88,7 @@ export function ProjectSettingsPage() {
         model,
         temperature,
         api_provider: apiProvider,
+        max_tokens: maxTokens,
       }),
     onSuccess: () => {
       setSaveFeedback("success");
@@ -227,6 +230,27 @@ export function ProjectSettingsPage() {
               <span className={styles.sliderValue}>{temperature.toFixed(1)}</span>
             </div>
             <p className={styles.fieldHint}>0.0（より決定論的）〜 2.0（よりランダム）</p>
+          </div>
+
+          {/* Max Tokens */}
+          <div className={styles.fieldGroup}>
+            <label htmlFor="settings-max-tokens" className={styles.fieldLabel}>
+              Max Tokens
+            </label>
+            <input
+              id="settings-max-tokens"
+              type="number"
+              min={1}
+              step={1}
+              value={maxTokens ?? ""}
+              onChange={(e) => setMaxTokens(e.target.value === "" ? null : Number(e.target.value))}
+              placeholder="デフォルト (4096)"
+              className={styles.fieldInput}
+            />
+            <p className={styles.fieldHint}>
+              LLM の出力トークン上限。長い出力が途中で切れる場合は増やしてください（例:
+              16000）。空欄でデフォルト値 (4096) を使用。
+            </p>
           </div>
         </div>
 
