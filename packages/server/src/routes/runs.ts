@@ -182,19 +182,89 @@ function parseStructuredOutput(json: string | null): StructuredOutput | null {
   return JSON.parse(json) as StructuredOutput;
 }
 
+function peekNextNonWhitespace(text: string, startIndex: number): string | null {
+  for (let index = startIndex; index < text.length; index += 1) {
+    const char = text[index];
+    if (char === undefined) {
+      return null;
+    }
+    if (!/\s/.test(char)) {
+      return char;
+    }
+  }
+
+  return null;
+}
+
+function sanitizeLenientJson(text: string): string {
+  let result = "";
+  let inString = false;
+  let escaping = false;
+
+  for (let index = 0; index < text.length; index += 1) {
+    const char = text[index];
+
+    if (escaping) {
+      result += char;
+      escaping = false;
+      continue;
+    }
+
+    if (char === "\\") {
+      result += char;
+      escaping = true;
+      continue;
+    }
+
+    if (char === '"') {
+      if (inString) {
+        const nextNonWhitespace = peekNextNonWhitespace(text, index + 1);
+        if (
+          nextNonWhitespace !== null &&
+          nextNonWhitespace !== "," &&
+          nextNonWhitespace !== "}" &&
+          nextNonWhitespace !== "]" &&
+          nextNonWhitespace !== ":"
+        ) {
+          result += '\\"';
+          continue;
+        }
+      }
+
+      result += char;
+      inString = !inString;
+      continue;
+    }
+
+    if (inString && (char === "\n" || char === "\r")) {
+      if (char === "\r" && text[index + 1] === "\n") {
+        index += 1;
+      }
+      result += "\\n";
+      continue;
+    }
+
+    result += char;
+  }
+
+  return result;
+}
+
 function extractJsonFromText(text: string): unknown {
+  const normalizedText = sanitizeLenientJson(text);
+
   // まず直接パースを試みる
   try {
-    return JSON.parse(text);
+    return JSON.parse(normalizedText);
   } catch {
     // ignore
   }
   // テキスト内の最初の { から最後の } を抽出してパース
   // （コードブロック内に ``` が含まれる場合でも対応できる）
-  const firstBrace = text.indexOf("{");
-  const lastBrace = text.lastIndexOf("}");
+  const firstBrace = normalizedText.indexOf("{");
+  const lastBrace = normalizedText.lastIndexOf("}");
   if (firstBrace !== -1 && lastBrace > firstBrace) {
-    return JSON.parse(text.slice(firstBrace, lastBrace + 1));
+    return JSON.parse(normalizedText.slice(firstBrace, lastBrace + 1));
   }
   throw new SyntaxError("Failed to parse as JSON");
 }
@@ -208,6 +278,15 @@ function parseStructuredItems(
   }
 
   return parsed.data.items;
+}
+
+function parseItemsFromStructuredOutput(json: string | null): z.infer<typeof structuredOutputSchema>["items"] | null {
+  const parsedStructuredOutput = parseStructuredOutput(json);
+  if (parsedStructuredOutput === null) {
+    return null;
+  }
+
+  return parseStructuredItems(parsedStructuredOutput);
 }
 
 function addLineNumbers(text: string): string {
@@ -924,20 +1003,15 @@ export function createRunsRouter(db: DB, options: RunsRouterOptions = {}) {
     // ソースタイプ決定とアイテム抽出
     let sourceType: CandidateSourceType;
     let resolvedSourceStepId: string | null = null;
-    let items: z.infer<typeof structuredOutputSchema>["items"];
+    let items: z.infer<typeof structuredOutputSchema>["items"] | null = null;
     const requestedSourceType =
       source_type ?? (run.structured_output !== null ? "structured_json" : "final_answer");
 
     if (requestedSourceType === "structured_json") {
       sourceType = "structured_json";
-      const parsedStructuredOutput = parseStructuredOutput(run.structured_output);
-      if (parsedStructuredOutput === null) {
-        return c.json({ error: "structured_output is not available for this run" }, 400);
-      }
-
-      const parsedItems = parseStructuredItems(parsedStructuredOutput);
+      const parsedItems = parseItemsFromStructuredOutput(run.structured_output);
       if (parsedItems === null) {
-        return c.json({ error: "structured_output has invalid format" }, 400);
+        return c.json({ error: "structured_output is not available for this run" }, 400);
       }
       items = parsedItems;
     } else if (requestedSourceType === "final_answer") {
@@ -952,20 +1026,34 @@ export function createRunsRouter(db: DB, options: RunsRouterOptions = {}) {
       try {
         parsedFinalAnswer = extractJsonFromText(lastAssistantMessage.content);
       } catch {
-        return c.json({ error: "Failed to parse assistant message as JSON" }, 400);
+        const fallbackItems = parseItemsFromStructuredOutput(run.structured_output);
+        if (fallbackItems !== null) {
+          sourceType = "structured_json";
+          items = fallbackItems;
+        } else {
+          return c.json({ error: "Failed to parse assistant message as JSON" }, 400);
+        }
       }
-
-      const parsedItems = parseStructuredItems(parsedFinalAnswer);
-      if (parsedItems === null) {
-        return c.json(
-          {
-            error:
-              "Assistant message JSON has invalid format (missing items field or invalid schema)",
-          },
-          400,
-        );
+      if (items === null) {
+        const parsedItems = parseStructuredItems(parsedFinalAnswer);
+        if (parsedItems === null) {
+          const fallbackItems = parseItemsFromStructuredOutput(run.structured_output);
+          if (fallbackItems !== null) {
+            sourceType = "structured_json";
+            items = fallbackItems;
+          } else {
+            return c.json(
+              {
+                error:
+                  "Assistant message JSON has invalid format (missing items field or invalid schema)",
+              },
+              400,
+            );
+          }
+        } else {
+          items = parsedItems;
+        }
       }
-      items = parsedItems;
     } else {
       sourceType = "trace_step";
       resolvedSourceStepId = source_step_id ?? null;
@@ -992,6 +1080,10 @@ export function createRunsRouter(db: DB, options: RunsRouterOptions = {}) {
         return c.json({ error: "trace_step output has invalid format" }, 400);
       }
       items = parsedItems;
+    }
+
+    if (items === null) {
+      return c.json({ error: "Failed to resolve annotation candidate items" }, 500);
     }
 
     // label の存在チェック

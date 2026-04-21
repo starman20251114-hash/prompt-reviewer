@@ -250,6 +250,7 @@ function AnnotationExtractPanel({
       if (selectedTaskId === "") throw new Error("タスクを選択してください");
       return extractAnnotationCandidates(projectId, run.id, {
         annotation_task_id: selectedTaskId,
+        source_type: hasStructuredOutput ? "structured_json" : "final_answer",
       });
     },
     onSuccess: (result) => {

@@ -796,7 +796,7 @@ export function extractAnnotationCandidates(
   runId: number,
   data: {
     annotation_task_id: number;
-    source_type?: "structured_json" | "final_answer" | "workflow_step";
+    source_type?: "structured_json" | "final_answer" | "trace_step";
     source_step_id?: string;
   },
 ): Promise<{ candidates_created: number; annotation_task_id: number }> {
