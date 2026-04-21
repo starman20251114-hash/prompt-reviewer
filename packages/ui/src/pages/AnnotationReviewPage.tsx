@@ -13,7 +13,6 @@ import {
   getAnnotationTask,
   getAnnotationTasks,
   getGoldAnnotations,
-  getProject,
   getRun,
   getTestCase,
   getTestCases,
@@ -35,11 +34,11 @@ function statusLabel(status: CandidateStatus): string {
 function statusClassName(status: CandidateStatus, s: typeof styles): string {
   switch (status) {
     case "pending":
-      return s.badgePending;
+      return s.badgePending ?? "";
     case "accepted":
-      return s.badgeAccepted;
+      return s.badgeAccepted ?? "";
     case "rejected":
-      return s.badgeRejected;
+      return s.badgeRejected ?? "";
   }
 }
 
@@ -79,6 +78,7 @@ function LineNumberedText({
     );
     if (matching.length === 0) return null;
     const first = matching[0];
+    if (!first) return null;
     const label = labels.find((l) => l.key === first.label);
     return labelColorRgba(label?.color, first.status === "accepted" ? 0.35 : 0.15);
   }
@@ -330,52 +330,42 @@ function CandidateCard({
   );
 }
 
-export function AnnotationReviewPage() {
-  const { id } = useParams<{ id: string }>();
-  const [searchParams] = useSearchParams();
-  const projectId = Number(id);
-  const runIdParam = searchParams.get("runId");
-  const mode = searchParams.get("mode");
-  const runId = Number(runIdParam);
-  const taskId = Number(searchParams.get("taskId"));
-
-  if (mode === "review" && !runIdParam) {
-    return (
-      <div className={styles.root}>
-        <div className={styles.pageHeader}>
-          <div>
-            <h2 className={styles.pageTitle}>抽出</h2>
-          </div>
-        </div>
-        <AnnotationSectionTabs />
-        <div className={styles.rightSection}>
-          <h3 className={styles.panelTitle}>レビューの開始方法</h3>
-          <p className={styles.emptyMsg}>
-            Run ページで候補抽出を実行するか、既存の候補レビューリンクからこの画面を開いてください。
-          </p>
-          <div style={{ padding: "0 16px 16px" }}>
-            <Link to={`/projects/${projectId}/runs`} className={styles.backLink}>
-              ← Run に戻る
-            </Link>
-          </div>
+function AnnotationReviewStartPage({ projectId }: { projectId: number }) {
+  return (
+    <div className={styles.root}>
+      <div className={styles.pageHeader}>
+        <div>
+          <h2 className={styles.pageTitle}>抽出</h2>
         </div>
       </div>
-    );
-  }
+      <AnnotationSectionTabs />
+      <div className={styles.rightSection}>
+        <h3 className={styles.panelTitle}>レビューの開始方法</h3>
+        <p className={styles.emptyMsg}>
+          Run ページで候補抽出を実行するか、既存の候補レビューリンクからこの画面を開いてください。
+        </p>
+        <div style={{ padding: "0 16px 16px" }}>
+          <Link to={`/projects/${projectId}/runs`} className={styles.backLink}>
+            ← Run に戻る
+          </Link>
+        </div>
+      </div>
+    </div>
+  );
+}
 
-  // runId が指定されていない場合は Gold Annotation ブラウズモード
-  if (!runIdParam) {
-    return <GoldAnnotationBrowse projectId={projectId} />;
-  }
+function AnnotationReviewContent({
+  projectId,
+  runId,
+  taskId,
+}: {
+  projectId: number;
+  runId: number;
+  taskId: number;
+}) {
   const queryClient = useQueryClient();
 
   const [activeRange, setActiveRange] = useState<{ start: number; end: number } | null>(null);
-
-  const { data: project } = useQuery({
-    queryKey: ["projects", projectId],
-    queryFn: () => getProject(projectId),
-    enabled: !Number.isNaN(projectId),
-  });
 
   const { data: run, isLoading: isRunLoading } = useQuery({
     queryKey: ["runs", projectId, runId],
@@ -559,6 +549,26 @@ export function AnnotationReviewPage() {
       </div>
     </div>
   );
+}
+
+export function AnnotationReviewPage() {
+  const { id } = useParams<{ id: string }>();
+  const [searchParams] = useSearchParams();
+  const projectId = Number(id);
+  const runIdParam = searchParams.get("runId");
+  const mode = searchParams.get("mode");
+  const runId = Number(runIdParam);
+  const taskId = Number(searchParams.get("taskId"));
+
+  if (mode === "review" && !runIdParam) {
+    return <AnnotationReviewStartPage projectId={projectId} />;
+  }
+
+  if (!runIdParam) {
+    return <GoldAnnotationBrowse projectId={projectId} />;
+  }
+
+  return <AnnotationReviewContent projectId={projectId} runId={runId} taskId={taskId} />;
 }
 
 function GoldAnnotationCard({
