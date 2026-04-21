@@ -25,7 +25,8 @@
 
 /* ==================== Header ==================== */
 .pageHeader {
-  margin-bottom: 8px;
+  composes: pageHeader from '../styles/shared.module.css';
+  margin-bottom: 24px;
   flex-shrink: 0;
 }
 
