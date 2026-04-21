@@ -88,7 +88,7 @@ app.route("/api/context-assets", createContextAssetsRouter(db));
 app.route("/api/projects", createProjectsRouter(db));
 app.route("/api/execution-profiles", createExecutionProfilesRouter(db));
 app.route("/api/prompt-families", createPromptFamiliesRouter(db));
-app.route("/api/projects/:projectId/context-files", createContextFilesRouter());
+app.route("/api/projects/:projectId/context-files", createContextFilesRouter(db));
 app.route("/api/test-cases", createTestCasesRouter(db));
 app.route("/api/prompt-versions", createPromptVersionsRouter(db));
 app.route("/api/projects/:projectId/prompt-versions", createPromptVersionsRouter(db));

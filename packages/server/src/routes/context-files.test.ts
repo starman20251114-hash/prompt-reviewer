@@ -1,55 +1,127 @@
-import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
-import os from "node:os";
-import path from "node:path";
+vi.mock("better-sqlite3", () => {
+  return {
+    default: vi.fn().mockReturnValue({}),
+  };
+});
+
+import type { DB } from "@prompt-reviewer/core";
 import { Hono } from "hono";
-import { afterEach, describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { createContextFilesRouter } from "./context-files.js";
 
-async function createTempDir(): Promise<string> {
-  return mkdtemp(path.join(os.tmpdir(), "prompt-reviewer-context-files-"));
-}
+type MockContextAsset = {
+  id: number;
+  name: string;
+  path: string;
+  content: string;
+  mime_type: string;
+  content_hash: string | null;
+  created_at: number;
+  updated_at: number;
+};
 
-function buildApp(baseDir: string) {
+function buildApp(db: unknown) {
   const app = new Hono();
-  app.route("/api/projects/:projectId/context-files", createContextFilesRouter({ baseDir }));
+  app.route("/api/projects/:projectId/context-files", createContextFilesRouter(db as DB));
   return app;
 }
 
-const cleanupTargets: string[] = [];
-
-afterEach(async () => {
-  await Promise.all(
-    cleanupTargets.splice(0).map((target) => rm(target, { recursive: true, force: true })),
-  );
-});
+const sampleAsset: MockContextAsset = {
+  id: 1,
+  name: "guide.md",
+  path: "docs/guide.md",
+  content: "# guide",
+  mime_type: "text/markdown",
+  content_hash: "sha256:guide",
+  created_at: 1000000,
+  updated_at: 1000100,
+};
 
 describe("context files router", () => {
-  it("GET /api/projects/:projectId/context-files returns uploaded files", async () => {
-    const baseDir = await createTempDir();
-    cleanupTargets.push(baseDir);
-    const projectDir = path.join(baseDir, "12");
-    await mkdir(path.join(projectDir, "docs"), { recursive: true });
-    await writeFile(path.join(projectDir, "docs", "guide.md"), "# guide", {
-      encoding: "utf8",
-      flag: "w",
+  it("GET /api/projects/:projectId/context-files は project ラベル付き素材だけ返す", async () => {
+    let selectCallCount = 0;
+    const app = buildApp({
+      select: () => {
+        selectCallCount++;
+        if (selectCallCount === 1) {
+          return {
+            from: () => ({
+              where: () => Promise.resolve([{ context_asset_id: 1 }]),
+            }),
+          };
+        }
+
+        return {
+          from: () =>
+            Promise.resolve([
+              sampleAsset,
+              {
+                ...sampleAsset,
+                id: 2,
+                name: "other.md",
+                path: "docs/other.md",
+              },
+            ]),
+        };
+      },
     });
 
-    const app = buildApp(baseDir);
     const res = await app.request("/api/projects/12/context-files");
 
     expect(res.status).toBe(200);
-    const body = (await res.json()) as Array<{ path: string; name: string }>;
-    expect(body).toHaveLength(1);
-    expect(body[0]?.path).toBe("docs/guide.md");
-    expect(body[0]?.name).toBe("guide.md");
+    await expect(res.json()).resolves.toEqual([
+      {
+        name: "guide.md",
+        path: "docs/guide.md",
+        mime_type: "text/markdown",
+        size: Buffer.byteLength("# guide", "utf8"),
+        updated_at: 1000100,
+      },
+    ]);
   });
 
-  it("POST /api/projects/:projectId/context-files creates a file under the project directory", async () => {
-    const baseDir = await createTempDir();
-    cleanupTargets.push(baseDir);
-    const app = buildApp(baseDir);
+  it("POST /api/projects/:projectId/context-files は context asset を作成して project に紐付ける", async () => {
+    const created = {
+      ...sampleAsset,
+      id: 10,
+      name: "policy.txt",
+      path: "snapshots/policy.txt",
+      content: "refund within 30 days",
+      mime_type: "text/plain",
+    };
+    let insertCallCount = 0;
+    let capturedAssetValues: Record<string, unknown> = {};
+    let capturedLinkValues: Record<string, unknown> = {};
 
-    const res = await app.request("/api/projects/3/context-files", {
+    const db = {
+      select: () => ({
+        from: () => ({
+          where: () => Promise.resolve([]),
+        }),
+      }),
+      insert: () => {
+        insertCallCount++;
+        if (insertCallCount === 1) {
+          return {
+            values: (values: Record<string, unknown>) => {
+              capturedAssetValues = values;
+              return {
+                returning: () => Promise.resolve([created]),
+              };
+            },
+          };
+        }
+
+        return {
+          values: (values: Record<string, unknown>) => {
+            capturedLinkValues = values;
+            return Promise.resolve();
+          },
+        };
+      },
+    };
+
+    const res = await buildApp(db).request("/api/projects/3/context-files", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
@@ -59,51 +131,219 @@ describe("context files router", () => {
     });
 
     expect(res.status).toBe(201);
-    const saved = await readFile(path.join(baseDir, "3", "snapshots", "policy.txt"), "utf8");
-    expect(saved).toBe("refund within 30 days");
+    expect(capturedAssetValues.name).toBe("policy.txt");
+    expect(capturedAssetValues.path).toBe("snapshots/policy.txt");
+    expect(capturedAssetValues.mime_type).toBe("text/plain");
+    expect(typeof capturedAssetValues.content_hash).toBe("string");
+    expect(capturedLinkValues.context_asset_id).toBe(10);
+    expect(capturedLinkValues.project_id).toBe(3);
   });
 
-  it("GET /content returns file content", async () => {
-    const baseDir = await createTempDir();
-    cleanupTargets.push(baseDir);
-    const targetPath = path.join(baseDir, "7", "context.md");
-    await mkdir(path.dirname(targetPath), { recursive: true });
-    await writeFile(targetPath, "hello context", { encoding: "utf8", flag: "w" });
+  it("同じ path を再投稿した場合は新規作成せず既存 asset を更新する", async () => {
+    let selectCallCount = 0;
+    let updateCalled = false;
+    let insertCalled = false;
+    let capturedUpdateValues: Record<string, unknown> = {};
+    const updated = {
+      ...sampleAsset,
+      content: "updated content",
+      updated_at: 2000000,
+    };
 
-    const app = buildApp(baseDir);
-    const res = await app.request("/api/projects/7/context-files/content?path=context.md");
+    const app = buildApp({
+      select: () => {
+        selectCallCount++;
+        if (selectCallCount === 1) {
+          return {
+            from: () => ({
+              where: () => Promise.resolve([{ context_asset_id: 1 }]),
+            }),
+          };
+        }
+
+        return {
+          from: () => Promise.resolve([sampleAsset]),
+        };
+      },
+      update: () => ({
+        set: (values: Record<string, unknown>) => {
+          updateCalled = true;
+          capturedUpdateValues = values;
+          return {
+            where: () => ({
+              returning: () => Promise.resolve([updated]),
+            }),
+          };
+        },
+      }),
+      insert: () => {
+        insertCalled = true;
+        return {
+          values: () => Promise.resolve(),
+        };
+      },
+    });
+
+    const res = await app.request("/api/projects/3/context-files", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        file_name: "docs/guide.md",
+        content: "updated content",
+      }),
+    });
+
+    expect(res.status).toBe(201);
+    expect(updateCalled).toBe(true);
+    expect(insertCalled).toBe(false);
+    expect(capturedUpdateValues.content).toBe("updated content");
+    expect(capturedUpdateValues.path).toBe("docs/guide.md");
+    expect(capturedUpdateValues.name).toBe("guide.md");
+    expect(capturedUpdateValues.mime_type).toBe("text/markdown");
+  });
+
+  it("GET /content は project に紐付いた同一 path の素材を返す", async () => {
+    let selectCallCount = 0;
+    const app = buildApp({
+      select: () => {
+        selectCallCount++;
+        if (selectCallCount === 1) {
+          return {
+            from: () => ({
+              where: () => Promise.resolve([{ context_asset_id: 2 }]),
+            }),
+          };
+        }
+
+        return {
+          from: () =>
+            Promise.resolve([
+              sampleAsset,
+              {
+                ...sampleAsset,
+                id: 2,
+                content: "project specific",
+              },
+            ]),
+        };
+      },
+    });
+
+    const res = await app.request("/api/projects/7/context-files/content?path=docs/guide.md");
 
     expect(res.status).toBe(200);
-    const body = (await res.json()) as { content: string; path: string };
-    expect(body.content).toBe("hello context");
-    expect(body.path).toBe("context.md");
+    await expect(res.json()).resolves.toEqual({
+      name: "guide.md",
+      path: "docs/guide.md",
+      mime_type: "text/markdown",
+      size: Buffer.byteLength("project specific", "utf8"),
+      updated_at: 1000100,
+      content: "project specific",
+    });
   });
 
-  it("PUT /content updates an existing file", async () => {
-    const baseDir = await createTempDir();
-    cleanupTargets.push(baseDir);
-    const targetPath = path.join(baseDir, "9", "drafts", "memo.md");
-    await mkdir(path.dirname(targetPath), { recursive: true });
-    await writeFile(targetPath, "before", { encoding: "utf8", flag: "w" });
+  it("PUT /content は path から解決した asset を更新する", async () => {
+    let selectCallCount = 0;
+    let capturedUpdateValues: Record<string, unknown> = {};
+    const updated = {
+      ...sampleAsset,
+      id: 2,
+      content: "after",
+      updated_at: 2000000,
+    };
 
-    const app = buildApp(baseDir);
-    const res = await app.request("/api/projects/9/context-files/content?path=drafts/memo.md", {
+    const app = buildApp({
+      select: () => {
+        selectCallCount++;
+        if (selectCallCount === 1) {
+          return {
+            from: () => ({
+              where: () => Promise.resolve([{ context_asset_id: 2 }]),
+            }),
+          };
+        }
+
+        return {
+          from: () =>
+            Promise.resolve([
+              sampleAsset,
+              {
+                ...sampleAsset,
+                id: 2,
+                content: "before",
+              },
+            ]),
+        };
+      },
+      update: () => ({
+        set: (values: Record<string, unknown>) => {
+          capturedUpdateValues = values;
+          return {
+            where: () => ({
+              returning: () => Promise.resolve([updated]),
+            }),
+          };
+        },
+      }),
+    });
+
+    const res = await app.request("/api/projects/9/context-files/content?path=docs/guide.md", {
       method: "PUT",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ content: "after" }),
     });
 
     expect(res.status).toBe(200);
-    const saved = await readFile(targetPath, "utf8");
-    expect(saved).toBe("after");
+    expect(capturedUpdateValues.content).toBe("after");
+    expect(typeof capturedUpdateValues.content_hash).toBe("string");
     const body = (await res.json()) as { content: string };
     expect(body.content).toBe("after");
   });
 
-  it("rejects traversal paths", async () => {
-    const baseDir = await createTempDir();
-    cleanupTargets.push(baseDir);
-    const app = buildApp(baseDir);
+  it("project フィルタ外の素材は一覧に含めない", async () => {
+    let selectCallCount = 0;
+    const app = buildApp({
+      select: () => {
+        selectCallCount++;
+        if (selectCallCount === 1) {
+          return {
+            from: () => ({
+              where: () => Promise.resolve([{ context_asset_id: 2 }]),
+            }),
+          };
+        }
+
+        return {
+          from: () =>
+            Promise.resolve([
+              sampleAsset,
+              {
+                ...sampleAsset,
+                id: 2,
+                name: "selected.md",
+                path: "docs/selected.md",
+              },
+            ]),
+        };
+      },
+    });
+
+    const res = await app.request("/api/projects/4/context-files");
+
+    expect(res.status).toBe(200);
+    await expect(res.json()).resolves.toEqual([
+      {
+        name: "selected.md",
+        path: "docs/selected.md",
+        mime_type: "text/markdown",
+        size: Buffer.byteLength("# guide", "utf8"),
+        updated_at: 1000100,
+      },
+    ]);
+  });
+
+  it("不正な path を拒否する", async () => {
+    const app = buildApp({});
 
     const res = await app.request("/api/projects/4/context-files", {
       method: "POST",
@@ -115,5 +355,15 @@ describe("context files router", () => {
     });
 
     expect(res.status).toBe(400);
+    await expect(res.json()).resolves.toEqual({ error: "Invalid file_name" });
+  });
+
+  it("GET /content の不正な path は 400 を返す", async () => {
+    const app = buildApp({});
+
+    const res = await app.request("/api/projects/4/context-files/content?path=../escape.txt");
+
+    expect(res.status).toBe(400);
+    await expect(res.json()).resolves.toEqual({ error: "Invalid path" });
   });
 });
