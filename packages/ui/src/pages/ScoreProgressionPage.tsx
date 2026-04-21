@@ -11,6 +11,7 @@ import {
   XAxis,
   YAxis,
 } from "recharts";
+import { ScoreSectionTabs } from "../components/ScoreSectionTabs";
 import { type VersionSummary, getProject, getScoreProgression } from "../lib/api";
 import styles from "./ScoreProgressionPage.module.css";
 
@@ -277,7 +278,7 @@ export function ScoreProgressionPage() {
       {/* Page header */}
       <div className={styles.pageHeader}>
         <div>
-          <h2 className={styles.pageTitle}>Score Progression</h2>
+          <h2 className={styles.pageTitle}>採点</h2>
           {project && <p className={styles.projectName}>{project.name}</p>}
         </div>
 
@@ -302,6 +303,7 @@ export function ScoreProgressionPage() {
           </button>
         </div>
       </div>
+      <ScoreSectionTabs />
 
       {isLoading && <p className={styles.loadingMsg}>Loading...</p>}
       {isError && <p className={styles.errorMsg}>Failed to load score data. Please try again.</p>}

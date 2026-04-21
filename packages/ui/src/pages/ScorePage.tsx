@@ -12,6 +12,7 @@ import {
   getScore,
   updateScore,
 } from "../lib/api";
+import { ScoreSectionTabs } from "../components/ScoreSectionTabs";
 import styles from "./ScorePage.module.css";
 
 function formatDate(timestamp: number): string {
@@ -759,6 +760,8 @@ export function ScorePage() {
           {project && <p className={styles.projectName}>{project.name}</p>}
         </div>
       </div>
+
+      <ScoreSectionTabs />
 
       {/* タブ */}
       <div className={styles.tabs}>

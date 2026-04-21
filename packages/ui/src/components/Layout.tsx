@@ -20,7 +20,6 @@ function ProjectSubNav({ projectId }: { projectId: string }) {
     { to: `/projects/${projectId}/prompts`, label: "プロンプト" },
     { to: `/projects/${projectId}/runs`, label: "Run" },
     { to: `/projects/${projectId}/score`, label: "採点" },
-    { to: `/projects/${projectId}/score-progression`, label: "スコア推移" },
     {
       to: `/projects/${projectId}/annotation-review`,
       label: "抽出",
