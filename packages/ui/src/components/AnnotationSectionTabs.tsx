@@ -19,9 +19,15 @@ export function AnnotationSectionTabs() {
   const isReviewPath = location.pathname.endsWith(`/${annotationRoutes.review}`);
   const isSettingsPath = location.pathname.endsWith(`/${annotationRoutes.settings}`);
 
+  const reviewParams = new URLSearchParams({ mode: "review" });
+  const runId = searchParams.get("runId");
+  const taskId = searchParams.get("taskId");
+  if (runId) reviewParams.set("runId", runId);
+  if (taskId) reviewParams.set("taskId", taskId);
+
   const tabs = [
     {
-      to: `/projects/${id}/${annotationRoutes.review}?mode=review`,
+      to: `/projects/${id}/${annotationRoutes.review}?${reviewParams.toString()}`,
       label: "レビュー",
       isActive: isReviewPath && hasRunId,
     },

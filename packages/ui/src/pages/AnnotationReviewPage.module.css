@@ -21,8 +21,6 @@
   min-height: 0;
   overflow: hidden;
   color: var(--c-text);
-  padding: 0 24px 24px;
-  box-sizing: border-box;
 }
 
 /* ==================== Header ==================== */
