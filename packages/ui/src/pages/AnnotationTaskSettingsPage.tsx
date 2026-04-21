@@ -124,6 +124,7 @@ export function AnnotationTaskSettingsPage() {
   const [feedbackMessage, setFeedbackMessage] = useState<string | null>(null);
   const [feedbackTone, setFeedbackTone] = useState<"success" | "error" | null>(null);
   const [taskFormMode, setTaskFormMode] = useState<"create" | "edit" | null>(null);
+  const [labelCreateOpen, setLabelCreateOpen] = useState(false);
 
   const { data: project } = useQuery({
     queryKey: ["project", projectId],
@@ -166,20 +167,22 @@ export function AnnotationTaskSettingsPage() {
   });
 
   useEffect(() => {
-    if (taskDetailQuery.data) {
-      setTaskForm(buildTaskForm(taskDetailQuery.data));
-
-      if (editingLabelId !== null) {
-        const nextLabel = taskDetailQuery.data.labels.find((label) => label.id === editingLabelId);
+    if (!taskDetailQuery.data) return;
+    setTaskForm(buildTaskForm(taskDetailQuery.data));
+    const labels = taskDetailQuery.data.labels;
+    setEditingLabelId((currentId) => {
+      if (currentId !== null) {
+        const nextLabel = labels.find((l) => l.id === currentId);
         if (nextLabel) {
           setEditingLabelForm(buildLabelForm(nextLabel));
         } else {
-          setEditingLabelId(null);
           setEditingLabelForm(emptyLabelForm);
+          return null;
         }
       }
-    }
-  }, [editingLabelId, taskDetailQuery.data]);
+      return currentId;
+    });
+  }, [taskDetailQuery.data]);
 
   const sortedLabels = useMemo(
     () => taskDetailQuery.data?.labels ?? [],
@@ -259,6 +262,7 @@ export function AnnotationTaskSettingsPage() {
         await refreshTaskData(selectedTaskId);
       }
       setNewLabelForm(emptyLabelForm);
+      setLabelCreateOpen(false);
       showFeedback("ラベルを追加しました。", "success");
     },
     onError: (error) => {
@@ -424,78 +428,6 @@ export function AnnotationTaskSettingsPage() {
             })}
           </div>
 
-          <div className={styles.createTaskSection}>
-            {taskFormMode === "create" && (
-              <form
-                className={styles.panel}
-                onSubmit={(event) => {
-                  event.preventDefault();
-                  createTaskMutation.mutate();
-                }}
-              >
-                <label className={styles.fieldLabel} htmlFor="new-task-name">
-                  新規タスク名
-                </label>
-                <input
-                  id="new-task-name"
-                  className={styles.fieldInput}
-                  value={newTaskForm.name}
-                  onChange={(event) =>
-                    setNewTaskForm((current) => ({ ...current, name: event.target.value }))
-                  }
-                  placeholder="例: 回答品質アノテーション"
-                />
-
-                <label className={styles.fieldLabel} htmlFor="new-task-description">
-                  説明
-                </label>
-                <textarea
-                  id="new-task-description"
-                  className={styles.fieldTextarea}
-                  value={newTaskForm.description}
-                  onChange={(event) =>
-                    setNewTaskForm((current) => ({ ...current, description: event.target.value }))
-                  }
-                  placeholder="任意: この task の目的や判定基準"
-                  rows={4}
-                />
-
-                <div className={styles.outputModeBox}>
-                  <span className={styles.outputModeLabel}>Output mode</span>
-                  <strong className={styles.outputModeValue}>span_label</strong>
-                  <p className={styles.outputModeHint}>初期実装では固定です。</p>
-                </div>
-
-                <div className={styles.formFooter}>
-                  <button type="submit" className={styles.primaryButton} disabled={!canCreateTask}>
-                    {createTaskMutation.isPending ? "作成中..." : "タスクを追加"}
-                  </button>
-                  <button
-                    type="button"
-                    className={styles.ghostButton}
-                    onClick={() => setTaskFormMode(null)}
-                    disabled={createTaskMutation.isPending}
-                  >
-                    キャンセル
-                  </button>
-                </div>
-              </form>
-            )}
-
-            <div className={styles.leftAlignedAction}>
-              <button
-                type="button"
-                className={styles.secondaryButton}
-                onClick={() =>
-                  setTaskFormMode((current) => (current === "create" ? null : "create"))
-                }
-                aria-expanded={taskFormMode === "create"}
-              >
-                {taskFormMode === "create" ? "新規タスク作成を閉じる" : "新規タスクを作成"}
-              </button>
-            </div>
-          </div>
-
           {selectedTaskId !== null &&
             !taskDetailQuery.isLoading &&
             !taskDetailQuery.isError &&
@@ -626,6 +558,78 @@ export function AnnotationTaskSettingsPage() {
                 </div>
               </section>
             )}
+
+          <div className={styles.createTaskSection}>
+            {taskFormMode === "create" && (
+              <form
+                className={styles.panel}
+                onSubmit={(event) => {
+                  event.preventDefault();
+                  createTaskMutation.mutate();
+                }}
+              >
+                <label className={styles.fieldLabel} htmlFor="new-task-name">
+                  新規タスク名
+                </label>
+                <input
+                  id="new-task-name"
+                  className={styles.fieldInput}
+                  value={newTaskForm.name}
+                  onChange={(event) =>
+                    setNewTaskForm((current) => ({ ...current, name: event.target.value }))
+                  }
+                  placeholder="例: 回答品質アノテーション"
+                />
+
+                <label className={styles.fieldLabel} htmlFor="new-task-description">
+                  説明
+                </label>
+                <textarea
+                  id="new-task-description"
+                  className={styles.fieldTextarea}
+                  value={newTaskForm.description}
+                  onChange={(event) =>
+                    setNewTaskForm((current) => ({ ...current, description: event.target.value }))
+                  }
+                  placeholder="任意: この task の目的や判定基準"
+                  rows={4}
+                />
+
+                <div className={styles.outputModeBox}>
+                  <span className={styles.outputModeLabel}>Output mode</span>
+                  <strong className={styles.outputModeValue}>span_label</strong>
+                  <p className={styles.outputModeHint}>初期実装では固定です。</p>
+                </div>
+
+                <div className={styles.formFooter}>
+                  <button type="submit" className={styles.primaryButton} disabled={!canCreateTask}>
+                    {createTaskMutation.isPending ? "作成中..." : "タスクを追加"}
+                  </button>
+                  <button
+                    type="button"
+                    className={styles.ghostButton}
+                    onClick={() => setTaskFormMode(null)}
+                    disabled={createTaskMutation.isPending}
+                  >
+                    キャンセル
+                  </button>
+                </div>
+              </form>
+            )}
+
+            <div className={styles.leftAlignedAction}>
+              <button
+                type="button"
+                className={styles.secondaryButton}
+                onClick={() =>
+                  setTaskFormMode((current) => (current === "create" ? null : "create"))
+                }
+                aria-expanded={taskFormMode === "create"}
+              >
+                {taskFormMode === "create" ? "新規タスク作成を閉じる" : "新規タスクを作成"}
+              </button>
+            </div>
+          </div>
         </section>
 
         <section className={styles.contentSection}>
@@ -650,102 +654,10 @@ export function AnnotationTaskSettingsPage() {
                 <div>
                   <h3 className={styles.sectionTitle}>ラベル設定</h3>
                   <p className={styles.sectionHint}>
-                    表示名、内部 key、色、表示順を UI から管理できます。
+                    カテゴリキー・カテゴリ名・色・表示順を UI から管理できます。
                   </p>
                 </div>
               </div>
-
-              <form
-                className={styles.panel}
-                onSubmit={(event) => {
-                  event.preventDefault();
-                  createLabelMutation.mutate();
-                }}
-              >
-                <div className={styles.fieldGrid}>
-                  <div className={styles.fieldGroup}>
-                    <label className={styles.fieldLabel} htmlFor="new-label-key">
-                      分類ラベル
-                      <span className={styles.requiredMark}>必須</span>
-                    </label>
-                    <input
-                      id="new-label-key"
-                      className={styles.fieldInput}
-                      value={newLabelForm.key}
-                      onChange={(event) =>
-                        setNewLabelForm((current) => ({ ...current, key: event.target.value }))
-                      }
-                      placeholder="例: missing_evidence"
-                    />
-                    <p className={styles.fieldHint}>未入力なら表示名から自動生成します。</p>
-                  </div>
-
-                  <div className={styles.fieldGroup}>
-                    <label className={styles.fieldLabel} htmlFor="new-label-name">
-                      表示名
-                    </label>
-                    <input
-                      id="new-label-name"
-                      className={styles.fieldInput}
-                      value={newLabelForm.name}
-                      onChange={(event) =>
-                        setNewLabelForm((current) => ({ ...current, name: event.target.value }))
-                      }
-                      placeholder="未入力なら分類ラベルをそのまま使います"
-                    />
-                  </div>
-
-                  <div className={styles.fieldGroup}>
-                    <label className={styles.fieldLabel} htmlFor="new-label-color">
-                      色
-                    </label>
-                    <div className={styles.colorFieldRow}>
-                      <input
-                        id="new-label-color"
-                        className={styles.fieldInput}
-                        value={newLabelForm.color}
-                        onChange={(event) =>
-                          setNewLabelForm((current) => ({
-                            ...current,
-                            color: event.target.value,
-                          }))
-                        }
-                        placeholder="#ff7a59"
-                      />
-                      <span
-                        className={styles.colorChip}
-                        style={{ backgroundColor: buildLabelPreviewColor(newLabelForm) }}
-                        aria-label="色プレビュー"
-                      />
-                    </div>
-                    <p className={styles.fieldHint}>未入力なら自動で設定します。</p>
-                  </div>
-
-                  <div className={styles.fieldGroup}>
-                    <label className={styles.fieldLabel} htmlFor="new-label-order">
-                      並び順
-                    </label>
-                    <input
-                      id="new-label-order"
-                      className={styles.fieldInput}
-                      type="number"
-                      value={newLabelForm.displayOrder}
-                      onChange={(event) =>
-                        setNewLabelForm((current) => ({
-                          ...current,
-                          displayOrder: event.target.value,
-                        }))
-                      }
-                    />
-                  </div>
-                </div>
-
-                <div className={styles.formFooter}>
-                  <button type="submit" className={styles.primaryButton} disabled={!canCreateLabel}>
-                    {createLabelMutation.isPending ? "追加中..." : "ラベルを追加"}
-                  </button>
-                </div>
-              </form>
 
               <div className={styles.labelList}>
                 {sortedLabels.length === 0 ? (
@@ -760,18 +672,9 @@ export function AnnotationTaskSettingsPage() {
                     const currentForm = isEditing ? editingLabelForm : buildLabelForm(label);
 
                     return (
-                      <form
+                      <div
                         key={label.id}
                         className={styles.labelCard}
-                        onSubmit={(event) => {
-                          event.preventDefault();
-                          if (!isEditing) {
-                            setEditingLabelId(label.id);
-                            setEditingLabelForm(buildLabelForm(label));
-                            return;
-                          }
-                          updateLabelMutation.mutate();
-                        }}
                       >
                         <div className={styles.labelCardHeader}>
                           <div>
@@ -794,9 +697,10 @@ export function AnnotationTaskSettingsPage() {
                               </button>
                             ) : (
                               <button
-                                type="submit"
+                                type="button"
                                 className={styles.secondaryButton}
                                 disabled={!canUpdateLabel}
+                                onClick={() => updateLabelMutation.mutate()}
                               >
                                 {updateLabelMutation.isPending ? "保存中..." : "保存"}
                               </button>
@@ -815,7 +719,7 @@ export function AnnotationTaskSettingsPage() {
                         <div className={styles.fieldGrid}>
                           <div className={styles.fieldGroup}>
                             <label htmlFor="label-key-input" className={styles.fieldLabel}>
-                              分類ラベル
+                              分類ラベル/カテゴリキー
                               <span className={styles.requiredMark}>必須</span>
                             </label>
                             <input
@@ -832,14 +736,14 @@ export function AnnotationTaskSettingsPage() {
                             />
                             {isEditing && (
                               <p className={styles.fieldHint}>
-                                未入力なら表示名から自動生成します。
+                                未入力ならカテゴリ名から自動生成します。
                               </p>
                             )}
                           </div>
 
                           <div className={styles.fieldGroup}>
                             <label htmlFor="label-name-input" className={styles.fieldLabel}>
-                              表示名
+                              カテゴリ名
                             </label>
                             <input
                               id="label-name-input"
@@ -915,10 +819,128 @@ export function AnnotationTaskSettingsPage() {
                             </button>
                           </div>
                         )}
-                      </form>
+                      </div>
                     );
                   })
                 )}
+              </div>
+
+              <div className={styles.createTaskSection}>
+                {labelCreateOpen && (
+                  <form
+                    className={styles.panel}
+                    onSubmit={(event) => {
+                      event.preventDefault();
+                      createLabelMutation.mutate();
+                    }}
+                  >
+                    <div className={styles.fieldGrid}>
+                      <div className={styles.fieldGroup}>
+                        <label className={styles.fieldLabel} htmlFor="new-label-key">
+                          分類ラベル/カテゴリキー
+                          <span className={styles.requiredMark}>必須</span>
+                        </label>
+                        <input
+                          id="new-label-key"
+                          className={styles.fieldInput}
+                          value={newLabelForm.key}
+                          onChange={(event) =>
+                            setNewLabelForm((current) => ({ ...current, key: event.target.value }))
+                          }
+                          placeholder="例: missing_evidence"
+                        />
+                        <p className={styles.fieldHint}>未入力ならカテゴリ名から自動生成します。</p>
+                      </div>
+
+                      <div className={styles.fieldGroup}>
+                        <label className={styles.fieldLabel} htmlFor="new-label-name">
+                          カテゴリ名
+                        </label>
+                        <input
+                          id="new-label-name"
+                          className={styles.fieldInput}
+                          value={newLabelForm.name}
+                          onChange={(event) =>
+                            setNewLabelForm((current) => ({ ...current, name: event.target.value }))
+                          }
+                          placeholder="未入力ならカテゴリキーをそのまま使います"
+                        />
+                      </div>
+
+                      <div className={styles.fieldGroup}>
+                        <label className={styles.fieldLabel} htmlFor="new-label-color">
+                          色
+                        </label>
+                        <div className={styles.colorFieldRow}>
+                          <input
+                            id="new-label-color"
+                            className={styles.fieldInput}
+                            value={newLabelForm.color}
+                            onChange={(event) =>
+                              setNewLabelForm((current) => ({
+                                ...current,
+                                color: event.target.value,
+                              }))
+                            }
+                            placeholder="#ff7a59"
+                          />
+                          <span
+                            className={styles.colorChip}
+                            style={{ backgroundColor: buildLabelPreviewColor(newLabelForm) }}
+                            aria-label="色プレビュー"
+                          />
+                        </div>
+                        <p className={styles.fieldHint}>未入力なら自動で設定します。</p>
+                      </div>
+
+                      <div className={styles.fieldGroup}>
+                        <label className={styles.fieldLabel} htmlFor="new-label-order">
+                          並び順
+                        </label>
+                        <input
+                          id="new-label-order"
+                          className={styles.fieldInput}
+                          type="number"
+                          value={newLabelForm.displayOrder}
+                          onChange={(event) =>
+                            setNewLabelForm((current) => ({
+                              ...current,
+                              displayOrder: event.target.value,
+                            }))
+                          }
+                        />
+                      </div>
+                    </div>
+
+                    <div className={styles.formFooter}>
+                      <button type="submit" className={styles.primaryButton} disabled={!canCreateLabel}>
+                        {createLabelMutation.isPending ? "追加中..." : "ラベルを追加"}
+                      </button>
+                      <button
+                        type="button"
+                        className={styles.ghostButton}
+                        onClick={() => {
+                          setLabelCreateOpen(false);
+                          setNewLabelForm(emptyLabelForm);
+                        }}
+                        disabled={createLabelMutation.isPending}
+                      >
+                        キャンセル
+                      </button>
+                    </div>
+                  </form>
+                )}
+
+                <div className={styles.leftAlignedAction}>
+                  <button
+                    type="button"
+                    className={styles.secondaryButton}
+                    onClick={() => setLabelCreateOpen((prev) => !prev)}
+                    aria-expanded={labelCreateOpen}
+                  >
+                    {labelCreateOpen ? "新規ラベル追加を閉じる" : "新規ラベルを追加"}
+                  </button>
+                </div>
               </div>
 
               {/* プロンプト生成パネル */}

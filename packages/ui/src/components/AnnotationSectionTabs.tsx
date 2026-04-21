@@ -17,23 +17,23 @@ export function AnnotationSectionTabs() {
   const { id } = useParams<{ id: string }>();
   const location = useLocation();
 
-  if (!id) {
-    return null;
-  }
-
   const searchParams = new URLSearchParams(location.search);
   const reviewContextFromSearch = getAnnotationReviewContextFromSearch(location.search);
-  const persistedReviewContext = loadLastAnnotationReviewContext(id);
+  const persistedReviewContext = id ? loadLastAnnotationReviewContext(id) : null;
   const reviewContext = reviewContextFromSearch ?? persistedReviewContext;
   const hasRunId = searchParams.get("runId") !== null;
   const isReviewPath = location.pathname.endsWith(`/${annotationRoutes.review}`);
   const isSettingsPath = location.pathname.endsWith(`/${annotationRoutes.settings}`);
 
   useEffect(() => {
-    if (reviewContextFromSearch) {
+    if (id && reviewContextFromSearch) {
       saveLastAnnotationReviewContext(id, reviewContextFromSearch);
     }
   }, [id, reviewContextFromSearch]);
+
+  if (!id) {
+    return null;
+  }
 
   const tabs = [
     {
