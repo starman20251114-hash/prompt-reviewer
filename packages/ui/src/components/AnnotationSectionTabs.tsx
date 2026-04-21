@@ -1,4 +1,11 @@
+import { useEffect } from "react";
 import { NavLink, useLocation, useParams } from "react-router";
+import {
+  buildAnnotationReviewPath,
+  getAnnotationReviewContextFromSearch,
+  loadLastAnnotationReviewContext,
+  saveLastAnnotationReviewContext,
+} from "../lib/annotationReviewNavigation";
 import styles from "./AnnotationSectionTabs.module.css";
 
 const annotationRoutes = {
@@ -15,19 +22,22 @@ export function AnnotationSectionTabs() {
   }
 
   const searchParams = new URLSearchParams(location.search);
+  const reviewContextFromSearch = getAnnotationReviewContextFromSearch(location.search);
+  const persistedReviewContext = loadLastAnnotationReviewContext(id);
+  const reviewContext = reviewContextFromSearch ?? persistedReviewContext;
   const hasRunId = searchParams.get("runId") !== null;
   const isReviewPath = location.pathname.endsWith(`/${annotationRoutes.review}`);
   const isSettingsPath = location.pathname.endsWith(`/${annotationRoutes.settings}`);
 
-  const reviewParams = new URLSearchParams({ mode: "review" });
-  const runId = searchParams.get("runId");
-  const taskId = searchParams.get("taskId");
-  if (runId) reviewParams.set("runId", runId);
-  if (taskId) reviewParams.set("taskId", taskId);
+  useEffect(() => {
+    if (reviewContextFromSearch) {
+      saveLastAnnotationReviewContext(id, reviewContextFromSearch);
+    }
+  }, [id, reviewContextFromSearch]);
 
   const tabs = [
     {
-      to: `/projects/${id}/${annotationRoutes.review}?${reviewParams.toString()}`,
+      to: buildAnnotationReviewPath(id, reviewContext),
       label: "レビュー",
       isActive: isReviewPath && hasRunId,
     },

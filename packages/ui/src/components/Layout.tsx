@@ -1,4 +1,9 @@
 import { NavLink, Outlet, useLocation, useParams } from "react-router";
+import {
+  buildAnnotationReviewPath,
+  getAnnotationReviewContextFromSearch,
+  loadLastAnnotationReviewContext,
+} from "../lib/annotationReviewNavigation";
 import { ErrorBoundary } from "./ErrorBoundary";
 
 const navLinkStyle = ({ isActive }: { isActive: boolean }) => ({
@@ -13,6 +18,12 @@ const navLinkStyle = ({ isActive }: { isActive: boolean }) => ({
 });
 
 function ProjectSubNav({ projectId }: { projectId: string }) {
+  const location = useLocation();
+  const reviewContext =
+    getAnnotationReviewContextFromSearch(location.search) ??
+    loadLastAnnotationReviewContext(projectId);
+  const annotationReviewPath = buildAnnotationReviewPath(projectId, reviewContext);
+
   const subNavItems = [
     { to: `/projects/${projectId}`, label: "ホーム", end: true },
     { to: `/projects/${projectId}/context-files`, label: "コンテキスト" },
@@ -21,7 +32,7 @@ function ProjectSubNav({ projectId }: { projectId: string }) {
     { to: `/projects/${projectId}/runs`, label: "Run" },
     { to: `/projects/${projectId}/score`, label: "採点" },
     {
-      to: `/projects/${projectId}/annotation-review`,
+      to: annotationReviewPath,
       label: "抽出",
       matchPaths: [
         `/projects/${projectId}/annotation-review`,
@@ -30,7 +41,6 @@ function ProjectSubNav({ projectId }: { projectId: string }) {
     },
     { to: `/projects/${projectId}/settings`, label: "設定" },
   ];
-  const location = useLocation();
 
   return (
     <div style={{ marginTop: "8px" }}>
