@@ -49,6 +49,7 @@ type MockRun = {
 
 function buildApp(db: unknown) {
   const app = new Hono();
+  app.route("/api/runs", createRunsRouter(db as DB));
   app.route("/api/projects/:projectId/runs", createRunsRouter(db as DB));
   return app;
 }
@@ -103,6 +104,62 @@ const sampleStructuredOutput = {
 // ---- テスト ----
 
 describe("GET /api/projects/:projectId/runs", () => {
+  it("新APIでは project_id を含めずに Run 一覧を返す", async () => {
+    let selectCallCount = 0;
+    const db = {
+      select: () => {
+        selectCallCount++;
+        if (selectCallCount === 1) {
+          return {
+            from: () => ({
+              where: () => Promise.resolve([sampleRun]),
+            }),
+          };
+        }
+        return {
+          from: () => ({
+            where: () => Promise.resolve([sampleRun]),
+          }),
+        };
+      },
+    };
+
+    const app = buildApp(db);
+    const res = await app.request("/api/runs?project_id=1");
+
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as Array<MockRun & { conversation: MockConversationMessage[] }>;
+    expect(body.at(0)).not.toHaveProperty("project_id");
+  });
+
+  it("legacy path は project_id を補完して返す", async () => {
+    let selectCallCount = 0;
+    const db = {
+      select: () => {
+        selectCallCount++;
+        if (selectCallCount === 1) {
+          return {
+            from: () => ({
+              where: () => Promise.resolve([{ prompt_version_id: 1 }]),
+            }),
+          };
+        }
+        return {
+          from: () => ({
+            where: () => Promise.resolve([sampleRun]),
+          }),
+        };
+      },
+    };
+
+    const app = buildApp(db);
+    const res = await app.request("/api/projects/1/runs");
+
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as Array<MockRun & { conversation: MockConversationMessage[] }>;
+    expect(body.at(0)).toHaveProperty("project_id", 1);
+  });
+
   it("prompt_version_projects 基準でフィルタしてRun一覧を200で返す", async () => {
     const runs = [sampleRun, { ...sampleRun, id: 2 }];
 

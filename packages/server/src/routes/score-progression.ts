@@ -17,6 +17,24 @@ function parseIntParam(value: string | undefined): number | null {
   return Number.isNaN(parsed) ? null : parsed;
 }
 
+function resolveProjectId(c: {
+  req: {
+    param: (name: string) => string;
+    query: (name: string) => string | undefined;
+  };
+}): number | null | undefined {
+  const legacyProjectId = parseIntParam(c.req.param("projectId"));
+  if (legacyProjectId !== null) {
+    return legacyProjectId;
+  }
+
+  if (c.req.param("projectId") !== undefined) {
+    return null;
+  }
+
+  return parseIntParam(c.req.query("project_id"));
+}
+
 export type VersionSummary = {
   versionId: number;
   versionNumber: number;
@@ -59,21 +77,23 @@ export function createScoreProgressionRouter(db: DB) {
   const router = new Hono();
 
   router.get("/", async (c) => {
-    const projectId = parseIntParam(c.req.param("projectId"));
+    const projectId = resolveProjectId(c);
 
     if (projectId === null) {
       return c.json({ error: "Invalid projectId" }, 400);
     }
 
-    // prompt_version_projects 経由でプロジェクトに紐づくバージョンIDを取得
-    const versionLinks = await db
-      .select({ prompt_version_id: prompt_version_projects.prompt_version_id })
-      .from(prompt_version_projects)
-      .where(eq(prompt_version_projects.project_id, projectId));
+    const versionIds =
+      projectId !== undefined
+        ? (
+            await db
+              .select({ prompt_version_id: prompt_version_projects.prompt_version_id })
+              .from(prompt_version_projects)
+              .where(eq(prompt_version_projects.project_id, projectId))
+          ).map((l) => l.prompt_version_id)
+        : [];
 
-    const versionIds = versionLinks.map((l) => l.prompt_version_id);
-
-    if (versionIds.length === 0) {
+    if (projectId !== undefined && versionIds.length === 0) {
       return c.json({
         versionSummaries: [],
         testCaseBreakdown: [],
@@ -81,10 +101,10 @@ export function createScoreProgressionRouter(db: DB) {
     }
 
     // バージョン詳細を取得
-    const versions = await db
-      .select()
-      .from(prompt_versions)
-      .where(inArray(prompt_versions.id, versionIds));
+    const versions =
+      projectId !== undefined
+        ? await db.select().from(prompt_versions).where(inArray(prompt_versions.id, versionIds))
+        : await db.select().from(prompt_versions);
 
     if (versions.length === 0) {
       return c.json({
@@ -94,10 +114,10 @@ export function createScoreProgressionRouter(db: DB) {
     }
 
     // prompt_version_projects 基準でRunを取得
-    const allRuns = await db
-      .select()
-      .from(runs)
-      .where(and(eq(runs.project_id, projectId), inArray(runs.prompt_version_id, versionIds)));
+    const allRuns =
+      projectId !== undefined
+        ? await db.select().from(runs).where(inArray(runs.prompt_version_id, versionIds))
+        : await db.select().from(runs);
 
     if (allRuns.length === 0) {
       const emptySummaries: VersionSummary[] = versions.map((v) => ({
@@ -164,12 +184,15 @@ export function createScoreProgressionRouter(db: DB) {
       });
 
     // test_case_projects 経由でプロジェクトに紐づくテストケースIDを取得
-    const testCaseLinks = await db
-      .select({ test_case_id: test_case_projects.test_case_id })
-      .from(test_case_projects)
-      .where(eq(test_case_projects.project_id, projectId));
-
-    const testCaseIds = testCaseLinks.map((l) => l.test_case_id);
+    const testCaseIds =
+      projectId !== undefined
+        ? (
+            await db
+              .select({ test_case_id: test_case_projects.test_case_id })
+              .from(test_case_projects)
+              .where(eq(test_case_projects.project_id, projectId))
+          ).map((l) => l.test_case_id)
+        : [...new Set(allRuns.map((run) => run.test_case_id))];
 
     if (testCaseIds.length === 0) {
       return c.json({
