@@ -45,6 +45,19 @@ const patchCandidateSchema = z
     { message: "end_line は start_line 以上でなければなりません", path: ["end_line"] },
   );
 
+function buildGoldFromCandidate(candidate: typeof annotation_candidates.$inferSelect, now: number) {
+  return {
+    annotation_task_id: candidate.annotation_task_id,
+    target_text_ref: candidate.target_text_ref,
+    label: candidate.label,
+    start_line: candidate.start_line,
+    end_line: candidate.end_line,
+    quote: candidate.quote,
+    note: candidate.note ?? null,
+    updated_at: now,
+  };
+}
+
 // ---- annotation_candidates ルーター ----
 
 export function createAnnotationCandidatesRouter(db: DB) {
@@ -172,36 +185,33 @@ export function createAnnotationCandidatesRouter(db: DB) {
       return c.json({ error: "Annotation candidate not found" }, 404);
     }
 
-    // status が "accepted" に変更された場合は gold_annotation を作成する
-    if (body.status === "accepted") {
-      const [existingGold] = await db
-        .select()
-        .from(gold_annotations)
-        .where(eq(gold_annotations.source_candidate_id, updatedCandidate.id));
+    const [linkedGold] = await db
+      .select()
+      .from(gold_annotations)
+      .where(eq(gold_annotations.source_candidate_id, updatedCandidate.id));
 
-      if (existingGold) {
-        return c.json({ candidate: updatedCandidate, gold: existingGold });
+    // accepted 済み candidate の編集は linked gold にも追従させる
+    if (updatedCandidate.status === "accepted") {
+      if (linkedGold) {
+        const synced = await db
+          .update(gold_annotations)
+          .set(buildGoldFromCandidate(updatedCandidate, now))
+          .where(eq(gold_annotations.id, linkedGold.id))
+          .returning();
+
+        return c.json({ candidate: updatedCandidate, gold: synced[0] });
       }
 
       const inserted = await db
         .insert(gold_annotations)
         .values({
-          annotation_task_id: updatedCandidate.annotation_task_id,
-          target_text_ref: updatedCandidate.target_text_ref,
-          label: updatedCandidate.label,
-          start_line: updatedCandidate.start_line,
-          end_line: updatedCandidate.end_line,
-          quote: updatedCandidate.quote,
-          note: updatedCandidate.note ?? null,
+          ...buildGoldFromCandidate(updatedCandidate, now),
           source_candidate_id: updatedCandidate.id,
           created_at: now,
-          updated_at: now,
         })
         .returning();
 
-      const createdGold = inserted[0];
-
-      return c.json({ candidate: updatedCandidate, gold: createdGold });
+      return c.json({ candidate: updatedCandidate, gold: inserted[0] });
     }
 
     return c.json({ candidate: updatedCandidate });
@@ -263,6 +273,13 @@ export function createGoldAnnotationsRouter(db: DB) {
     }
 
     await db.delete(gold_annotations).where(eq(gold_annotations.id, id));
+
+    if (existing.source_candidate_id !== null) {
+      await db
+        .update(annotation_candidates)
+        .set({ status: "pending", updated_at: Date.now() })
+        .where(eq(annotation_candidates.id, existing.source_candidate_id));
+    }
 
     return c.json({ success: true });
   });

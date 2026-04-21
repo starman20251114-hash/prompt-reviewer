@@ -416,7 +416,9 @@ export function AnnotationReviewPage() {
   const deleteGoldMutation = useMutation({
     mutationFn: (goldId: number) => deleteGoldAnnotation(goldId),
     onSuccess: () => {
+      void refetchCandidates();
       void refetchGold();
+      void queryClient.invalidateQueries({ queryKey: ["annotation-candidates"] });
       void queryClient.invalidateQueries({ queryKey: ["gold-annotations"] });
     },
   });
