@@ -345,9 +345,6 @@ export function AnnotationReviewPage() {
         <div className={styles.pageHeader}>
           <div>
             <h2 className={styles.pageTitle}>抽出</h2>
-            <p className={styles.pageMeta}>
-              Run から抽出した候補をレビューするには、対象の Run とタスクを選択してください。
-            </p>
           </div>
         </div>
         <AnnotationSectionTabs />
@@ -483,9 +480,6 @@ export function AnnotationReviewPage() {
             ← Run 一覧に戻る
           </Link>
           <h2 className={styles.pageTitle}>抽出</h2>
-          <p className={styles.pageMeta}>
-            {project?.name} / Run #{run.id} / {annotationTask.name}
-          </p>
         </div>
       </div>
       <AnnotationSectionTabs />
@@ -737,7 +731,6 @@ function GoldAnnotationBrowse({ projectId }: { projectId: number }) {
       <div className={styles.pageHeader}>
         <div>
           <h2 className={styles.pageTitle}>抽出</h2>
-          <p className={styles.pageMeta}>Gold Annotation の確認と手動メンテナンスを行います。</p>
         </div>
       </div>
       <AnnotationSectionTabs />
