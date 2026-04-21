@@ -486,7 +486,9 @@ export function AnnotationTaskSettingsPage() {
               <button
                 type="button"
                 className={styles.secondaryButton}
-                onClick={() => setTaskFormMode((current) => (current === "create" ? null : "create"))}
+                onClick={() =>
+                  setTaskFormMode((current) => (current === "create" ? null : "create"))
+                }
                 aria-expanded={taskFormMode === "create"}
               >
                 {taskFormMode === "create" ? "新規タスク作成を閉じる" : "新規タスクを作成"}
@@ -561,7 +563,10 @@ export function AnnotationTaskSettingsPage() {
                         className={styles.fieldTextarea}
                         value={taskForm.description}
                         onChange={(event) =>
-                          setTaskForm((current) => ({ ...current, description: event.target.value }))
+                          setTaskForm((current) => ({
+                            ...current,
+                            description: event.target.value,
+                          }))
                         }
                         rows={5}
                         placeholder="任意: アノテーション方針やラベルの使い分けを記載"
@@ -611,7 +616,9 @@ export function AnnotationTaskSettingsPage() {
                   <button
                     type="button"
                     className={styles.secondaryButton}
-                    onClick={() => setTaskFormMode((current) => (current === "edit" ? null : "edit"))}
+                    onClick={() =>
+                      setTaskFormMode((current) => (current === "edit" ? null : "edit"))
+                    }
                     aria-expanded={taskFormMode === "edit"}
                   >
                     {taskFormMode === "edit" ? "タスク編集を閉じる" : "タスクを編集"}
@@ -655,93 +662,89 @@ export function AnnotationTaskSettingsPage() {
                   createLabelMutation.mutate();
                 }}
               >
-                  <div className={styles.fieldGrid}>
-                    <div className={styles.fieldGroup}>
-                      <label className={styles.fieldLabel} htmlFor="new-label-key">
-                        分類ラベル
-                        <span className={styles.requiredMark}>必須</span>
-                      </label>
-                      <input
-                        id="new-label-key"
-                        className={styles.fieldInput}
-                        value={newLabelForm.key}
-                        onChange={(event) =>
-                          setNewLabelForm((current) => ({ ...current, key: event.target.value }))
-                        }
-                        placeholder="例: missing_evidence"
-                      />
-                      <p className={styles.fieldHint}>未入力なら表示名から自動生成します。</p>
-                    </div>
+                <div className={styles.fieldGrid}>
+                  <div className={styles.fieldGroup}>
+                    <label className={styles.fieldLabel} htmlFor="new-label-key">
+                      分類ラベル
+                      <span className={styles.requiredMark}>必須</span>
+                    </label>
+                    <input
+                      id="new-label-key"
+                      className={styles.fieldInput}
+                      value={newLabelForm.key}
+                      onChange={(event) =>
+                        setNewLabelForm((current) => ({ ...current, key: event.target.value }))
+                      }
+                      placeholder="例: missing_evidence"
+                    />
+                    <p className={styles.fieldHint}>未入力なら表示名から自動生成します。</p>
+                  </div>
 
-                    <div className={styles.fieldGroup}>
-                      <label className={styles.fieldLabel} htmlFor="new-label-name">
-                        表示名
-                      </label>
-                      <input
-                        id="new-label-name"
-                        className={styles.fieldInput}
-                        value={newLabelForm.name}
-                        onChange={(event) =>
-                          setNewLabelForm((current) => ({ ...current, name: event.target.value }))
-                        }
-                        placeholder="未入力なら分類ラベルをそのまま使います"
-                      />
-                    </div>
+                  <div className={styles.fieldGroup}>
+                    <label className={styles.fieldLabel} htmlFor="new-label-name">
+                      表示名
+                    </label>
+                    <input
+                      id="new-label-name"
+                      className={styles.fieldInput}
+                      value={newLabelForm.name}
+                      onChange={(event) =>
+                        setNewLabelForm((current) => ({ ...current, name: event.target.value }))
+                      }
+                      placeholder="未入力なら分類ラベルをそのまま使います"
+                    />
+                  </div>
 
-                    <div className={styles.fieldGroup}>
-                      <label className={styles.fieldLabel} htmlFor="new-label-color">
-                        色
-                      </label>
-                      <div className={styles.colorFieldRow}>
-                        <input
-                          id="new-label-color"
-                          className={styles.fieldInput}
-                          value={newLabelForm.color}
-                          onChange={(event) =>
-                            setNewLabelForm((current) => ({
-                              ...current,
-                              color: event.target.value,
-                            }))
-                          }
-                          placeholder="#ff7a59"
-                        />
-                        <span
-                          className={styles.colorChip}
-                          style={{ backgroundColor: buildLabelPreviewColor(newLabelForm) }}
-                          aria-label="色プレビュー"
-                        />
-                      </div>
-                      <p className={styles.fieldHint}>未入力なら自動で設定します。</p>
-                    </div>
-
-                    <div className={styles.fieldGroup}>
-                      <label className={styles.fieldLabel} htmlFor="new-label-order">
-                        並び順
-                      </label>
+                  <div className={styles.fieldGroup}>
+                    <label className={styles.fieldLabel} htmlFor="new-label-color">
+                      色
+                    </label>
+                    <div className={styles.colorFieldRow}>
                       <input
-                        id="new-label-order"
+                        id="new-label-color"
                         className={styles.fieldInput}
-                        type="number"
-                        value={newLabelForm.displayOrder}
+                        value={newLabelForm.color}
                         onChange={(event) =>
                           setNewLabelForm((current) => ({
                             ...current,
-                            displayOrder: event.target.value,
+                            color: event.target.value,
                           }))
                         }
+                        placeholder="#ff7a59"
+                      />
+                      <span
+                        className={styles.colorChip}
+                        style={{ backgroundColor: buildLabelPreviewColor(newLabelForm) }}
+                        aria-label="色プレビュー"
                       />
                     </div>
+                    <p className={styles.fieldHint}>未入力なら自動で設定します。</p>
                   </div>
 
-                  <div className={styles.formFooter}>
-                    <button
-                      type="submit"
-                      className={styles.primaryButton}
-                      disabled={!canCreateLabel}
-                    >
-                      {createLabelMutation.isPending ? "追加中..." : "ラベルを追加"}
-                    </button>
+                  <div className={styles.fieldGroup}>
+                    <label className={styles.fieldLabel} htmlFor="new-label-order">
+                      並び順
+                    </label>
+                    <input
+                      id="new-label-order"
+                      className={styles.fieldInput}
+                      type="number"
+                      value={newLabelForm.displayOrder}
+                      onChange={(event) =>
+                        setNewLabelForm((current) => ({
+                          ...current,
+                          displayOrder: event.target.value,
+                        }))
+                      }
+                    />
                   </div>
+                </div>
+
+                <div className={styles.formFooter}>
+                  <button type="submit" className={styles.primaryButton} disabled={!canCreateLabel}>
+                    {createLabelMutation.isPending ? "追加中..." : "ラベルを追加"}
+                  </button>
+                </div>
               </form>
 
               <div className={styles.labelList}>
@@ -770,148 +773,148 @@ export function AnnotationTaskSettingsPage() {
                           updateLabelMutation.mutate();
                         }}
                       >
-                          <div className={styles.labelCardHeader}>
-                            <div>
-                              <h4 className={styles.labelTitle}>{label.name}</h4>
-                              <p className={styles.labelMeta}>
-                                key: <code>{label.key}</code>
-                              </p>
-                            </div>
-                            <div className={styles.labelActions}>
-                              {!isEditing ? (
-                                <button
-                                  type="button"
-                                  className={styles.secondaryButton}
-                                  onClick={() => {
-                                    setEditingLabelId(label.id);
-                                    setEditingLabelForm(buildLabelForm(label));
-                                  }}
-                                >
-                                  編集
-                                </button>
-                              ) : (
-                                <button
-                                  type="submit"
-                                  className={styles.secondaryButton}
-                                  disabled={!canUpdateLabel}
-                                >
-                                  {updateLabelMutation.isPending ? "保存中..." : "保存"}
-                                </button>
-                              )}
+                        <div className={styles.labelCardHeader}>
+                          <div>
+                            <h4 className={styles.labelTitle}>{label.name}</h4>
+                            <p className={styles.labelMeta}>
+                              key: <code>{label.key}</code>
+                            </p>
+                          </div>
+                          <div className={styles.labelActions}>
+                            {!isEditing ? (
                               <button
                                 type="button"
-                                className={styles.dangerButton}
-                                onClick={() => deleteLabelMutation.mutate(label.id)}
-                                disabled={deleteLabelMutation.isPending}
-                              >
-                                削除
-                              </button>
-                            </div>
-                          </div>
-
-                          <div className={styles.fieldGrid}>
-                            <div className={styles.fieldGroup}>
-                              <label htmlFor="label-key-input" className={styles.fieldLabel}>
-                                分類ラベル
-                                <span className={styles.requiredMark}>必須</span>
-                              </label>
-                              <input
-                                id="label-key-input"
-                                className={styles.fieldInput}
-                                value={currentForm.key}
-                                disabled={!isEditing}
-                                onChange={(event) =>
-                                  setEditingLabelForm((current) => ({
-                                    ...current,
-                                    key: event.target.value,
-                                  }))
-                                }
-                              />
-                              {isEditing && (
-                                <p className={styles.fieldHint}>
-                                  未入力なら表示名から自動生成します。
-                                </p>
-                              )}
-                            </div>
-
-                            <div className={styles.fieldGroup}>
-                              <label htmlFor="label-name-input" className={styles.fieldLabel}>
-                                表示名
-                              </label>
-                              <input
-                                id="label-name-input"
-                                className={styles.fieldInput}
-                                value={currentForm.name}
-                                disabled={!isEditing}
-                                onChange={(event) =>
-                                  setEditingLabelForm((current) => ({
-                                    ...current,
-                                    name: event.target.value,
-                                  }))
-                                }
-                              />
-                            </div>
-
-                            <div className={styles.fieldGroup}>
-                              <label htmlFor="label-color-input" className={styles.fieldLabel}>
-                                色
-                              </label>
-                              <div className={styles.colorFieldRow}>
-                                <input
-                                  id="label-color-input"
-                                  className={styles.fieldInput}
-                                  value={currentForm.color}
-                                  disabled={!isEditing}
-                                  onChange={(event) =>
-                                    setEditingLabelForm((current) => ({
-                                      ...current,
-                                      color: event.target.value,
-                                    }))
-                                  }
-                                />
-                                <span
-                                  className={styles.colorChip}
-                                  style={{ backgroundColor: buildLabelPreviewColor(currentForm) }}
-                                  aria-label="色プレビュー"
-                                />
-                              </div>
-                              <p className={styles.fieldHint}>未入力なら自動で設定します。</p>
-                            </div>
-
-                            <div className={styles.fieldGroup}>
-                              <label htmlFor="label-order-input" className={styles.fieldLabel}>
-                                並び順
-                              </label>
-                              <input
-                                id="label-order-input"
-                                className={styles.fieldInput}
-                                type="number"
-                                value={currentForm.displayOrder}
-                                disabled={!isEditing}
-                                onChange={(event) =>
-                                  setEditingLabelForm((current) => ({
-                                    ...current,
-                                    displayOrder: event.target.value,
-                                  }))
-                                }
-                              />
-                            </div>
-                          </div>
-
-                          {isEditing && (
-                            <div className={styles.formFooter}>
-                              <button
-                                type="button"
-                                className={styles.ghostButton}
+                                className={styles.secondaryButton}
                                 onClick={() => {
-                                  setEditingLabelId(null);
-                                  setEditingLabelForm(emptyLabelForm);
+                                  setEditingLabelId(label.id);
+                                  setEditingLabelForm(buildLabelForm(label));
                                 }}
                               >
-                                キャンセル
+                                編集
                               </button>
+                            ) : (
+                              <button
+                                type="submit"
+                                className={styles.secondaryButton}
+                                disabled={!canUpdateLabel}
+                              >
+                                {updateLabelMutation.isPending ? "保存中..." : "保存"}
+                              </button>
+                            )}
+                            <button
+                              type="button"
+                              className={styles.dangerButton}
+                              onClick={() => deleteLabelMutation.mutate(label.id)}
+                              disabled={deleteLabelMutation.isPending}
+                            >
+                              削除
+                            </button>
+                          </div>
+                        </div>
+
+                        <div className={styles.fieldGrid}>
+                          <div className={styles.fieldGroup}>
+                            <label htmlFor="label-key-input" className={styles.fieldLabel}>
+                              分類ラベル
+                              <span className={styles.requiredMark}>必須</span>
+                            </label>
+                            <input
+                              id="label-key-input"
+                              className={styles.fieldInput}
+                              value={currentForm.key}
+                              disabled={!isEditing}
+                              onChange={(event) =>
+                                setEditingLabelForm((current) => ({
+                                  ...current,
+                                  key: event.target.value,
+                                }))
+                              }
+                            />
+                            {isEditing && (
+                              <p className={styles.fieldHint}>
+                                未入力なら表示名から自動生成します。
+                              </p>
+                            )}
+                          </div>
+
+                          <div className={styles.fieldGroup}>
+                            <label htmlFor="label-name-input" className={styles.fieldLabel}>
+                              表示名
+                            </label>
+                            <input
+                              id="label-name-input"
+                              className={styles.fieldInput}
+                              value={currentForm.name}
+                              disabled={!isEditing}
+                              onChange={(event) =>
+                                setEditingLabelForm((current) => ({
+                                  ...current,
+                                  name: event.target.value,
+                                }))
+                              }
+                            />
+                          </div>
+
+                          <div className={styles.fieldGroup}>
+                            <label htmlFor="label-color-input" className={styles.fieldLabel}>
+                              色
+                            </label>
+                            <div className={styles.colorFieldRow}>
+                              <input
+                                id="label-color-input"
+                                className={styles.fieldInput}
+                                value={currentForm.color}
+                                disabled={!isEditing}
+                                onChange={(event) =>
+                                  setEditingLabelForm((current) => ({
+                                    ...current,
+                                    color: event.target.value,
+                                  }))
+                                }
+                              />
+                              <span
+                                className={styles.colorChip}
+                                style={{ backgroundColor: buildLabelPreviewColor(currentForm) }}
+                                aria-label="色プレビュー"
+                              />
                             </div>
-                          )}
+                            <p className={styles.fieldHint}>未入力なら自動で設定します。</p>
+                          </div>
+
+                          <div className={styles.fieldGroup}>
+                            <label htmlFor="label-order-input" className={styles.fieldLabel}>
+                              並び順
+                            </label>
+                            <input
+                              id="label-order-input"
+                              className={styles.fieldInput}
+                              type="number"
+                              value={currentForm.displayOrder}
+                              disabled={!isEditing}
+                              onChange={(event) =>
+                                setEditingLabelForm((current) => ({
+                                  ...current,
+                                  displayOrder: event.target.value,
+                                }))
+                              }
+                            />
+                          </div>
+                        </div>
+
+                        {isEditing && (
+                          <div className={styles.formFooter}>
+                            <button
+                              type="button"
+                              className={styles.ghostButton}
+                              onClick={() => {
+                                setEditingLabelId(null);
+                                setEditingLabelForm(emptyLabelForm);
+                              }}
+                            >
+                              キャンセル
+                            </button>
+                          </div>
+                        )}
                       </form>
                     );
                   })

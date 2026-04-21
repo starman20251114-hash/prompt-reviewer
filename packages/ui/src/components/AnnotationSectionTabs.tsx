@@ -40,11 +40,7 @@ export function AnnotationSectionTabs() {
   return (
     <div className={styles.tabList} aria-label="抽出ページ切り替え">
       {tabs.map(({ to, label, isActive }) => (
-        <NavLink
-          key={to}
-          to={to}
-          className={`${styles.tab} ${isActive ? styles.tabActive : ""}`}
-        >
+        <NavLink key={to} to={to} className={`${styles.tab} ${isActive ? styles.tabActive : ""}`}>
           {label}
         </NavLink>
       ))}
