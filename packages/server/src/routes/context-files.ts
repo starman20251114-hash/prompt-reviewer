@@ -1,7 +1,9 @@
-import type { Dirent } from "node:fs";
-import { access, mkdir, readFile, readdir, stat, writeFile } from "node:fs/promises";
+import { createHash } from "node:crypto";
 import path from "node:path";
 import { zValidator } from "@hono/zod-validator";
+import type { DB } from "@prompt-reviewer/core";
+import { context_asset_projects, context_assets } from "@prompt-reviewer/core";
+import { eq } from "drizzle-orm";
 import { Hono } from "hono";
 import { z } from "zod";
 
@@ -27,9 +29,7 @@ export type ContextFileDetail = ContextFileSummary & {
   content: string;
 };
 
-type ContextFilesRouterOptions = {
-  baseDir?: string;
-};
+type ContextAssetRecord = typeof context_assets.$inferSelect;
 
 const textMimeTypes: Record<string, string> = {
   ".css": "text/css",
@@ -46,14 +46,6 @@ const textMimeTypes: Record<string, string> = {
   ".yaml": "application/yaml",
   ".yml": "application/yaml",
 };
-
-function getBaseDir(options: ContextFilesRouterOptions): string {
-  const configured =
-    options.baseDir ??
-    process.env.CONTEXT_FILES_DIR ??
-    path.resolve(process.cwd(), "data/context-files");
-  return path.resolve(configured);
-}
 
 function parseProjectId(value: string | undefined): number | null {
   if (value === undefined) return null;
@@ -77,64 +69,56 @@ function sanitizeRelativePath(input: string): string | null {
   return parts.join("/");
 }
 
-function resolveProjectRoot(baseDir: string, projectId: number): string {
-  return path.join(baseDir, String(projectId));
+function buildContentHash(content: string): string {
+  return `sha256:${createHash("sha256").update(content, "utf8").digest("hex")}`;
 }
 
-function resolveProjectFilePath(projectRoot: string, relativePath: string): string | null {
-  const safeRelativePath = sanitizeRelativePath(relativePath);
-  if (!safeRelativePath) return null;
-
-  const resolvedPath = path.resolve(projectRoot, safeRelativePath);
-  const relativeToRoot = path.relative(projectRoot, resolvedPath);
-  if (relativeToRoot.startsWith("..") || path.isAbsolute(relativeToRoot)) {
-    return null;
-  }
-
-  return resolvedPath;
+function toSummary(asset: ContextAssetRecord): ContextFileSummary {
+  return {
+    name: asset.name,
+    path: asset.path,
+    mime_type: asset.mime_type,
+    size: Buffer.byteLength(asset.content, "utf8"),
+    updated_at: asset.updated_at,
+  };
 }
 
-async function listProjectFiles(
-  projectRoot: string,
-  currentDir = projectRoot,
-): Promise<ContextFileSummary[]> {
-  let entries: Dirent[];
-  try {
-    entries = await readdir(currentDir, { withFileTypes: true });
-  } catch {
+function toDetail(asset: ContextAssetRecord): ContextFileDetail {
+  return {
+    ...toSummary(asset),
+    content: asset.content,
+  };
+}
+
+async function listProjectContextAssets(db: DB, projectId: number): Promise<ContextAssetRecord[]> {
+  const links = await db
+    .select({ context_asset_id: context_asset_projects.context_asset_id })
+    .from(context_asset_projects)
+    .where(eq(context_asset_projects.project_id, projectId));
+
+  if (links.length === 0) {
     return [];
   }
 
-  const files = await Promise.all(
-    entries.map(async (entry) => {
-      const fullPath = path.join(currentDir, entry.name);
-      if (entry.isDirectory()) {
-        return listProjectFiles(projectRoot, fullPath);
-      }
-      if (!entry.isFile()) {
-        return [];
-      }
+  const linkedIds = new Set(links.map((link) => link.context_asset_id));
+  const assets = await db.select().from(context_assets);
 
-      const fileStat = await stat(fullPath);
-      const relativePath = path.relative(projectRoot, fullPath).replace(/\\/g, "/");
-      return [
-        {
-          name: entry.name,
-          path: relativePath,
-          mime_type: inferMimeType(entry.name),
-          size: fileStat.size,
-          updated_at: fileStat.mtimeMs,
-        } satisfies ContextFileSummary,
-      ];
-    }),
-  );
-
-  return files.flat().sort((a, b) => a.path.localeCompare(b.path, "ja"));
+  return assets
+    .filter((asset) => linkedIds.has(asset.id))
+    .sort((a, b) => a.path.localeCompare(b.path, "ja"));
 }
 
-export function createContextFilesRouter(options: ContextFilesRouterOptions = {}) {
+async function findProjectContextAssetByPath(
+  db: DB,
+  projectId: number,
+  safePath: string,
+): Promise<ContextAssetRecord | null> {
+  const assets = await listProjectContextAssets(db, projectId);
+  return assets.find((asset) => asset.path === safePath) ?? null;
+}
+
+export function createContextFilesRouter(db: DB) {
   const router = new Hono();
-  const baseDir = getBaseDir(options);
 
   router.get("/", async (c) => {
     const projectId = parseProjectId(c.req.param("projectId"));
@@ -142,9 +126,8 @@ export function createContextFilesRouter(options: ContextFilesRouterOptions = {}
       return c.json({ error: "Invalid projectId" }, 400);
     }
 
-    const projectRoot = resolveProjectRoot(baseDir, projectId);
-    const files = await listProjectFiles(projectRoot);
-    return c.json(files);
+    const assets = await listProjectContextAssets(db, projectId);
+    return c.json(assets.map(toSummary));
   });
 
   router.post("/", zValidator("json", createContextFileSchema), async (c) => {
@@ -154,26 +137,37 @@ export function createContextFilesRouter(options: ContextFilesRouterOptions = {}
     }
 
     const body = c.req.valid("json");
-    const projectRoot = resolveProjectRoot(baseDir, projectId);
-    const targetPath = resolveProjectFilePath(projectRoot, body.file_name);
-    if (!targetPath) {
+    const safePath = sanitizeRelativePath(body.file_name);
+    if (!safePath) {
       return c.json({ error: "Invalid file_name" }, 400);
     }
 
-    await mkdir(path.dirname(targetPath), { recursive: true });
-    await writeFile(targetPath, body.content, "utf8");
+    const now = Date.now();
+    const mimeType = body.mime_type ?? inferMimeType(safePath);
+    const [created] = await db
+      .insert(context_assets)
+      .values({
+        name: path.basename(safePath),
+        path: safePath,
+        content: body.content,
+        mime_type: mimeType,
+        content_hash: buildContentHash(body.content),
+        created_at: now,
+        updated_at: now,
+      })
+      .returning();
 
-    const fileStat = await stat(targetPath);
-    return c.json(
-      {
-        name: path.basename(targetPath),
-        path: path.relative(projectRoot, targetPath).replace(/\\/g, "/"),
-        mime_type: body.mime_type ?? inferMimeType(targetPath),
-        size: fileStat.size,
-        updated_at: fileStat.mtimeMs,
-      } satisfies ContextFileSummary,
-      201,
-    );
+    if (!created) {
+      return c.json({ error: "Failed to create context file" }, 500);
+    }
+
+    await db.insert(context_asset_projects).values({
+      context_asset_id: created.id,
+      project_id: projectId,
+      created_at: now,
+    });
+
+    return c.json(toSummary(created), 201);
   });
 
   router.get("/content", async (c) => {
@@ -187,27 +181,17 @@ export function createContextFilesRouter(options: ContextFilesRouterOptions = {}
       return c.json({ error: "Missing path" }, 400);
     }
 
-    const projectRoot = resolveProjectRoot(baseDir, projectId);
-    const targetPath = resolveProjectFilePath(projectRoot, requestedPath);
-    if (!targetPath) {
+    const safePath = sanitizeRelativePath(requestedPath);
+    if (!safePath) {
       return c.json({ error: "Invalid path" }, 400);
     }
 
-    try {
-      await access(targetPath);
-    } catch {
+    const asset = await findProjectContextAssetByPath(db, projectId, safePath);
+    if (!asset) {
       return c.json({ error: "Context file not found" }, 404);
     }
 
-    const [content, fileStat] = await Promise.all([readFile(targetPath, "utf8"), stat(targetPath)]);
-    return c.json({
-      name: path.basename(targetPath),
-      path: path.relative(projectRoot, targetPath).replace(/\\/g, "/"),
-      mime_type: inferMimeType(targetPath),
-      size: fileStat.size,
-      updated_at: fileStat.mtimeMs,
-      content,
-    } satisfies ContextFileDetail);
+    return c.json(toDetail(asset));
   });
 
   router.put("/content", zValidator("json", updateContextFileSchema), async (c) => {
@@ -221,30 +205,32 @@ export function createContextFilesRouter(options: ContextFilesRouterOptions = {}
       return c.json({ error: "Missing path" }, 400);
     }
 
-    const projectRoot = resolveProjectRoot(baseDir, projectId);
-    const targetPath = resolveProjectFilePath(projectRoot, requestedPath);
-    if (!targetPath) {
+    const safePath = sanitizeRelativePath(requestedPath);
+    if (!safePath) {
       return c.json({ error: "Invalid path" }, 400);
     }
 
-    try {
-      await access(targetPath);
-    } catch {
+    const asset = await findProjectContextAssetByPath(db, projectId, safePath);
+    if (!asset) {
       return c.json({ error: "Context file not found" }, 404);
     }
 
     const body = c.req.valid("json");
-    await writeFile(targetPath, body.content, "utf8");
+    const [updated] = await db
+      .update(context_assets)
+      .set({
+        content: body.content,
+        content_hash: buildContentHash(body.content),
+        updated_at: Date.now(),
+      })
+      .where(eq(context_assets.id, asset.id))
+      .returning();
 
-    const fileStat = await stat(targetPath);
-    return c.json({
-      name: path.basename(targetPath),
-      path: path.relative(projectRoot, targetPath).replace(/\\/g, "/"),
-      mime_type: inferMimeType(targetPath),
-      size: fileStat.size,
-      updated_at: fileStat.mtimeMs,
-      content: body.content,
-    } satisfies ContextFileDetail);
+    if (!updated) {
+      return c.json({ error: "Failed to update context file" }, 500);
+    }
+
+    return c.json(toDetail(updated));
   });
 
   return router;
