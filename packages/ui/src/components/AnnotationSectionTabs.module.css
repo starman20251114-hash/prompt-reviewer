@@ -1,9 +1,10 @@
 .tabList {
   display: flex;
   gap: 4px;
-  margin-top: 20px;
+  margin-bottom: 20px;
   border-bottom: 1px solid #45475a;
   padding-bottom: 0;
+  flex-shrink: 0;
 }
 
 .tab {

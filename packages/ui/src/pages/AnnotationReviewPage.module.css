@@ -25,9 +25,7 @@
 
 /* ==================== Header ==================== */
 .pageHeader {
-  padding: 0 0 16px;
-  border-bottom: 1px solid var(--c-border);
-  margin-bottom: 16px;
+  margin-bottom: 0;
   flex-shrink: 0;
 }
 
