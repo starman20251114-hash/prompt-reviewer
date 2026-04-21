@@ -920,7 +920,7 @@ describe("POST /api/projects/:projectId/runs/execute", () => {
     expect(capturedRequests[0]).toMatchObject({
       model: sampleProfile.model,
       temperature: sampleProfile.temperature,
-      systemPrompt: "あなたは親切なアシスタントです。\n\n入力文: 今日は晴れです。",
+      systemPrompt: "あなたは親切なアシスタントです。\n\n1: 入力文: 今日は晴れです。",
     });
   });
 
@@ -1164,7 +1164,7 @@ describe("POST /api/projects/:projectId/runs/execute", () => {
       created_at: 0,
       updated_at: 0,
     };
-    const promptMessage = "次のルールで回答してください。\n\n入力文: 今日は晴れです。";
+    const promptMessage = "次のルールで回答してください。\n\n1: 入力文: 今日は晴れです。";
     const created = {
       ...sampleRun,
       conversation: JSON.stringify([
@@ -1617,7 +1617,7 @@ describe("POST /api/projects/:projectId/runs/execute", () => {
     expect(capturedRequests).toHaveLength(2);
     expect(JSON.parse(capturedInsertValues[0]?.execution_trace ?? "[]")).toHaveLength(2);
     expect(capturedRequests[0]).toMatchObject({
-      systemPrompt: "判定してください\n\n元の相談コンテキスト",
+      systemPrompt: "判定してください\n\n1: 元の相談コンテキスト",
     });
     expect(capturedRequests[1]).toMatchObject({
       messages: [{ role: "user", content: "長い相談ログ" }],

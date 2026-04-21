@@ -61,6 +61,50 @@
   gap: 16px;
 }
 
+.createTaskSection {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.inlineForm,
+.taskSummary {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.leftAlignedAction {
+  display: flex;
+  justify-content: flex-start;
+}
+
+.summaryList {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  margin: 0;
+}
+
+.summaryRow {
+  display: grid;
+  grid-template-columns: 120px minmax(0, 1fr);
+  gap: 12px;
+  align-items: start;
+}
+
+.summaryLabel {
+  color: var(--c-muted);
+  font-size: 13px;
+}
+
+.summaryValue {
+  margin: 0;
+  color: var(--c-text);
+  line-height: 1.6;
+  word-break: break-word;
+}
+
 .sectionHeader {
   display: flex;
   justify-content: space-between;

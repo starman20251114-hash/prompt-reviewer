@@ -209,16 +209,24 @@ function parseStructuredItems(
   return parsed.data.items;
 }
 
+function addLineNumbers(text: string): string {
+  const lines = text.split("\n");
+  const width = String(lines.length).length;
+  return lines.map((line, index) => `${String(index + 1).padStart(width, " ")}: ${line}`).join("\n");
+}
+
 function buildSystemPrompt(version: StoredPromptVersion, testCase: StoredTestCase): string {
   if (!testCase.context_content) {
     return version.content;
   }
 
+  const numberedContext = addLineNumbers(testCase.context_content);
+
   if (version.content.includes("{{context}}")) {
-    return version.content.replace("{{context}}", testCase.context_content);
+    return version.content.replace("{{context}}", numberedContext);
   }
 
-  return `${version.content}\n\n${testCase.context_content}`;
+  return `${version.content}\n\n${numberedContext}`;
 }
 
 function buildWorkflowConversation(messages: ConversationMessage[]): ConversationMessage[] {
@@ -255,7 +263,8 @@ function renderWorkflowPrompt(params: {
     .map((message) => `${message.role === "user" ? "User" : "Assistant"}: ${message.content}`)
     .join("\n\n");
   const rawContext = params.testCase.context_content ?? "";
-  const effectiveContext = params.previousOutput ?? rawContext;
+  const numberedContext = rawContext ? addLineNumbers(rawContext) : "";
+  const effectiveContext = params.previousOutput ?? numberedContext;
 
   let rendered = params.step.prompt
     .replaceAll("{{prompt}}", params.version.content)

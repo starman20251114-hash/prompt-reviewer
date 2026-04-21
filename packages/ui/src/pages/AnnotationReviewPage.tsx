@@ -18,6 +18,7 @@ import {
   getTestCases,
   updateAnnotationCandidate,
 } from "../lib/api";
+import { AnnotationSectionTabs } from "../components/AnnotationSectionTabs";
 import styles from "./AnnotationReviewPage.module.css";
 
 function statusLabel(status: CandidateStatus): string {
@@ -334,8 +335,36 @@ export function AnnotationReviewPage() {
   const [searchParams] = useSearchParams();
   const projectId = Number(id);
   const runIdParam = searchParams.get("runId");
+  const mode = searchParams.get("mode");
   const runId = Number(runIdParam);
   const taskId = Number(searchParams.get("taskId"));
+
+  if (mode === "review" && !runIdParam) {
+    return (
+      <div className={styles.root}>
+        <div className={styles.pageHeader}>
+          <div>
+            <h2 className={styles.pageTitle}>抽出</h2>
+            <p className={styles.pageMeta}>
+              Run から抽出した候補をレビューするには、対象の Run とタスクを選択してください。
+            </p>
+            <AnnotationSectionTabs />
+          </div>
+        </div>
+        <div className={styles.rightSection}>
+          <h3 className={styles.panelTitle}>レビューの開始方法</h3>
+          <p className={styles.emptyMsg}>
+            Run ページで候補抽出を実行するか、既存の候補レビューリンクからこの画面を開いてください。
+          </p>
+          <div style={{ padding: "0 16px 16px" }}>
+            <Link to={`/projects/${projectId}/runs`} className={styles.backLink}>
+              ← Run に戻る
+            </Link>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   // runId が指定されていない場合は Gold Annotation ブラウズモード
   if (!runIdParam) {
@@ -453,10 +482,11 @@ export function AnnotationReviewPage() {
           <Link to={`/projects/${projectId}/runs`} className={styles.backLink}>
             ← Run 一覧に戻る
           </Link>
-          <h2 className={styles.pageTitle}>Annotation レビュー</h2>
+          <h2 className={styles.pageTitle}>抽出</h2>
           <p className={styles.pageMeta}>
             {project?.name} / Run #{run.id} / {annotationTask.name}
           </p>
+          <AnnotationSectionTabs />
         </div>
       </div>
 
@@ -705,7 +735,11 @@ function GoldAnnotationBrowse({ projectId }: { projectId: number }) {
   return (
     <div className={styles.root}>
       <div className={styles.pageHeader}>
-        <h2 className={styles.pageTitle}>Gold Annotation 一覧</h2>
+        <div>
+          <h2 className={styles.pageTitle}>抽出</h2>
+          <p className={styles.pageMeta}>Gold Annotation の確認と手動メンテナンスを行います。</p>
+          <AnnotationSectionTabs />
+        </div>
       </div>
 
       <div className={styles.layout}>
