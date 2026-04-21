@@ -1,0 +1,31 @@
+.tabList {
+  display: flex;
+  gap: 4px;
+  margin-top: 20px;
+  border-bottom: 1px solid #45475a;
+  padding-bottom: 0;
+}
+
+.tab {
+  padding: 8px 20px;
+  background: transparent;
+  border: none;
+  border-bottom: 2px solid transparent;
+  text-decoration: none;
+  color: #a6adc8;
+  font-size: 14px;
+  font-weight: 500;
+  margin-bottom: -1px;
+  transition:
+    color 0.15s ease,
+    border-color 0.15s ease;
+}
+
+.tab:hover {
+  color: #cdd6f4;
+}
+
+.tabActive {
+  color: #cba6f7;
+  border-bottom-color: #cba6f7;
+}

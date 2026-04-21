@@ -1,4 +1,4 @@
-import { NavLink, Outlet, useParams } from "react-router";
+import { NavLink, Outlet, useLocation, useParams } from "react-router";
 import { ErrorBoundary } from "./ErrorBoundary";
 
 const navLinkStyle = ({ isActive }: { isActive: boolean }) => ({
@@ -14,17 +14,24 @@ const navLinkStyle = ({ isActive }: { isActive: boolean }) => ({
 
 function ProjectSubNav({ projectId }: { projectId: string }) {
   const subNavItems = [
-    { to: `/projects/${projectId}`, label: "概要", end: true },
+    { to: `/projects/${projectId}`, label: "ホーム", end: true },
     { to: `/projects/${projectId}/context-files`, label: "コンテキスト" },
     { to: `/projects/${projectId}/test-cases`, label: "テストケース" },
     { to: `/projects/${projectId}/prompts`, label: "プロンプト" },
-    { to: `/projects/${projectId}/runs`, label: "Run 一覧" },
+    { to: `/projects/${projectId}/runs`, label: "Run" },
     { to: `/projects/${projectId}/score`, label: "採点" },
     { to: `/projects/${projectId}/score-progression`, label: "スコア推移" },
-    { to: `/projects/${projectId}/annotation-tasks`, label: "アノテーション設定" },
-    { to: `/projects/${projectId}/annotation-review`, label: "アノテーション" },
+    {
+      to: `/projects/${projectId}/annotation-review`,
+      label: "抽出",
+      matchPaths: [
+        `/projects/${projectId}/annotation-review`,
+        `/projects/${projectId}/annotation-tasks`,
+      ],
+    },
     { to: `/projects/${projectId}/settings`, label: "設定" },
   ];
+  const location = useLocation();
 
   return (
     <div style={{ marginTop: "8px" }}>
@@ -40,8 +47,19 @@ function ProjectSubNav({ projectId }: { projectId: string }) {
       >
         プロジェクト
       </div>
-      {subNavItems.map(({ to, label, end }) => (
-        <NavLink key={to} to={to} end={end} style={navLinkStyle}>
+      {subNavItems.map(({ to, label, end, matchPaths }) => (
+        <NavLink
+          key={to}
+          to={to}
+          end={end}
+          style={
+            matchPaths
+              ? navLinkStyle({
+                  isActive: matchPaths.some((path) => location.pathname.startsWith(path)),
+                })
+              : navLinkStyle
+          }
+        >
           {label}
         </NavLink>
       ))}

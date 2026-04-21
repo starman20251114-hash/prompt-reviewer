@@ -1,6 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useMemo, useState } from "react";
 import { useParams } from "react-router";
+import { AnnotationSectionTabs } from "../components/AnnotationSectionTabs";
 import { generateAnnotationPrompt } from "../lib/annotationPrompt";
 import {
   type AnnotationLabel,
@@ -122,6 +123,7 @@ export function AnnotationTaskSettingsPage() {
   const [editingLabelForm, setEditingLabelForm] = useState<LabelFormState>(emptyLabelForm);
   const [feedbackMessage, setFeedbackMessage] = useState<string | null>(null);
   const [feedbackTone, setFeedbackTone] = useState<"success" | "error" | null>(null);
+  const [taskFormMode, setTaskFormMode] = useState<"create" | "edit" | null>(null);
 
   const { data: project } = useQuery({
     queryKey: ["project", projectId],
@@ -135,10 +137,15 @@ export function AnnotationTaskSettingsPage() {
   });
 
   useEffect(() => {
+    if (tasksQuery.isLoading) {
+      return;
+    }
+
     const tasks = tasksQuery.data ?? [];
 
     if (tasks.length === 0) {
       setSelectedTaskId(null);
+      setTaskFormMode("create");
       return;
     }
 
@@ -150,7 +157,7 @@ export function AnnotationTaskSettingsPage() {
     if (selectedTaskId === null || !tasks.some((task) => task.id === selectedTaskId)) {
       setSelectedTaskId(firstTask.id);
     }
-  }, [selectedTaskId, tasksQuery.data]);
+  }, [selectedTaskId, tasksQuery.data, tasksQuery.isLoading]);
 
   const taskDetailQuery = useQuery({
     queryKey: ["annotation-task", selectedTaskId],
@@ -202,6 +209,7 @@ export function AnnotationTaskSettingsPage() {
       await refreshTaskData(createdTask.id);
       setSelectedTaskId(createdTask.id);
       setNewTaskForm(emptyTaskForm);
+      setTaskFormMode(null);
       showFeedback("アノテーションタスクを作成しました。", "success");
     },
     onError: () => {
@@ -361,11 +369,12 @@ export function AnnotationTaskSettingsPage() {
       <div className={styles.pageHeader}>
         <div>
           <p className={styles.eyebrow}>Annotation Task Settings</p>
-          <h2 className={styles.pageTitle}>アノテーション設定</h2>
+          <h2 className={styles.pageTitle}>抽出</h2>
           <p className={styles.pageDescription}>
             {project?.name ?? "プロジェクト"} で使う annotation task と label を準備します。
             現在の初期実装では output mode は <code>span_label</code> 固定です。
           </p>
+          <AnnotationSectionTabs />
         </div>
         {feedbackMessage && (
           <p className={feedbackTone === "error" ? styles.feedbackError : styles.feedbackSuccess}>
@@ -379,54 +388,9 @@ export function AnnotationTaskSettingsPage() {
           <div className={styles.sectionHeader}>
             <div>
               <h3 className={styles.sectionTitle}>タスク一覧</h3>
-              <p className={styles.sectionHint}>Review 用に使う task を選択・追加できます。</p>
+              <p className={styles.sectionHint}>Review 用に使う task を選択できます。</p>
             </div>
           </div>
-
-          <form
-            className={styles.panel}
-            onSubmit={(event) => {
-              event.preventDefault();
-              createTaskMutation.mutate();
-            }}
-          >
-            <label className={styles.fieldLabel} htmlFor="new-task-name">
-              新規タスク名
-            </label>
-            <input
-              id="new-task-name"
-              className={styles.fieldInput}
-              value={newTaskForm.name}
-              onChange={(event) =>
-                setNewTaskForm((current) => ({ ...current, name: event.target.value }))
-              }
-              placeholder="例: 回答品質アノテーション"
-            />
-
-            <label className={styles.fieldLabel} htmlFor="new-task-description">
-              説明
-            </label>
-            <textarea
-              id="new-task-description"
-              className={styles.fieldTextarea}
-              value={newTaskForm.description}
-              onChange={(event) =>
-                setNewTaskForm((current) => ({ ...current, description: event.target.value }))
-              }
-              placeholder="任意: この task の目的や判定基準"
-              rows={4}
-            />
-
-            <div className={styles.outputModeBox}>
-              <span className={styles.outputModeLabel}>Output mode</span>
-              <strong className={styles.outputModeValue}>span_label</strong>
-              <p className={styles.outputModeHint}>初期実装では固定です。</p>
-            </div>
-
-            <button type="submit" className={styles.primaryButton} disabled={!canCreateTask}>
-              {createTaskMutation.isPending ? "作成中..." : "タスクを追加"}
-            </button>
-          </form>
 
           <div className={styles.taskList}>
             {tasksQuery.isLoading && <p className={styles.stateText}>タスクを読み込み中...</p>}
@@ -459,6 +423,202 @@ export function AnnotationTaskSettingsPage() {
               );
             })}
           </div>
+
+          <div className={styles.createTaskSection}>
+            {taskFormMode === "create" && (
+              <form
+                className={styles.panel}
+                onSubmit={(event) => {
+                  event.preventDefault();
+                  createTaskMutation.mutate();
+                }}
+              >
+                <label className={styles.fieldLabel} htmlFor="new-task-name">
+                  新規タスク名
+                </label>
+                <input
+                  id="new-task-name"
+                  className={styles.fieldInput}
+                  value={newTaskForm.name}
+                  onChange={(event) =>
+                    setNewTaskForm((current) => ({ ...current, name: event.target.value }))
+                  }
+                  placeholder="例: 回答品質アノテーション"
+                />
+
+                <label className={styles.fieldLabel} htmlFor="new-task-description">
+                  説明
+                </label>
+                <textarea
+                  id="new-task-description"
+                  className={styles.fieldTextarea}
+                  value={newTaskForm.description}
+                  onChange={(event) =>
+                    setNewTaskForm((current) => ({ ...current, description: event.target.value }))
+                  }
+                  placeholder="任意: この task の目的や判定基準"
+                  rows={4}
+                />
+
+                <div className={styles.outputModeBox}>
+                  <span className={styles.outputModeLabel}>Output mode</span>
+                  <strong className={styles.outputModeValue}>span_label</strong>
+                  <p className={styles.outputModeHint}>初期実装では固定です。</p>
+                </div>
+
+                <div className={styles.formFooter}>
+                  <button type="submit" className={styles.primaryButton} disabled={!canCreateTask}>
+                    {createTaskMutation.isPending ? "作成中..." : "タスクを追加"}
+                  </button>
+                  <button
+                    type="button"
+                    className={styles.ghostButton}
+                    onClick={() => setTaskFormMode(null)}
+                    disabled={createTaskMutation.isPending}
+                  >
+                    キャンセル
+                  </button>
+                </div>
+              </form>
+            )}
+
+            <div className={styles.leftAlignedAction}>
+              <button
+                type="button"
+                className={styles.secondaryButton}
+                onClick={() => setTaskFormMode((current) => (current === "create" ? null : "create"))}
+                aria-expanded={taskFormMode === "create"}
+              >
+                {taskFormMode === "create" ? "新規タスク作成を閉じる" : "新規タスクを作成"}
+              </button>
+            </div>
+          </div>
+
+          {selectedTaskId !== null &&
+            !taskDetailQuery.isLoading &&
+            !taskDetailQuery.isError &&
+            taskDetailQuery.data && (
+              <section className={styles.panel}>
+                <div className={styles.sectionHeader}>
+                  <div>
+                    <h3 className={styles.sectionTitle}>タスク設定</h3>
+                    <p className={styles.sectionHint}>
+                      Review に使う task 本体の名前と説明を編集します。
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    className={styles.dangerButton}
+                    onClick={() => deleteTaskMutation.mutate()}
+                    disabled={deleteTaskMutation.isPending}
+                  >
+                    {deleteTaskMutation.isPending ? "削除中..." : "タスクを削除"}
+                  </button>
+                </div>
+
+                {taskFormMode === "edit" ? (
+                  <form
+                    className={styles.inlineForm}
+                    onSubmit={(event) => {
+                      event.preventDefault();
+                      updateTaskMutation.mutate();
+                    }}
+                  >
+                    <div className={styles.fieldGrid}>
+                      <div className={styles.fieldGroup}>
+                        <label className={styles.fieldLabel} htmlFor="task-name">
+                          タスク名
+                        </label>
+                        <input
+                          id="task-name"
+                          className={styles.fieldInput}
+                          value={taskForm.name}
+                          onChange={(event) =>
+                            setTaskForm((current) => ({ ...current, name: event.target.value }))
+                          }
+                        />
+                      </div>
+
+                      <div className={styles.fieldGroup}>
+                        <label className={styles.fieldLabel} htmlFor="task-output-mode">
+                          Output mode
+                        </label>
+                        <input
+                          id="task-output-mode"
+                          className={styles.fieldInput}
+                          value="span_label"
+                          disabled
+                        />
+                      </div>
+                    </div>
+
+                    <div className={styles.fieldGroup}>
+                      <label className={styles.fieldLabel} htmlFor="task-description">
+                        説明
+                      </label>
+                      <textarea
+                        id="task-description"
+                        className={styles.fieldTextarea}
+                        value={taskForm.description}
+                        onChange={(event) =>
+                          setTaskForm((current) => ({ ...current, description: event.target.value }))
+                        }
+                        rows={5}
+                        placeholder="任意: アノテーション方針やラベルの使い分けを記載"
+                      />
+                    </div>
+
+                    <div className={styles.formFooter}>
+                      <button
+                        type="submit"
+                        className={styles.primaryButton}
+                        disabled={!canUpdateTask}
+                      >
+                        {updateTaskMutation.isPending ? "保存中..." : "タスク設定を保存"}
+                      </button>
+                      <button
+                        type="button"
+                        className={styles.ghostButton}
+                        onClick={() => setTaskFormMode(null)}
+                        disabled={updateTaskMutation.isPending}
+                      >
+                        キャンセル
+                      </button>
+                    </div>
+                  </form>
+                ) : (
+                  <div className={styles.taskSummary}>
+                    <dl className={styles.summaryList}>
+                      <div className={styles.summaryRow}>
+                        <dt className={styles.summaryLabel}>タスク名</dt>
+                        <dd className={styles.summaryValue}>{taskDetailQuery.data.name}</dd>
+                      </div>
+                      <div className={styles.summaryRow}>
+                        <dt className={styles.summaryLabel}>Output mode</dt>
+                        <dd className={styles.summaryValue}>span_label</dd>
+                      </div>
+                      <div className={styles.summaryRow}>
+                        <dt className={styles.summaryLabel}>説明</dt>
+                        <dd className={styles.summaryValue}>
+                          {taskDetailQuery.data.description?.trim() || "未設定"}
+                        </dd>
+                      </div>
+                    </dl>
+                  </div>
+                )}
+
+                <div className={styles.leftAlignedAction}>
+                  <button
+                    type="button"
+                    className={styles.secondaryButton}
+                    onClick={() => setTaskFormMode((current) => (current === "edit" ? null : "edit"))}
+                    aria-expanded={taskFormMode === "edit"}
+                  >
+                    {taskFormMode === "edit" ? "タスク編集を閉じる" : "タスクを編集"}
+                  </button>
+                </div>
+              </section>
+            )}
         </section>
 
         <section className={styles.contentSection}>
@@ -478,99 +638,23 @@ export function AnnotationTaskSettingsPage() {
               <p className={styles.errorText}>タスク詳細の取得に失敗しました。</p>
             </div>
           ) : (
-            <>
+            <div className={styles.labelSection}>
+              <div className={styles.sectionHeader}>
+                <div>
+                  <h3 className={styles.sectionTitle}>ラベル設定</h3>
+                  <p className={styles.sectionHint}>
+                    表示名、内部 key、色、表示順を UI から管理できます。
+                  </p>
+                </div>
+              </div>
+
               <form
                 className={styles.panel}
                 onSubmit={(event) => {
                   event.preventDefault();
-                  updateTaskMutation.mutate();
+                  createLabelMutation.mutate();
                 }}
               >
-                <div className={styles.sectionHeader}>
-                  <div>
-                    <h3 className={styles.sectionTitle}>タスク設定</h3>
-                    <p className={styles.sectionHint}>
-                      Review に使う task 本体の名前と説明を編集します。
-                    </p>
-                  </div>
-                  <button
-                    type="button"
-                    className={styles.dangerButton}
-                    onClick={() => deleteTaskMutation.mutate()}
-                    disabled={deleteTaskMutation.isPending}
-                  >
-                    {deleteTaskMutation.isPending ? "削除中..." : "タスクを削除"}
-                  </button>
-                </div>
-
-                <div className={styles.fieldGrid}>
-                  <div className={styles.fieldGroup}>
-                    <label className={styles.fieldLabel} htmlFor="task-name">
-                      タスク名
-                    </label>
-                    <input
-                      id="task-name"
-                      className={styles.fieldInput}
-                      value={taskForm.name}
-                      onChange={(event) =>
-                        setTaskForm((current) => ({ ...current, name: event.target.value }))
-                      }
-                    />
-                  </div>
-
-                  <div className={styles.fieldGroup}>
-                    <label className={styles.fieldLabel} htmlFor="task-output-mode">
-                      Output mode
-                    </label>
-                    <input
-                      id="task-output-mode"
-                      className={styles.fieldInput}
-                      value="span_label"
-                      disabled
-                    />
-                  </div>
-                </div>
-
-                <div className={styles.fieldGroup}>
-                  <label className={styles.fieldLabel} htmlFor="task-description">
-                    説明
-                  </label>
-                  <textarea
-                    id="task-description"
-                    className={styles.fieldTextarea}
-                    value={taskForm.description}
-                    onChange={(event) =>
-                      setTaskForm((current) => ({ ...current, description: event.target.value }))
-                    }
-                    rows={5}
-                    placeholder="任意: アノテーション方針やラベルの使い分けを記載"
-                  />
-                </div>
-
-                <div className={styles.formFooter}>
-                  <button type="submit" className={styles.primaryButton} disabled={!canUpdateTask}>
-                    {updateTaskMutation.isPending ? "保存中..." : "タスク設定を保存"}
-                  </button>
-                </div>
-              </form>
-
-              <div className={styles.labelSection}>
-                <div className={styles.sectionHeader}>
-                  <div>
-                    <h3 className={styles.sectionTitle}>ラベル設定</h3>
-                    <p className={styles.sectionHint}>
-                      表示名、内部 key、色、表示順を UI から管理できます。
-                    </p>
-                  </div>
-                </div>
-
-                <form
-                  className={styles.panel}
-                  onSubmit={(event) => {
-                    event.preventDefault();
-                    createLabelMutation.mutate();
-                  }}
-                >
                   <div className={styles.fieldGrid}>
                     <div className={styles.fieldGroup}>
                       <label className={styles.fieldLabel} htmlFor="new-label-key">
@@ -658,34 +742,34 @@ export function AnnotationTaskSettingsPage() {
                       {createLabelMutation.isPending ? "追加中..." : "ラベルを追加"}
                     </button>
                   </div>
-                </form>
+              </form>
 
-                <div className={styles.labelList}>
-                  {sortedLabels.length === 0 ? (
-                    <div className={styles.emptyState}>
-                      <p className={styles.stateText}>
-                        まだ label はありません。Review で選びたいラベルを追加してください。
-                      </p>
-                    </div>
-                  ) : (
-                    sortedLabels.map((label) => {
-                      const isEditing = label.id === editingLabelId;
-                      const currentForm = isEditing ? editingLabelForm : buildLabelForm(label);
+              <div className={styles.labelList}>
+                {sortedLabels.length === 0 ? (
+                  <div className={styles.emptyState}>
+                    <p className={styles.stateText}>
+                      まだ label はありません。Review で選びたいラベルを追加してください。
+                    </p>
+                  </div>
+                ) : (
+                  sortedLabels.map((label) => {
+                    const isEditing = label.id === editingLabelId;
+                    const currentForm = isEditing ? editingLabelForm : buildLabelForm(label);
 
-                      return (
-                        <form
-                          key={label.id}
-                          className={styles.labelCard}
-                          onSubmit={(event) => {
-                            event.preventDefault();
-                            if (!isEditing) {
-                              setEditingLabelId(label.id);
-                              setEditingLabelForm(buildLabelForm(label));
-                              return;
-                            }
-                            updateLabelMutation.mutate();
-                          }}
-                        >
+                    return (
+                      <form
+                        key={label.id}
+                        className={styles.labelCard}
+                        onSubmit={(event) => {
+                          event.preventDefault();
+                          if (!isEditing) {
+                            setEditingLabelId(label.id);
+                            setEditingLabelForm(buildLabelForm(label));
+                            return;
+                          }
+                          updateLabelMutation.mutate();
+                        }}
+                      >
                           <div className={styles.labelCardHeader}>
                             <div>
                               <h4 className={styles.labelTitle}>{label.name}</h4>
@@ -828,11 +912,10 @@ export function AnnotationTaskSettingsPage() {
                               </button>
                             </div>
                           )}
-                        </form>
-                      );
-                    })
-                  )}
-                </div>
+                      </form>
+                    );
+                  })
+                )}
               </div>
 
               {/* プロンプト生成パネル */}
@@ -937,7 +1020,7 @@ export function AnnotationTaskSettingsPage() {
                   </div>
                 )}
               </div>
-            </>
+            </div>
           )}
         </section>
       </div>
