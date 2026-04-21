@@ -94,6 +94,11 @@ describe("context files router", () => {
     let capturedLinkValues: Record<string, unknown> = {};
 
     const db = {
+      select: () => ({
+        from: () => ({
+          where: () => Promise.resolve([]),
+        }),
+      }),
       insert: () => {
         insertCallCount++;
         if (insertCallCount === 1) {
@@ -132,6 +137,69 @@ describe("context files router", () => {
     expect(typeof capturedAssetValues.content_hash).toBe("string");
     expect(capturedLinkValues.context_asset_id).toBe(10);
     expect(capturedLinkValues.project_id).toBe(3);
+  });
+
+  it("同じ path を再投稿した場合は新規作成せず既存 asset を更新する", async () => {
+    let selectCallCount = 0;
+    let updateCalled = false;
+    let insertCalled = false;
+    let capturedUpdateValues: Record<string, unknown> = {};
+    const updated = {
+      ...sampleAsset,
+      content: "updated content",
+      updated_at: 2000000,
+    };
+
+    const app = buildApp({
+      select: () => {
+        selectCallCount++;
+        if (selectCallCount === 1) {
+          return {
+            from: () => ({
+              where: () => Promise.resolve([{ context_asset_id: 1 }]),
+            }),
+          };
+        }
+
+        return {
+          from: () => Promise.resolve([sampleAsset]),
+        };
+      },
+      update: () => ({
+        set: (values: Record<string, unknown>) => {
+          updateCalled = true;
+          capturedUpdateValues = values;
+          return {
+            where: () => ({
+              returning: () => Promise.resolve([updated]),
+            }),
+          };
+        },
+      }),
+      insert: () => {
+        insertCalled = true;
+        return {
+          values: () => Promise.resolve(),
+        };
+      },
+    });
+
+    const res = await app.request("/api/projects/3/context-files", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        file_name: "docs/guide.md",
+        content: "updated content",
+      }),
+    });
+
+    expect(res.status).toBe(201);
+    expect(updateCalled).toBe(true);
+    expect(insertCalled).toBe(false);
+    expect(capturedUpdateValues.content).toBe("updated content");
+    expect(capturedUpdateValues.path).toBe("docs/guide.md");
+    expect(capturedUpdateValues.name).toBe("guide.md");
+    expect(capturedUpdateValues.mime_type).toBe("text/markdown");
   });
 
   it("GET /content は project に紐付いた同一 path の素材を返す", async () => {

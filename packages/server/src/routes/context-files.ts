@@ -144,6 +144,29 @@ export function createContextFilesRouter(db: DB) {
 
     const now = Date.now();
     const mimeType = body.mime_type ?? inferMimeType(safePath);
+    const existing = await findProjectContextAssetByPath(db, projectId, safePath);
+
+    if (existing) {
+      const [updated] = await db
+        .update(context_assets)
+        .set({
+          name: path.basename(safePath),
+          path: safePath,
+          content: body.content,
+          mime_type: mimeType,
+          content_hash: buildContentHash(body.content),
+          updated_at: now,
+        })
+        .where(eq(context_assets.id, existing.id))
+        .returning();
+
+      if (!updated) {
+        return c.json({ error: "Failed to update context file" }, 500);
+      }
+
+      return c.json(toSummary(updated), 201);
+    }
+
     const [created] = await db
       .insert(context_assets)
       .values({
