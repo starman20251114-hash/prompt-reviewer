@@ -453,10 +453,16 @@ function AnnotationReviewContent({
   if (!run || !annotationTask) {
     return (
       <div className={styles.root}>
+        <div className={styles.pageHeader}>
+          <div>
+            <Link to={`/projects/${projectId}/runs`} className={styles.backLink}>
+              ← Run 一覧に戻る
+            </Link>
+            <h2 className={styles.pageTitle}>抽出</h2>
+          </div>
+        </div>
+        <AnnotationSectionTabs />
         <p className={styles.errorMsg}>Run またはアノテーションタスクが見つかりません。</p>
-        <Link to={`/projects/${projectId}/runs`} className={styles.backLink}>
-          ← Run 一覧に戻る
-        </Link>
       </div>
     );
   }
@@ -505,7 +511,7 @@ function AnnotationReviewContent({
               <p className={styles.emptyMsg}>候補がありません。Run ページから抽出してください。</p>
             ) : (
               <div className={styles.candidateList}>
-                {candidates.map((c) => (
+                {[...candidates].sort((a, b) => a.start_line - b.start_line).map((c) => (
                   <CandidateCard
                     key={c.id}
                     candidate={c}
@@ -534,7 +540,7 @@ function AnnotationReviewContent({
               <p className={styles.emptyMsg}>まだ Gold Annotation がありません</p>
             ) : (
               <div className={styles.goldList}>
-                {goldAnnotations.map((g) => (
+                {[...goldAnnotations].sort((a, b) => a.start_line - b.start_line).map((g) => (
                   <GoldAnnotationCard
                     key={g.id}
                     gold={g}
@@ -824,7 +830,7 @@ function GoldAnnotationBrowse({ projectId }: { projectId: number }) {
                 <p className={styles.emptyMsg}>Gold Annotation がありません</p>
               ) : (
                 <div className={styles.goldList}>
-                  {goldAnnotations.map((g) => (
+                  {[...goldAnnotations].sort((a, b) => a.start_line - b.start_line).map((g) => (
                     <GoldAnnotationCard
                       key={g.id}
                       gold={g}

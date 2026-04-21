@@ -51,20 +51,34 @@
   align-items: start;
 }
 
-.sidebarSection,
+.sidebarSection {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  min-height: 60vh;
+}
+
 .contentSection,
 .labelSection,
-.taskList,
 .labelList {
   display: flex;
   flex-direction: column;
   gap: 16px;
 }
 
+.taskList {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  flex: 1;
+  overflow-y: auto;
+}
+
 .createTaskSection {
   display: flex;
   flex-direction: column;
   gap: 12px;
+  margin-top: auto;
 }
 
 .inlineForm,
