@@ -265,9 +265,7 @@ function AnnotationExtractPanel({
     <div className={styles.annotationPanel}>
       {!canExtract && (
         <p className={styles.annotationWarning}>
-          このRunのアシスタント応答は平文テキストです。抽出にはLLMがJSON形式 （
-          <code>{`{"items":[{"label","start_line","end_line","quote"}]}`}</code>）
-          で出力したRunが必要です。
+          このRunのアシスタント応答がJSON形式と判定できませんでした。抽出を実行しますが、サーバー側でJSONが見つからない場合はエラーになります。
         </p>
       )}
       <div className={styles.annotationPanelRow}>
@@ -294,7 +292,7 @@ function AnnotationExtractPanel({
         <button
           type="button"
           onClick={() => extractMutation.mutate()}
-          disabled={selectedTaskId === "" || extractMutation.isPending || !canExtract}
+          disabled={selectedTaskId === "" || extractMutation.isPending}
           className={styles.btnAnnotationExtract}
         >
           {extractMutation.isPending ? "抽出中..." : "抽出実行"}
