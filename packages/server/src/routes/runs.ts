@@ -133,6 +133,7 @@ type ExecutionSettings = {
   model: string;
   temperature: number;
   api_provider: string;
+  max_tokens: number | null;
 };
 
 const encoder = new TextEncoder();
@@ -212,7 +213,9 @@ function parseStructuredItems(
 function addLineNumbers(text: string): string {
   const lines = text.split("\n");
   const width = String(lines.length).length;
-  return lines.map((line, index) => `${String(index + 1).padStart(width, " ")}: ${line}`).join("\n");
+  return lines
+    .map((line, index) => `${String(index + 1).padStart(width, " ")}: ${line}`)
+    .join("\n");
 }
 
 function buildSystemPrompt(version: StoredPromptVersion, testCase: StoredTestCase): string {
@@ -288,7 +291,9 @@ function buildExecutionRequest(params: {
   messages: ConversationMessage[];
   systemPrompt: string;
   temperature: number;
+  maxTokens: number | null;
 }): { request: LLMRequest; conversationBase: ConversationMessage[] } | null {
+  const maxTokens = params.maxTokens ?? undefined;
   if (params.messages.length > 0) {
     return {
       request: {
@@ -296,6 +301,7 @@ function buildExecutionRequest(params: {
         messages: params.messages,
         systemPrompt: params.systemPrompt,
         temperature: params.temperature,
+        ...(maxTokens !== undefined ? { maxTokens } : {}),
       },
       conversationBase: params.messages,
     };
@@ -312,6 +318,7 @@ function buildExecutionRequest(params: {
       model: params.model,
       messages: fallbackMessages,
       temperature: params.temperature,
+      ...(maxTokens !== undefined ? { maxTokens } : {}),
     },
     conversationBase: fallbackMessages,
   };
@@ -554,6 +561,7 @@ export function createRunsRouter(db: DB, options: RunsRouterOptions = {}) {
         model: profile.model,
         temperature: profile.temperature,
         api_provider: profile.api_provider,
+        max_tokens: profile.max_tokens,
       };
       resolvedExecutionProfileId = profile.id;
     } else {
@@ -570,6 +578,7 @@ export function createRunsRouter(db: DB, options: RunsRouterOptions = {}) {
         model: projectSettings.model,
         temperature: projectSettings.temperature,
         api_provider: projectSettings.api_provider,
+        max_tokens: projectSettings.max_tokens,
       };
     }
 
@@ -593,6 +602,7 @@ export function createRunsRouter(db: DB, options: RunsRouterOptions = {}) {
       messages: parseConversation(storedTestCase.turns),
       systemPrompt: buildSystemPrompt(version, storedTestCase),
       temperature: settings.temperature,
+      maxTokens: settings.max_tokens,
     });
     const workflow = parseWorkflowDefinition(version.workflow_definition);
     const workflowSteps = buildWorkflowSteps(version, workflow);
@@ -630,6 +640,7 @@ export function createRunsRouter(db: DB, options: RunsRouterOptions = {}) {
                   messages: inputConversation,
                   systemPrompt: renderedPrompt,
                   temperature: settings.temperature,
+                  maxTokens: settings.max_tokens,
                 });
 
                 if (!stepExecution) {
