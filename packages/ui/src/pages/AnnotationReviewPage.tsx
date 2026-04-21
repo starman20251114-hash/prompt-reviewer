@@ -345,12 +345,9 @@ export function AnnotationReviewPage() {
         <div className={styles.pageHeader}>
           <div>
             <h2 className={styles.pageTitle}>抽出</h2>
-            <p className={styles.pageMeta}>
-              Run から抽出した候補をレビューするには、対象の Run とタスクを選択してください。
-            </p>
-            <AnnotationSectionTabs />
           </div>
         </div>
+        <AnnotationSectionTabs />
         <div className={styles.rightSection}>
           <h3 className={styles.panelTitle}>レビューの開始方法</h3>
           <p className={styles.emptyMsg}>
@@ -483,12 +480,9 @@ export function AnnotationReviewPage() {
             ← Run 一覧に戻る
           </Link>
           <h2 className={styles.pageTitle}>抽出</h2>
-          <p className={styles.pageMeta}>
-            {project?.name} / Run #{run.id} / {annotationTask.name}
-          </p>
-          <AnnotationSectionTabs />
         </div>
       </div>
+      <AnnotationSectionTabs />
 
       {/* 2カラムレイアウト */}
       <div className={styles.layout}>
@@ -737,10 +731,9 @@ function GoldAnnotationBrowse({ projectId }: { projectId: number }) {
       <div className={styles.pageHeader}>
         <div>
           <h2 className={styles.pageTitle}>抽出</h2>
-          <p className={styles.pageMeta}>Gold Annotation の確認と手動メンテナンスを行います。</p>
-          <AnnotationSectionTabs />
         </div>
       </div>
+      <AnnotationSectionTabs />
 
       <div className={styles.layout}>
         {/* 左パネル: 行番号付きテキスト */}

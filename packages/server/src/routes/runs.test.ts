@@ -2254,6 +2254,41 @@ describe("POST /api/projects/:projectId/runs/:id/candidates/extract", () => {
     ]);
   });
 
+  it("final_answer のパースに失敗しても structured_output があればそちらへフォールバックする", async () => {
+    const insertedValues: Record<string, unknown>[] = [];
+    const runWithInvalidFinalAnswerAndStructuredOutput: MockRun = {
+      ...sampleRunWithStructuredOutput,
+      conversation: JSON.stringify([
+        { role: "user", content: "文章を分析してください" },
+        {
+          role: "assistant",
+          content: "```json\nnot-json\n```",
+        },
+      ]),
+    };
+
+    const db = buildExtractDb({
+      run: runWithInvalidFinalAnswerAndStructuredOutput,
+      insertReturns: [{ id: 6 }],
+      insertedValues,
+    });
+
+    const app = buildApp(db);
+    const res = await app.request("/api/projects/1/runs/1/candidates/extract", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ annotation_task_id: 1, source_type: "final_answer" }),
+    });
+
+    expect(res.status).toBe(201);
+    expect(insertedValues).toEqual([
+      expect.objectContaining({
+        source_type: "structured_json",
+        label: "insight",
+      }),
+    ]);
+  });
+
   it("source_type=trace_step と source_step_id を指定すると対象 step から抽出する", async () => {
     const insertedValues: Record<string, unknown>[] = [];
     const db = buildExtractDb({
@@ -2367,6 +2402,96 @@ describe("POST /api/projects/:projectId/runs/:id/candidates/extract", () => {
     expect(res.status).toBe(400);
     const body = (await res.json()) as { error: string };
     expect(body.error).toContain("invalid format");
+  });
+
+  it("final_answer の JSON 文字列内に生改行があっても Candidate を生成できる", async () => {
+    const insertedValues: Record<string, unknown>[] = [];
+    const runWithMultilineQuote: MockRun = {
+      ...sampleRun,
+      structured_output: null,
+      conversation: JSON.stringify([
+        { role: "user", content: "文章を分析してください" },
+        {
+          role: "assistant",
+          content: `\`\`\`json
+{"items":[
+  {"label":"insight","start_line":1568,"end_line":1571,"quote":"「どうすればうまくいくか」を常に慎重に考えている
+- 行動の順番や準備の微調整、体調との兼ね合いなどを常に考えている
+- これが無意識に脳のリソースを使い、疲労感や余裕のなさに繋がる","rationale":"aiが慎重な思考自体が認知負荷になる構造を指摘している"}
+]}
+\`\`\``,
+        },
+      ]),
+    };
+
+    const db = buildExtractDb({
+      run: runWithMultilineQuote,
+      insertReturns: [{ id: 5 }],
+      insertedValues,
+    });
+
+    const app = buildApp(db);
+    const res = await app.request("/api/projects/1/runs/1/candidates/extract", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ annotation_task_id: 1 }),
+    });
+
+    expect(res.status).toBe(201);
+    expect(insertedValues).toEqual([
+      expect.objectContaining({
+        source_type: "final_answer",
+        label: "insight",
+        start_line: 1568,
+        end_line: 1571,
+        quote:
+          "「どうすればうまくいくか」を常に慎重に考えている\n- 行動の順番や準備の微調整、体調との兼ね合いなどを常に考えている\n- これが無意識に脳のリソースを使い、疲労感や余裕のなさに繋がる",
+      }),
+    ]);
+  });
+
+  it("final_answer の JSON 文字列内に未エスケープの引用符があっても Candidate を生成できる", async () => {
+    const insertedValues: Record<string, unknown>[] = [];
+    const runWithBareQuotes: MockRun = {
+      ...sampleRun,
+      structured_output: null,
+      conversation: JSON.stringify([
+        { role: "user", content: "文章を分析してください" },
+        {
+          role: "assistant",
+          content: `\`\`\`json
+{"items":[
+  {"label":"insight","start_line":1897,"end_line":1897,"quote":"「無為には過ごしたくないけれど、興味も湧かず、何をすればいいか分からない」という状態は、回復期によくある"エネルギーはまだ低いけど、自己意識は戻りつつある"時期の特徴でもあります。","rationale":"aiが回復プロセスの特徴を指摘している"}
+]}
+\`\`\``,
+        },
+      ]),
+    };
+
+    const db = buildExtractDb({
+      run: runWithBareQuotes,
+      insertReturns: [{ id: 7 }],
+      insertedValues,
+    });
+
+    const app = buildApp(db);
+    const res = await app.request("/api/projects/1/runs/1/candidates/extract", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ annotation_task_id: 1, source_type: "final_answer" }),
+    });
+
+    expect(res.status).toBe(201);
+    expect(insertedValues).toEqual([
+      expect.objectContaining({
+        source_type: "final_answer",
+        label: "insight",
+        start_line: 1897,
+        end_line: 1897,
+        quote:
+          '「無為には過ごしたくないけれど、興味も湧かず、何をすればいいか分からない」という状態は、回復期によくある"エネルギーはまだ低いけど、自己意識は戻りつつある"時期の特徴でもあります。',
+      }),
+    ]);
   });
 
   it("重複抽出時に 409 を返す", async () => {
