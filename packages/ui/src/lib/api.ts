@@ -20,7 +20,14 @@ async function fetchJson<T>(path: string, init?: RequestInit): Promise<T> {
   });
 
   if (!response.ok) {
-    throw new ApiError(response.status, `API error: ${response.status} ${response.statusText}`);
+    let message = `API error: ${response.status} ${response.statusText}`;
+    try {
+      const body = (await response.json()) as { error?: string };
+      if (body.error) message = body.error;
+    } catch {
+      // ignore parse error
+    }
+    throw new ApiError(response.status, message);
   }
 
   if (response.status === 204 || response.headers.get("Content-Length") === "0") {
@@ -671,6 +678,126 @@ export function listProjectSettingsModels(
   data: { api_provider: ApiProvider; api_key: string },
 ): Promise<{ models: LLMModelOption[] }> {
   return api.post<{ models: LLMModelOption[] }>(`/projects/${projectId}/settings/models`, data);
+}
+
+// Annotation Candidate API
+
+export type CandidateStatus = "pending" | "accepted" | "rejected";
+
+export type AnnotationCandidate = {
+  id: number;
+  annotation_task_id: number;
+  run_id: number | null;
+  target_text_ref: string;
+  label: string;
+  start_line: number;
+  end_line: number;
+  quote: string;
+  note: string | null;
+  status: CandidateStatus;
+  created_at: number;
+  updated_at: number;
+};
+
+export type GoldAnnotation = {
+  id: number;
+  annotation_task_id: number;
+  target_text_ref: string;
+  label: string;
+  start_line: number;
+  end_line: number;
+  quote: string;
+  note: string | null;
+  source_candidate_id: number | null;
+  created_at: number;
+  updated_at: number;
+};
+
+export function getAnnotationCandidates(filters?: {
+  annotation_task_id?: number;
+  run_id?: number;
+  test_case_id?: number;
+  status?: CandidateStatus;
+}): Promise<AnnotationCandidate[]> {
+  const params = new URLSearchParams();
+  if (filters?.annotation_task_id !== undefined) {
+    params.set("annotation_task_id", String(filters.annotation_task_id));
+  }
+  if (filters?.run_id !== undefined) {
+    params.set("run_id", String(filters.run_id));
+  }
+  if (filters?.test_case_id !== undefined) {
+    params.set("test_case_id", String(filters.test_case_id));
+  }
+  if (filters?.status !== undefined) {
+    params.set("status", filters.status);
+  }
+  const query = params.toString();
+  return api.get<AnnotationCandidate[]>(
+    query ? `/annotation-candidates?${query}` : "/annotation-candidates",
+  );
+}
+
+export function updateAnnotationCandidate(
+  id: number,
+  data: {
+    label?: string;
+    start_line?: number;
+    end_line?: number;
+    note?: string | null;
+    status?: CandidateStatus;
+  },
+): Promise<{ candidate: AnnotationCandidate; gold?: GoldAnnotation }> {
+  return api.patch<{ candidate: AnnotationCandidate; gold?: GoldAnnotation }>(
+    `/annotation-candidates/${id}`,
+    data,
+  );
+}
+
+export function getGoldAnnotations(filters?: {
+  annotation_task_id?: number;
+  test_case_id?: number;
+}): Promise<GoldAnnotation[]> {
+  const params = new URLSearchParams();
+  if (filters?.annotation_task_id !== undefined) {
+    params.set("annotation_task_id", String(filters.annotation_task_id));
+  }
+  if (filters?.test_case_id !== undefined) {
+    params.set("test_case_id", String(filters.test_case_id));
+  }
+  const query = params.toString();
+  return api.get<GoldAnnotation[]>(query ? `/gold-annotations?${query}` : "/gold-annotations");
+}
+
+export function deleteGoldAnnotation(id: number): Promise<{ success: boolean }> {
+  return api.delete<{ success: boolean }>(`/gold-annotations/${id}`);
+}
+
+export function createGoldAnnotation(data: {
+  annotation_task_id: number;
+  target_text_ref: string;
+  label: string;
+  start_line: number;
+  end_line: number;
+  quote: string;
+  note?: string | null;
+}): Promise<GoldAnnotation> {
+  return api.post<GoldAnnotation>("/gold-annotations", data);
+}
+
+export function extractAnnotationCandidates(
+  projectId: number,
+  runId: number,
+  data: {
+    annotation_task_id: number;
+    source_type?: "structured_json" | "final_answer" | "workflow_step";
+    source_step_id?: string;
+  },
+): Promise<{ candidates_created: number; annotation_task_id: number }> {
+  return api.post<{ candidates_created: number; annotation_task_id: number }>(
+    `/projects/${projectId}/runs/${runId}/candidates/extract`,
+    data,
+  );
 }
 
 // Score Progression API

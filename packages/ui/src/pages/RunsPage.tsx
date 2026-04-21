@@ -4,6 +4,7 @@ import { Link, useParams } from "react-router";
 import { RunCompareView } from "../components/RunCompareView";
 import { useApiKey } from "../hooks/useApiKey";
 import {
+  type AnnotationTask,
   type ConversationMessage,
   type ExecutionTraceStep,
   type PromptVersion,
@@ -12,6 +13,8 @@ import {
   createRun,
   discardRun,
   executeRunStream,
+  extractAnnotationCandidates,
+  getAnnotationTasks,
   getProject,
   getPromptVersions,
   getRuns,
@@ -200,6 +203,129 @@ function RunConversation({ conversation }: { conversation: ConversationMessage[]
   );
 }
 
+// Annotation抽出パネル
+function AnnotationExtractPanel({
+  run,
+  projectId,
+  annotationTasks,
+}: {
+  run: Run;
+  projectId: number;
+  annotationTasks: AnnotationTask[];
+}) {
+  const [selectedTaskId, setSelectedTaskId] = useState<number | "">("");
+  const [extractResult, setExtractResult] = useState<{
+    candidates_created: number;
+    annotation_task_id: number;
+  } | null>(null);
+  const [extractError, setExtractError] = useState<string | null>(null);
+
+  const hasStructuredOutput = run.structured_output !== null;
+  const lastAssistantMsg = [...run.conversation].reverse().find((m) => m.role === "assistant");
+  const lastMsgIsJson = (() => {
+    if (!lastAssistantMsg) return false;
+    const text = lastAssistantMsg.content;
+    try {
+      JSON.parse(text);
+      return true;
+    } catch {
+      // 最初の { から最後の } を抽出して試みる
+      const first = text.indexOf("{");
+      const last = text.lastIndexOf("}");
+      if (first !== -1 && last > first) {
+        try {
+          JSON.parse(text.slice(first, last + 1));
+          return true;
+        } catch {
+          // ignore
+        }
+      }
+      return false;
+    }
+  })();
+  const canExtract = hasStructuredOutput || lastMsgIsJson;
+
+  const extractMutation = useMutation({
+    mutationFn: () => {
+      if (selectedTaskId === "") throw new Error("タスクを選択してください");
+      return extractAnnotationCandidates(projectId, run.id, {
+        annotation_task_id: selectedTaskId,
+      });
+    },
+    onSuccess: (result) => {
+      setExtractResult(result);
+      setExtractError(null);
+    },
+    onError: (error) => {
+      setExtractError(error instanceof Error ? error.message : "抽出に失敗しました");
+    },
+  });
+
+  return (
+    <div className={styles.annotationPanel}>
+      {!canExtract && (
+        <p className={styles.annotationWarning}>
+          このRunのアシスタント応答は平文テキストです。抽出にはLLMがJSON形式 （
+          <code>{`{"items":[{"label","start_line","end_line","quote"}]}`}</code>）
+          で出力したRunが必要です。
+        </p>
+      )}
+      <div className={styles.annotationPanelRow}>
+        <label htmlFor={`task-select-${run.id}`} className={styles.annotationLabel}>
+          アノテーションタスク
+        </label>
+        <select
+          id={`task-select-${run.id}`}
+          value={selectedTaskId}
+          onChange={(e) => {
+            setSelectedTaskId(e.target.value === "" ? "" : Number(e.target.value));
+            setExtractResult(null);
+          }}
+          className={styles.annotationSelect}
+          disabled={extractMutation.isPending}
+        >
+          <option value="">-- タスクを選択 --</option>
+          {annotationTasks.map((task) => (
+            <option key={task.id} value={task.id}>
+              {task.name}
+            </option>
+          ))}
+        </select>
+        <button
+          type="button"
+          onClick={() => extractMutation.mutate()}
+          disabled={selectedTaskId === "" || extractMutation.isPending || !canExtract}
+          className={styles.btnAnnotationExtract}
+        >
+          {extractMutation.isPending ? "抽出中..." : "抽出実行"}
+        </button>
+      </div>
+      {extractError && <p className={styles.annotationError}>{extractError}</p>}
+      {extractResult && (
+        <div className={styles.annotationSuccess}>
+          <span>{extractResult.candidates_created} 件の候補を抽出しました。</span>
+          <Link
+            to={`/projects/${projectId}/annotation-review?runId=${run.id}&taskId=${extractResult.annotation_task_id}`}
+            className={styles.annotationReviewLink}
+          >
+            レビューページへ
+          </Link>
+        </div>
+      )}
+      {!extractResult && selectedTaskId !== "" && (
+        <div className={styles.annotationReviewLinkRow}>
+          <Link
+            to={`/projects/${projectId}/annotation-review?runId=${run.id}&taskId=${selectedTaskId}`}
+            className={styles.annotationReviewLinkSmall}
+          >
+            既存の候補をレビュー
+          </Link>
+        </div>
+      )}
+    </div>
+  );
+}
+
 // Run一覧カードコンポーネント
 function RunCard({
   run,
@@ -207,6 +333,7 @@ function RunCard({
   versionLabel,
   versionNumber,
   testCaseLabel,
+  annotationTasks,
   onSetBest,
   isBestPending,
   onCompare,
@@ -219,6 +346,7 @@ function RunCard({
   versionLabel: string;
   versionNumber: number;
   testCaseLabel: string;
+  annotationTasks: AnnotationTask[];
   onSetBest: (unset: boolean) => void;
   isBestPending: boolean;
   onCompare?: () => void;
@@ -227,6 +355,7 @@ function RunCard({
   isDiscardPending: boolean;
 }) {
   const [expanded, setExpanded] = useState(false);
+  const [showAnnotation, setShowAnnotation] = useState(false);
   const hasTrace = (run.execution_trace?.length ?? 0) > 0;
 
   return (
@@ -270,6 +399,13 @@ function RunCard({
           </Link>
           <button
             type="button"
+            onClick={() => setShowAnnotation((prev) => !prev)}
+            className={styles.btnAnnotation}
+          >
+            {showAnnotation ? "Annotation を閉じる" : "Annotation候補を抽出"}
+          </button>
+          <button
+            type="button"
             onClick={() => {
               // ベスト設定済みの場合は解除（unset=true）、未設定の場合は設定（unset=false）
               const unset = run.is_best;
@@ -290,6 +426,10 @@ function RunCard({
           </button>
         </div>
       </div>
+
+      {showAnnotation && (
+        <AnnotationExtractPanel run={run} projectId={projectId} annotationTasks={annotationTasks} />
+      )}
 
       {expanded && (
         <div className={styles.runConversation}>
@@ -404,6 +544,11 @@ export function RunsPage() {
     queryKey: ["test-cases", projectId],
     queryFn: () => getTestCases(projectId),
     enabled: !Number.isNaN(projectId),
+  });
+
+  const { data: annotationTasks = [] } = useQuery({
+    queryKey: ["annotation-tasks"],
+    queryFn: () => getAnnotationTasks(),
   });
 
   // Run 作成タブ: savedステップ時に同一バージョン×ケースのRunを取得
@@ -615,6 +760,7 @@ export function RunsPage() {
     discardMutation.mutate(run.id);
   }
 
+  // アノテーションプロンプト生成パネルの状態（RunsPage 内）
   const isStartDisabled = selectedVersionId === "" || selectedTestCaseId === "" || !hasApiKey;
   const isSaveDisabled =
     !llmResponse.trim() || createRunMutation.isPending || executeRunMutation.isPending;
@@ -924,6 +1070,7 @@ export function RunsPage() {
                           versionLabel={getVersionLabel(run.prompt_version_id)}
                           versionNumber={getVersionNumber(run.prompt_version_id)}
                           testCaseLabel={getTestCaseLabel(run.test_case_id)}
+                          annotationTasks={annotationTasks}
                           onSetBest={(unset) => setBestMutation.mutate({ id: run.id, unset })}
                           isBestPending={setBestMutation.isPending}
                           onDiscard={() => handleDiscardRun(run)}
@@ -1029,6 +1176,7 @@ export function RunsPage() {
                     versionLabel={getVersionLabel(run.prompt_version_id)}
                     versionNumber={getVersionNumber(run.prompt_version_id)}
                     testCaseLabel={getTestCaseLabel(run.test_case_id)}
+                    annotationTasks={annotationTasks}
                     onSetBest={(unset) => setBestMutation.mutate({ id: run.id, unset })}
                     isBestPending={setBestMutation.isPending}
                     onDiscard={() => handleDiscardRun(run)}

@@ -1,0 +1,522 @@
+/* ==================== Color tokens ==================== */
+.root {
+  --c-bg: #1e1e2e;
+  --c-surface: #313244;
+  --c-border: #45475a;
+  --c-text: #cdd6f4;
+  --c-subtext: #a6adc8;
+  --c-muted: #6c7086;
+  --c-accent: #cba6f7;
+  --c-card: #181825;
+  --c-danger: #f38ba8;
+  --c-success: #a6e3a1;
+  --c-overlay: #11111b;
+  --c-yellow: #f9e2af;
+  --c-blue: #89b4fa;
+  --c-green: #a6e3a1;
+
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  min-height: 0;
+  overflow: hidden;
+  color: var(--c-text);
+  padding: 0 24px 24px;
+  box-sizing: border-box;
+}
+
+/* ==================== Header ==================== */
+.pageHeader {
+  padding: 20px 0 16px;
+  border-bottom: 1px solid var(--c-border);
+  margin-bottom: 16px;
+  flex-shrink: 0;
+}
+
+.backLink {
+  color: var(--c-subtext);
+  text-decoration: none;
+  font-size: 13px;
+  display: inline-block;
+  margin-bottom: 8px;
+}
+
+.backLink:hover {
+  color: var(--c-accent);
+  text-decoration: underline;
+}
+
+.pageTitle {
+  margin: 0 0 4px;
+  font-size: 22px;
+  color: var(--c-text);
+}
+
+.pageMeta {
+  margin: 0;
+  font-size: 13px;
+  color: var(--c-subtext);
+}
+
+/* ==================== Layout ==================== */
+.layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(320px, 420px);
+  gap: 16px;
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+}
+
+/* ==================== Left panel ==================== */
+.leftPanel {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  overflow: hidden;
+  background: var(--c-card);
+  border: 1px solid var(--c-border);
+  border-radius: 8px;
+}
+
+.panelTitle {
+  margin: 0;
+  padding: 12px 16px;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--c-accent);
+  border-bottom: 1px solid var(--c-border);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
+.lineViewer {
+  overflow-y: auto;
+  flex: 1;
+  font-family: "Fira Code", "Cascadia Code", "Consolas", monospace;
+  font-size: 12px;
+  line-height: 1.6;
+}
+
+.lineRow {
+  display: flex;
+  align-items: baseline;
+  gap: 0;
+  padding: 0;
+  transition: background-color 0.1s ease;
+}
+
+.lineNumber {
+  width: 44px;
+  min-width: 44px;
+  text-align: right;
+  padding: 0 10px 0 8px;
+  color: var(--c-muted);
+  user-select: none;
+  font-size: 11px;
+  border-right: 1px solid var(--c-border);
+  flex-shrink: 0;
+}
+
+.lineContent {
+  padding: 0 12px;
+  white-space: pre-wrap;
+  word-break: break-all;
+  flex: 1;
+}
+
+/* ==================== Right panel ==================== */
+.rightPanel {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  min-height: 0;
+  overflow-y: auto;
+}
+
+.rightSection {
+  background: var(--c-card);
+  border: 1px solid var(--c-border);
+  border-radius: 8px;
+  display: flex;
+  flex-direction: column;
+}
+
+/* ==================== Count badge ==================== */
+.countBadge {
+  background: rgba(203, 166, 247, 0.15);
+  color: var(--c-accent);
+  border-radius: 999px;
+  padding: 1px 8px;
+  font-size: 11px;
+  font-weight: 600;
+}
+
+/* ==================== Candidate list ==================== */
+.candidateList {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+}
+
+.candidateCard {
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--c-border);
+  transition: background-color 0.1s ease;
+  cursor: pointer;
+}
+
+.candidateCard:last-child {
+  border-bottom: none;
+}
+
+.candidateCard:hover,
+.candidateCardActive {
+  background: rgba(137, 180, 250, 0.06);
+}
+
+.candidateHeader {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 6px;
+  flex-wrap: wrap;
+}
+
+/* Status badges */
+.badge {
+  padding: 2px 8px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.badgePending {
+  background: rgba(108, 112, 134, 0.2);
+  color: var(--c-muted);
+  border: 1px solid rgba(108, 112, 134, 0.4);
+}
+
+.badgeAccepted {
+  background: rgba(166, 227, 161, 0.15);
+  color: var(--c-green);
+  border: 1px solid rgba(166, 227, 161, 0.4);
+}
+
+.badgeRejected {
+  background: rgba(243, 139, 168, 0.12);
+  color: var(--c-danger);
+  border: 1px solid rgba(243, 139, 168, 0.35);
+}
+
+/* Label chip */
+.labelChip {
+  padding: 2px 8px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 600;
+  border: 1px solid var(--c-border);
+  white-space: nowrap;
+}
+
+.candidateLines {
+  font-size: 11px;
+  color: var(--c-muted);
+  font-family: monospace;
+  margin-left: auto;
+}
+
+.candidateQuote {
+  margin: 0 0 4px;
+  font-size: 12px;
+  color: var(--c-subtext);
+  line-height: 1.5;
+  font-style: italic;
+  overflow: hidden;
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+}
+
+.candidateNote {
+  margin: 0 0 6px;
+  font-size: 12px;
+  color: var(--c-muted);
+}
+
+.candidateActions {
+  display: flex;
+  gap: 6px;
+  margin-top: 8px;
+}
+
+.btnAccept {
+  padding: 4px 10px;
+  border-radius: 5px;
+  font-size: 12px;
+  cursor: pointer;
+  background: rgba(166, 227, 161, 0.15);
+  color: var(--c-green);
+  border: 1px solid rgba(166, 227, 161, 0.4);
+  font-weight: 600;
+}
+
+.btnAccept:hover:not(:disabled) {
+  background: rgba(166, 227, 161, 0.25);
+}
+
+.btnReject {
+  padding: 4px 10px;
+  border-radius: 5px;
+  font-size: 12px;
+  cursor: pointer;
+  background: rgba(243, 139, 168, 0.12);
+  color: var(--c-danger);
+  border: 1px solid rgba(243, 139, 168, 0.35);
+  font-weight: 600;
+}
+
+.btnReject:hover:not(:disabled) {
+  background: rgba(243, 139, 168, 0.22);
+}
+
+.btnEdit {
+  padding: 4px 10px;
+  border-radius: 5px;
+  font-size: 12px;
+  cursor: pointer;
+  background: transparent;
+  color: var(--c-subtext);
+  border: 1px solid var(--c-border);
+}
+
+.btnEdit:hover:not(:disabled) {
+  color: var(--c-text);
+  border-color: var(--c-subtext);
+}
+
+.btnDone {
+  opacity: 0.35;
+  cursor: not-allowed;
+}
+
+/* ==================== Edit form ==================== */
+.editForm {
+  margin-top: 10px;
+  padding: 10px;
+  background: var(--c-overlay);
+  border-radius: 6px;
+  border: 1px solid var(--c-border);
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.editRow {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.editLabel {
+  font-size: 12px;
+  color: var(--c-subtext);
+  white-space: nowrap;
+  min-width: 48px;
+}
+
+.editSelect {
+  padding: 4px 8px;
+  background: var(--c-surface);
+  color: var(--c-text);
+  border: 1px solid var(--c-border);
+  border-radius: 5px;
+  font-size: 12px;
+}
+
+.editInput {
+  padding: 4px 8px;
+  background: var(--c-surface);
+  color: var(--c-text);
+  border: 1px solid var(--c-border);
+  border-radius: 5px;
+  font-size: 12px;
+  width: 72px;
+}
+
+.editInputWide {
+  padding: 4px 8px;
+  background: var(--c-surface);
+  color: var(--c-text);
+  border: 1px solid var(--c-border);
+  border-radius: 5px;
+  font-size: 12px;
+  flex: 1;
+  min-width: 120px;
+}
+
+.editActions {
+  display: flex;
+  gap: 6px;
+}
+
+.btnSave {
+  padding: 5px 14px;
+  border-radius: 5px;
+  font-size: 12px;
+  cursor: pointer;
+  background: var(--c-accent);
+  color: #1e1e2e;
+  border: none;
+  font-weight: 600;
+}
+
+.btnSave:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.btnCancel {
+  padding: 5px 12px;
+  border-radius: 5px;
+  font-size: 12px;
+  cursor: pointer;
+  background: transparent;
+  color: var(--c-subtext);
+  border: 1px solid var(--c-border);
+}
+
+/* ==================== Gold annotation ==================== */
+.goldList {
+  display: flex;
+  flex-direction: column;
+}
+
+.goldCard {
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--c-border);
+  cursor: pointer;
+}
+
+.goldCard:last-child {
+  border-bottom: none;
+}
+
+/* ==================== Browse mode ==================== */
+.browseSelectors {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 12px;
+}
+
+.taskSelector {
+  width: 100%;
+  padding: 8px 10px;
+  background: var(--c-surface);
+  color: var(--c-text);
+  border: 1px solid var(--c-border);
+  border-radius: 6px;
+  font-size: 13px;
+  outline: none;
+  cursor: pointer;
+}
+
+.taskSelector:focus {
+  border-color: var(--c-accent);
+}
+
+.testCaseList {
+  max-height: 240px;
+  overflow-y: auto;
+  border: 1px solid var(--c-border);
+  border-radius: 6px;
+}
+
+.testCaseItem {
+  padding: 8px 12px;
+  font-size: 13px;
+  color: var(--c-text);
+  cursor: pointer;
+  border-bottom: 1px solid var(--c-border);
+  transition: background-color 0.1s ease;
+  user-select: none;
+}
+
+.testCaseItem:last-child {
+  border-bottom: none;
+}
+
+.testCaseItem:hover {
+  background: rgba(137, 180, 250, 0.06);
+}
+
+.testCaseItemActive {
+  background: rgba(203, 166, 247, 0.12);
+  color: var(--c-accent);
+}
+
+.testCaseItemActive:hover {
+  background: rgba(203, 166, 247, 0.18);
+}
+
+/* ==================== Gold annotation actions ==================== */
+.btnDelete {
+  padding: 2px 8px;
+  border-radius: 5px;
+  font-size: 11px;
+  cursor: pointer;
+  background: transparent;
+  color: var(--c-danger);
+  border: 1px solid rgba(243, 139, 168, 0.35);
+  margin-left: auto;
+}
+
+.btnDelete:hover:not(:disabled) {
+  background: rgba(243, 139, 168, 0.12);
+}
+
+.addGoldForm {
+  padding: 12px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  border-top: 1px solid var(--c-border);
+}
+
+.btnAddGold {
+  margin: 8px 16px;
+  padding: 5px 12px;
+  border-radius: 5px;
+  font-size: 12px;
+  cursor: pointer;
+  background: rgba(166, 227, 161, 0.1);
+  color: var(--c-green);
+  border: 1px solid rgba(166, 227, 161, 0.35);
+  font-weight: 600;
+  align-self: flex-start;
+}
+
+/* ==================== Misc ==================== */
+.loadingMsg {
+  margin: 16px;
+  font-size: 13px;
+  color: var(--c-muted);
+}
+
+.errorMsg {
+  margin: 16px 0;
+  font-size: 13px;
+  color: var(--c-danger);
+}
+
+.emptyMsg {
+  margin: 16px;
+  font-size: 13px;
+  color: var(--c-muted);
+  font-style: italic;
+}

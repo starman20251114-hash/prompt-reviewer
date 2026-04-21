@@ -1,16 +1,18 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useMemo, useState } from "react";
 import { useParams } from "react-router";
+import { generateAnnotationPrompt } from "../lib/annotationPrompt";
 import {
+  type AnnotationLabel,
   ApiError,
   createAnnotationLabel,
   createAnnotationTask,
+  createPromptVersion,
   deleteAnnotationLabel,
   deleteAnnotationTask,
   getAnnotationTask,
   getAnnotationTasks,
   getProject,
-  type AnnotationLabel,
   updateAnnotationLabel,
   updateAnnotationTask,
 } from "../lib/api";
@@ -261,7 +263,8 @@ export function AnnotationTaskSettingsPage() {
   });
 
   const updateLabelMutation = useMutation({
-    mutationFn: () => updateAnnotationLabel(editingLabelId as number, buildLabelPayload(editingLabelForm)),
+    mutationFn: () =>
+      updateAnnotationLabel(editingLabelId as number, buildLabelPayload(editingLabelForm)),
     onSuccess: async () => {
       if (selectedTaskId !== null) {
         await refreshTaskData(selectedTaskId);
@@ -296,6 +299,51 @@ export function AnnotationTaskSettingsPage() {
     },
   });
 
+  // プロンプト生成パネルの状態
+  const [promptGenOpen, setPromptGenOpen] = useState(false);
+  const [promptGenTarget, setPromptGenTarget] = useState("");
+  const [promptGenCriteria, setPromptGenCriteria] = useState("");
+  const [generatedPrompt, setGeneratedPrompt] = useState<string | null>(null);
+  const [promptGenCopied, setPromptGenCopied] = useState(false);
+  const [promptSaveMessage, setPromptSaveMessage] = useState<string | null>(null);
+
+  const savePromptVersionMutation = useMutation({
+    mutationFn: (content: string) => {
+      const taskName = taskDetailQuery.data?.name ?? "アノテーション";
+      return createPromptVersion(projectId, {
+        content,
+        name: `アノテーション: ${taskName}`,
+      });
+    },
+    onSuccess: (saved) => {
+      setPromptSaveMessage(`保存しました（v${saved.version}）`);
+    },
+    onError: () => {
+      setPromptSaveMessage("保存に失敗しました。");
+    },
+  });
+
+  function handleGeneratePrompt() {
+    const labels = sortedLabels;
+    const taskName = taskDetailQuery.data?.name ?? "";
+    const prompt = generateAnnotationPrompt({
+      taskName,
+      labels,
+      extractionTarget: promptGenTarget.trim(),
+      criteria: promptGenCriteria.trim() || undefined,
+    });
+    setGeneratedPrompt(prompt);
+    setPromptSaveMessage(null);
+  }
+
+  function handleCopyPrompt() {
+    if (!generatedPrompt) return;
+    navigator.clipboard.writeText(generatedPrompt).then(() => {
+      setPromptGenCopied(true);
+      setTimeout(() => setPromptGenCopied(false), 2000);
+    });
+  }
+
   const canCreateTask = newTaskForm.name.trim().length > 0 && !createTaskMutation.isPending;
   const canUpdateTask =
     selectedTaskId !== null && taskForm.name.trim().length > 0 && !updateTaskMutation.isPending;
@@ -320,11 +368,7 @@ export function AnnotationTaskSettingsPage() {
           </p>
         </div>
         {feedbackMessage && (
-          <p
-            className={
-              feedbackTone === "error" ? styles.feedbackError : styles.feedbackSuccess
-            }
-          >
+          <p className={feedbackTone === "error" ? styles.feedbackError : styles.feedbackSuccess}>
             {feedbackMessage}
           </p>
         )}
@@ -390,7 +434,9 @@ export function AnnotationTaskSettingsPage() {
               <p className={styles.errorText}>タスク一覧の取得に失敗しました。</p>
             )}
             {!tasksQuery.isLoading && (tasksQuery.data?.length ?? 0) === 0 && (
-              <p className={styles.stateText}>まだ task はありません。まず 1 件追加してください。</p>
+              <p className={styles.stateText}>
+                まだ task はありません。まず 1 件追加してください。
+              </p>
             )}
             {(tasksQuery.data ?? []).map((task) => {
               const isSelected = task.id === selectedTaskId;
@@ -540,9 +586,7 @@ export function AnnotationTaskSettingsPage() {
                         }
                         placeholder="例: missing_evidence"
                       />
-                      <p className={styles.fieldHint}>
-                        未入力なら表示名から自動生成します。
-                      </p>
+                      <p className={styles.fieldHint}>未入力なら表示名から自動生成します。</p>
                     </div>
 
                     <div className={styles.fieldGroup}>
@@ -683,11 +727,12 @@ export function AnnotationTaskSettingsPage() {
 
                           <div className={styles.fieldGrid}>
                             <div className={styles.fieldGroup}>
-                              <label className={styles.fieldLabel}>
+                              <label htmlFor="label-key-input" className={styles.fieldLabel}>
                                 分類ラベル
                                 <span className={styles.requiredMark}>必須</span>
                               </label>
                               <input
+                                id="label-key-input"
                                 className={styles.fieldInput}
                                 value={currentForm.key}
                                 disabled={!isEditing}
@@ -706,8 +751,11 @@ export function AnnotationTaskSettingsPage() {
                             </div>
 
                             <div className={styles.fieldGroup}>
-                              <label className={styles.fieldLabel}>表示名</label>
+                              <label htmlFor="label-name-input" className={styles.fieldLabel}>
+                                表示名
+                              </label>
                               <input
+                                id="label-name-input"
                                 className={styles.fieldInput}
                                 value={currentForm.name}
                                 disabled={!isEditing}
@@ -721,9 +769,12 @@ export function AnnotationTaskSettingsPage() {
                             </div>
 
                             <div className={styles.fieldGroup}>
-                              <label className={styles.fieldLabel}>色</label>
+                              <label htmlFor="label-color-input" className={styles.fieldLabel}>
+                                色
+                              </label>
                               <div className={styles.colorFieldRow}>
                                 <input
+                                  id="label-color-input"
                                   className={styles.fieldInput}
                                   value={currentForm.color}
                                   disabled={!isEditing}
@@ -744,8 +795,11 @@ export function AnnotationTaskSettingsPage() {
                             </div>
 
                             <div className={styles.fieldGroup}>
-                              <label className={styles.fieldLabel}>並び順</label>
+                              <label htmlFor="label-order-input" className={styles.fieldLabel}>
+                                並び順
+                              </label>
                               <input
+                                id="label-order-input"
                                 className={styles.fieldInput}
                                 type="number"
                                 value={currentForm.displayOrder}
@@ -779,6 +833,109 @@ export function AnnotationTaskSettingsPage() {
                     })
                   )}
                 </div>
+              </div>
+
+              {/* プロンプト生成パネル */}
+              <div className={styles.promptGenSection}>
+                <button
+                  type="button"
+                  className={styles.promptGenToggle}
+                  onClick={() => setPromptGenOpen((prev) => !prev)}
+                  aria-expanded={promptGenOpen}
+                >
+                  {promptGenOpen
+                    ? "▲ アノテーション用プロンプトを閉じる"
+                    : "▼ アノテーション用プロンプトを生成"}
+                </button>
+
+                {promptGenOpen && (
+                  <div className={styles.promptGenPanel}>
+                    <div className={styles.fieldGroup}>
+                      <label className={styles.fieldLabel} htmlFor="prompt-gen-target">
+                        抽出対象
+                        <span className={styles.requiredMark}>必須</span>
+                      </label>
+                      <input
+                        id="prompt-gen-target"
+                        className={styles.fieldInput}
+                        value={promptGenTarget}
+                        onChange={(e) => setPromptGenTarget(e.target.value)}
+                        placeholder="例: AIとの会話ログ、学習メモ、議事録"
+                      />
+                    </div>
+
+                    <div className={styles.fieldGroup}>
+                      <label className={styles.fieldLabel} htmlFor="prompt-gen-criteria">
+                        抽出判定条件の詳細（任意）
+                      </label>
+                      <textarea
+                        id="prompt-gen-criteria"
+                        className={styles.fieldTextarea}
+                        value={promptGenCriteria}
+                        onChange={(e) => setPromptGenCriteria(e.target.value)}
+                        placeholder="例: アイデアとは新しい発見や方針転換を含む記述を指す"
+                        rows={3}
+                      />
+                    </div>
+
+                    <div className={styles.formFooter}>
+                      <button
+                        type="button"
+                        className={styles.primaryButton}
+                        onClick={handleGeneratePrompt}
+                        disabled={!promptGenTarget.trim() || sortedLabels.length === 0}
+                      >
+                        生成
+                      </button>
+                      {sortedLabels.length === 0 && (
+                        <p className={styles.fieldHint}>
+                          ラベルを追加するとプロンプトを生成できます。
+                        </p>
+                      )}
+                    </div>
+
+                    {generatedPrompt !== null && (
+                      <div className={styles.promptGenResult}>
+                        <textarea
+                          readOnly
+                          className={styles.promptGenTextarea}
+                          value={generatedPrompt}
+                          rows={14}
+                        />
+                        <div className={styles.formFooter}>
+                          <button
+                            type="button"
+                            className={styles.secondaryButton}
+                            onClick={handleCopyPrompt}
+                          >
+                            {promptGenCopied ? "✓ コピー済み" : "コピー"}
+                          </button>
+                          <button
+                            type="button"
+                            className={styles.primaryButton}
+                            onClick={() => savePromptVersionMutation.mutate(generatedPrompt)}
+                            disabled={savePromptVersionMutation.isPending}
+                          >
+                            {savePromptVersionMutation.isPending
+                              ? "保存中..."
+                              : "プロンプトバージョンとして保存"}
+                          </button>
+                          {promptSaveMessage && (
+                            <p
+                              className={
+                                savePromptVersionMutation.isError
+                                  ? styles.feedbackError
+                                  : styles.feedbackSuccess
+                              }
+                            >
+                              {promptSaveMessage}
+                            </p>
+                          )}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )}
               </div>
             </>
           )}

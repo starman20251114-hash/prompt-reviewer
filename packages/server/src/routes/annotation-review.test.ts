@@ -300,6 +300,7 @@ describe("PATCH /api/annotation-candidates/:id", () => {
     const accepted: MockCandidate = { ...sampleCandidate, status: "accepted", updated_at: 2000000 };
     let selectCallCount = 0;
     let insertCalled = false;
+    let updateCallCount = 0;
 
     const existingGold: MockGoldAnnotation = {
       ...sampleGold,
@@ -326,7 +327,13 @@ describe("PATCH /api/annotation-candidates/:id", () => {
       update: () => ({
         set: () => ({
           where: () => ({
-            returning: () => Promise.resolve([accepted]),
+            returning: () => {
+              updateCallCount += 1;
+              if (updateCallCount === 1) {
+                return Promise.resolve([accepted]);
+              }
+              return Promise.resolve([{ ...existingGold, updated_at: 2000000 }]);
+            },
           }),
         }),
       }),
@@ -352,6 +359,78 @@ describe("PATCH /api/annotation-candidates/:id", () => {
     expect(body.candidate.status).toBe("accepted");
     expect(body.gold.id).toBe(99);
     expect(insertCalled).toBe(false);
+  });
+
+  it("accepted 済み candidate を編集すると linked gold も同期更新される", async () => {
+    const accepted: MockCandidate = {
+      ...sampleCandidate,
+      status: "accepted",
+      label: "feature",
+      start_line: 5,
+      end_line: 10,
+      note: "更新メモ",
+      updated_at: 2000000,
+    };
+    const syncedGold: MockGoldAnnotation = {
+      ...sampleGold,
+      label: "feature",
+      start_line: 5,
+      end_line: 10,
+      note: "更新メモ",
+      updated_at: 2000000,
+    };
+    let selectCallCount = 0;
+    let updateCallCount = 0;
+
+    const db = {
+      select: () => {
+        selectCallCount += 1;
+        if (selectCallCount === 1) {
+          return {
+            from: () => ({
+              where: () => Promise.resolve([{ ...sampleCandidate, status: "accepted" }]),
+            }),
+          };
+        }
+        if (selectCallCount === 2) {
+          return {
+            from: () => ({
+              where: () => Promise.resolve([{ key: "bug" }, { key: "feature" }]),
+            }),
+          };
+        }
+        return {
+          from: () => ({
+            where: () => Promise.resolve([sampleGold]),
+          }),
+        };
+      },
+      update: () => ({
+        set: () => ({
+          where: () => ({
+            returning: () => {
+              updateCallCount += 1;
+              return Promise.resolve(updateCallCount === 1 ? [accepted] : [syncedGold]);
+            },
+          }),
+        }),
+      }),
+    };
+
+    const app = buildApp(db);
+    const res = await app.request("/api/annotation-candidates/1", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ label: "feature", start_line: 5, end_line: 10, note: "更新メモ" }),
+    });
+
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as { candidate: MockCandidate; gold: MockGoldAnnotation };
+    expect(body.candidate.status).toBe("accepted");
+    expect(body.gold.label).toBe("feature");
+    expect(body.gold.start_line).toBe(5);
+    expect(body.gold.end_line).toBe(10);
+    expect(body.gold.note).toBe("更新メモ");
   });
 
   it("status='rejected' に変更してもgold_annotationは作成されず {candidate} のみ返す", async () => {
@@ -500,5 +579,36 @@ describe("GET /api/gold-annotations", () => {
     const body = (await res.json()) as MockGoldAnnotation[];
     expect(body).toHaveLength(1);
     expect(body.at(0)?.target_text_ref).toBe("test_case:5");
+  });
+});
+
+describe("DELETE /api/gold-annotations/:id", () => {
+  it("candidate 由来の gold を削除すると candidate を pending に戻す", async () => {
+    let updatedCandidate = false;
+
+    const db = {
+      select: () => ({
+        from: () => ({
+          where: () => Promise.resolve([sampleGold]),
+        }),
+      }),
+      delete: () => ({
+        where: () => Promise.resolve(),
+      }),
+      update: () => ({
+        set: () => ({
+          where: () => {
+            updatedCandidate = true;
+            return Promise.resolve();
+          },
+        }),
+      }),
+    };
+
+    const app = buildApp(db);
+    const res = await app.request("/api/gold-annotations/1", { method: "DELETE" });
+
+    expect(res.status).toBe(200);
+    expect(updatedCandidate).toBe(true);
   });
 });

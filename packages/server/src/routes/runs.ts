@@ -181,6 +181,23 @@ function parseStructuredOutput(json: string | null): StructuredOutput | null {
   return JSON.parse(json) as StructuredOutput;
 }
 
+function extractJsonFromText(text: string): unknown {
+  // まず直接パースを試みる
+  try {
+    return JSON.parse(text);
+  } catch {
+    // ignore
+  }
+  // テキスト内の最初の { から最後の } を抽出してパース
+  // （コードブロック内に ``` が含まれる場合でも対応できる）
+  const firstBrace = text.indexOf("{");
+  const lastBrace = text.lastIndexOf("}");
+  if (firstBrace !== -1 && lastBrace > firstBrace) {
+    return JSON.parse(text.slice(firstBrace, lastBrace + 1));
+  }
+  throw new SyntaxError("Failed to parse as JSON");
+}
+
 function parseStructuredItems(
   value: unknown,
 ): z.infer<typeof structuredOutputSchema>["items"] | null {
@@ -237,7 +254,8 @@ function renderWorkflowPrompt(params: {
   const conversationText = params.conversation
     .map((message) => `${message.role === "user" ? "User" : "Assistant"}: ${message.content}`)
     .join("\n\n");
-  const effectiveContext = params.previousOutput ?? params.testCase.context_content;
+  const rawContext = params.testCase.context_content ?? "";
+  const effectiveContext = params.previousOutput ?? rawContext;
 
   let rendered = params.step.prompt
     .replaceAll("{{prompt}}", params.version.content)
@@ -912,7 +930,7 @@ export function createRunsRouter(db: DB, options: RunsRouterOptions = {}) {
 
       let parsedFinalAnswer: unknown;
       try {
-        parsedFinalAnswer = JSON.parse(lastAssistantMessage.content);
+        parsedFinalAnswer = extractJsonFromText(lastAssistantMessage.content);
       } catch {
         return c.json({ error: "Failed to parse assistant message as JSON" }, 400);
       }
