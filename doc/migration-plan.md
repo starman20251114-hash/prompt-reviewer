@@ -802,6 +802,53 @@ Run 関連 UI を project 親子から独立させ、プロンプト側ラベル
 
 ---
 
+## Issue 19a: Run に「かんたん実行（prompt-only / 任意入力）」導線を追加する
+
+GitHub Issue: #175
+
+### 目的
+
+Run の軽い動作確認を、空の test case を明示作成しなくても始められるようにする。
+
+既存の評価 Run は固定 test case 前提で意味を持つため、`prompt-only` / `任意入力あり` の単発実行は
+UI 上とデータ上で区別できるようにする。
+
+### 対象
+
+- `packages/core/src/schema/runs.ts`
+- `packages/server/src/routes/runs.ts`
+- `packages/server/src/routes/runs.test.ts`
+- `packages/ui/src/lib/api.ts`
+- `packages/ui/src/pages/RunsPage.tsx`
+- 関連 CSS
+
+### 実装内容
+
+- Run の種別として quick / evaluation を区別できるようにする
+- test case 未指定の実行、または任意入力つき実行を扱えるようにする
+- 実行時プロンプト本文の保存方針を決め、必要なら snapshot を保持する
+- Runs 画面に `かんたん実行` 導線を追加する
+- quick run から test case 化する導線を検討する
+
+### 完了条件
+
+- 空の test case を明示作成しなくても prompt-only 実行ができる
+- 既存の評価 Run 一覧/採点/比較の意味が壊れない
+- 新 Runs API / UI モデルと整合する
+
+### テスト
+
+- quick run と evaluation run の振る舞い差分テスト
+- test_case_id 未指定時の実行テスト
+- 一覧表示・保存内容の互換テスト
+
+### 依存
+
+- Issue 14
+- Issue 19
+
+---
+
 ## Issue 20: Projects 画面を「ラベル管理画面」へ再設計する
 
 ### 目的
