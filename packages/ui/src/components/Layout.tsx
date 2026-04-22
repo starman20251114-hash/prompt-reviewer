@@ -81,6 +81,7 @@ function SidebarNav() {
 
   const topNavItems = [
     { to: "/", label: "プロジェクト一覧", end: true },
+    { to: "/prompts", label: "プロンプト", end: false },
     { to: "/execution-profiles", label: "実行設定", end: false },
     { to: "/health", label: "ヘルスチェック", end: false },
   ];

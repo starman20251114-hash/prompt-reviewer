@@ -1,5 +1,5 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { BrowserRouter, Navigate, Route, Routes } from "react-router";
+import { BrowserRouter, Route, Routes } from "react-router";
 import { Layout } from "./components/Layout";
 import { AnnotationReviewPage } from "./pages/AnnotationReviewPage";
 import { AnnotationTaskSettingsPage } from "./pages/AnnotationTaskSettingsPage";
@@ -8,6 +8,7 @@ import { ExecutionProfilesPage } from "./pages/ExecutionProfilesPage";
 import { HealthPage } from "./pages/HealthPage";
 import { NotFoundPage } from "./pages/NotFoundPage";
 import { ProjectDetailPage } from "./pages/ProjectDetailPage";
+import { ProjectSettingsPage } from "./pages/ProjectSettingsPage";
 import { ProjectsPage } from "./pages/ProjectsPage";
 import { PromptsPage } from "./pages/PromptsPage";
 import { RunsPage } from "./pages/RunsPage";
@@ -36,16 +37,14 @@ export function App() {
             <Route path="projects/:id" element={<ProjectDetailPage />} />
             <Route path="projects/:id/context-files" element={<ContextFilesPage />} />
             <Route path="projects/:id/test-cases" element={<TestCasesPage />} />
+            <Route path="prompts" element={<PromptsPage />} />
             <Route path="projects/:id/prompts" element={<PromptsPage />} />
             <Route path="projects/:id/runs" element={<RunsPage />} />
             <Route path="projects/:id/score" element={<ScorePage />} />
             <Route path="projects/:id/score-progression" element={<ScoreProgressionPage />} />
             <Route path="projects/:id/annotation-tasks" element={<AnnotationTaskSettingsPage />} />
             <Route path="projects/:id/annotation-review" element={<AnnotationReviewPage />} />
-            <Route
-              path="projects/:id/settings"
-              element={<Navigate to="/execution-profiles" replace />}
-            />
+            <Route path="projects/:id/settings" element={<ProjectSettingsPage />} />
             <Route path="execution-profiles" element={<ExecutionProfilesPage />} />
             {/* ユーティリティ */}
             <Route path="health" element={<HealthPage />} />

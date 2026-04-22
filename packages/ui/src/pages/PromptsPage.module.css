@@ -1,4 +1,10 @@
-/* ==================== Page layout ==================== */
+.root {
+  --prompts-family-bg: color-mix(in srgb, var(--c-accent) 10%, var(--c-card));
+  --prompts-branch-bg: rgba(249, 226, 175, 0.1);
+  --prompts-compare-bg: rgba(137, 180, 250, 0.1);
+  --prompts-filter-bg: color-mix(in srgb, var(--c-card) 78%, var(--c-overlay));
+}
+
 .page {
   display: flex;
   flex-direction: column;
@@ -15,7 +21,7 @@
   margin: 0 0 4px;
 }
 
-.projectName {
+.pageDescription {
   margin: 0;
   font-size: 13px;
   color: var(--c-muted);
@@ -24,19 +30,15 @@
 .pageActions {
   display: flex;
   gap: 8px;
+  flex-wrap: wrap;
 }
 
-/* ==================== Shared buttons ==================== */
 .btnPrimary {
   composes: btnPrimary from '../styles/shared.module.css';
-  padding: 7px 16px;
-  font-size: 13px;
 }
 
 .btnSecondary {
   composes: btnSecondary from '../styles/shared.module.css';
-  padding: 7px 16px;
-  font-size: 13px;
 }
 
 .btnBlue {
@@ -53,7 +55,43 @@
   composes: btnDisabled from '../styles/shared.module.css';
 }
 
-/* ==================== Compare bar ==================== */
+.filterBar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 12px 14px;
+  margin-bottom: 12px;
+  background: var(--prompts-filter-bg);
+  border: 1px solid var(--c-border);
+  border-radius: 10px;
+  flex-wrap: wrap;
+}
+
+.filterGroup {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.filterLabel {
+  font-size: 12px;
+  color: var(--c-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+
+.filterSelect {
+  composes: fieldInput from '../styles/shared.module.css';
+  min-width: 220px;
+}
+
+.filterHint {
+  margin: 0;
+  font-size: 13px;
+  color: var(--c-subtext);
+}
+
 .compareBar {
   padding: 8px 12px;
   background: var(--c-card);
@@ -64,6 +102,7 @@
   gap: 12px;
   align-items: center;
   font-size: 13px;
+  flex-wrap: wrap;
 }
 
 .compareBarLabel {
@@ -98,7 +137,6 @@
   cursor: pointer;
 }
 
-/* ==================== Main content ==================== */
 .mainContent {
   display: flex;
   gap: 16px;
@@ -106,13 +144,67 @@
   min-height: 0;
 }
 
-/* ==================== Tree panel ==================== */
-.treePanel {
-  width: 300px;
+.sidebarColumn {
+  width: 360px;
   flex-shrink: 0;
   display: flex;
   flex-direction: column;
+  gap: 16px;
+  min-height: 0;
+}
+
+.familyPanel,
+.treePanel,
+.rightPanel {
+  background: var(--c-card);
+  border: 1px solid var(--c-border);
+  border-radius: 10px;
+}
+
+.familyPanel {
+  padding: 14px;
+}
+
+.familyPanelHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+
+.familyActions {
+  display: flex;
+  gap: 6px;
+}
+
+.btnMini,
+.btnMiniDanger {
+  padding: 4px 10px;
+  border-radius: 999px;
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.btnMini {
+  background: transparent;
+  border: 1px solid var(--c-border);
+  color: var(--c-subtext);
+}
+
+.btnMiniDanger {
+  background: transparent;
+  border: 1px solid rgba(243, 139, 168, 0.45);
+  color: var(--c-danger);
+}
+
+.treePanel {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
   overflow: hidden;
+  padding: 14px;
 }
 
 .treePanelLabel {
@@ -120,43 +212,107 @@
   color: var(--c-muted);
   text-transform: uppercase;
   letter-spacing: 0.08em;
-  margin-bottom: 8px;
+}
+
+.treeFamilyName {
+  margin: 6px 0 0;
+  font-size: 14px;
+  color: var(--c-accent);
+  font-weight: 600;
+}
+
+.familyList {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  max-height: 280px;
+  overflow: auto;
+}
+
+.familyCard {
+  padding: 10px 12px;
+  border: 1px solid var(--c-border);
+  border-radius: 8px;
+  background: transparent;
+  text-align: left;
+  cursor: pointer;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  color: var(--c-text);
+}
+
+.familyCardSelected {
+  background: var(--prompts-family-bg);
+  border-color: var(--c-accent);
+}
+
+.familyName {
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.familyDescription {
+  font-size: 12px;
+  color: var(--c-muted);
+  line-height: 1.5;
 }
 
 .treeStatus {
   color: var(--c-muted);
   font-size: 13px;
+  margin: 12px 0 0;
 }
 
 .treeError {
   color: var(--c-danger);
   font-size: 13px;
+  margin: 12px 0 0;
 }
 
 .treeEmpty {
-  padding: 20px;
+  padding: 18px 14px;
+  margin-top: 12px;
   text-align: center;
   color: var(--c-muted);
   font-size: 13px;
-  background: var(--c-card);
+  background: var(--c-overlay);
   border-radius: 8px;
-  border: 1px solid var(--c-border);
+  border: 1px dashed var(--c-border);
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.treeEmptyHint {
+  font-size: 12px;
 }
 
 .treeScroll {
-  overflow-y: auto;
+  margin-top: 12px;
+  overflow: auto;
   flex: 1;
 }
 
-/* ==================== Tree item ==================== */
-.treeItem {
+.treeItemRow {
   display: flex;
   align-items: stretch;
-  margin-bottom: 2px;
+  gap: 2px;
+  margin-bottom: 6px;
+}
+
+.treeIndent {
+  display: flex;
+  flex-shrink: 0;
+}
+
+.treeIndentUnit {
+  width: 18px;
+  flex-shrink: 0;
 }
 
 .treeConnector {
-  width: 20px;
+  width: 16px;
   flex-shrink: 0;
   position: relative;
 }
@@ -165,7 +321,7 @@
   position: absolute;
   left: 0;
   top: 50%;
-  width: 16px;
+  width: 14px;
   height: 1px;
   background: var(--c-border);
 }
@@ -181,28 +337,44 @@
 
 .treeCard {
   flex: 1;
-  padding: 8px 12px;
+  min-width: 0;
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 10px 12px;
   background: var(--c-card);
   border: 1px solid var(--c-border);
-  border-radius: 6px;
+  border-radius: 8px;
   color: var(--c-text);
-  cursor: pointer;
   text-align: left;
-  font-family: inherit;
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  min-width: 0;
+  cursor: pointer;
 }
 
 .treeCardSelected {
-  background: rgba(203, 166, 247, 0.15);
+  background: color-mix(in srgb, var(--c-accent) 12%, var(--c-card));
   border-color: var(--c-accent);
 }
 
 .treeCardComparing {
-  background: rgba(137, 180, 250, 0.1);
+  background: var(--prompts-compare-bg);
   border-color: var(--c-blue);
+}
+
+.treeCardMain {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  flex: 1;
+}
+
+.treeCardTitleRow,
+.treeMetaRow {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
 }
 
 .treeVersionNum {
@@ -210,7 +382,6 @@
   font-weight: 700;
   color: var(--c-muted);
   flex-shrink: 0;
-  min-width: 28px;
 }
 
 .treeVersionNumSelected {
@@ -223,23 +394,48 @@
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  flex: 1;
 }
 
 .badgeBranch {
   font-size: 10px;
   color: var(--c-yellow);
-  background: rgba(249, 226, 175, 0.1);
+  background: var(--prompts-branch-bg);
   border: 1px solid rgba(249, 226, 175, 0.3);
-  border-radius: 4px;
-  padding: 1px 5px;
-  flex-shrink: 0;
+  border-radius: 999px;
+  padding: 1px 7px;
+}
+
+.projectTag,
+.projectTagMuted,
+.badgeSelectedInline {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 8px;
+  border-radius: 999px;
+  font-size: 11px;
+}
+
+.projectTag {
+  background: color-mix(in srgb, var(--c-blue) 16%, var(--c-card));
+  border: 1px solid color-mix(in srgb, var(--c-blue) 34%, transparent);
+  color: var(--c-blue);
+}
+
+.projectTagMuted {
+  background: transparent;
+  border: 1px solid var(--c-border);
+  color: var(--c-muted);
+}
+
+.badgeSelectedInline {
+  background: rgba(137, 220, 235, 0.2);
+  border: 1px solid rgba(137, 220, 235, 0.4);
+  color: var(--c-blue);
 }
 
 .treeCardActions {
   display: flex;
   gap: 4px;
-  margin-left: auto;
   flex-shrink: 0;
 }
 
@@ -261,14 +457,11 @@
   color: var(--c-yellow);
 }
 
-/* ==================== Right panel ==================== */
 .rightPanel {
   flex: 1;
-  background: var(--c-card);
-  border: 1px solid var(--c-border);
-  border-radius: 8px;
   display: flex;
   flex-direction: column;
+  min-height: 0;
   overflow: hidden;
 }
 
@@ -279,6 +472,8 @@
   justify-content: center;
   color: var(--c-muted);
   font-size: 14px;
+  padding: 20px;
+  text-align: center;
 }
 
 .panelHeader {
@@ -287,6 +482,7 @@
   display: flex;
   justify-content: space-between;
   align-items: center;
+  gap: 10px;
 }
 
 .panelHeaderTitle {
@@ -309,25 +505,23 @@
   color: var(--c-text);
 }
 
-.panelBody {
+.panelHeaderRight {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.panelBody,
+.panelEditorBody {
   flex: 1;
   overflow: auto;
   padding: 16px;
 }
 
 .panelEditorBody {
-  flex: 1;
-  padding: 16px;
-  overflow: auto;
   display: flex;
   flex-direction: column;
-  min-height: 0;
-}
-
-.panelHeaderRight {
-  display: flex;
-  align-items: center;
-  gap: 8px;
 }
 
 .btnEdit {
@@ -340,7 +534,6 @@
   cursor: pointer;
 }
 
-/* ==================== Selected badge & button ==================== */
 .badgeSelected {
   padding: 2px 8px;
   background: rgba(137, 220, 235, 0.2);
@@ -356,7 +549,6 @@
   border-radius: 6px;
   font-size: 12px;
   cursor: pointer;
-  white-space: nowrap;
 }
 
 .btnSelectedInactive {
@@ -370,6 +562,57 @@
   color: var(--c-blue);
   border: 1px solid rgba(137, 220, 235, 0.4);
   cursor: not-allowed;
+}
+
+.familySummaryCard {
+  padding: 14px;
+  border-radius: 10px;
+  border: 1px solid color-mix(in srgb, var(--c-accent) 28%, transparent);
+  background: var(--prompts-family-bg);
+  margin-bottom: 14px;
+}
+
+.familySummaryLabel {
+  display: block;
+  font-size: 11px;
+  color: var(--c-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  margin-bottom: 6px;
+}
+
+.familySummaryName {
+  display: block;
+  font-size: 16px;
+}
+
+.familySummaryDescription {
+  margin: 8px 0 0;
+  font-size: 13px;
+  line-height: 1.6;
+  color: var(--c-subtext);
+}
+
+.versionMetaRow {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  align-items: center;
+  margin-bottom: 14px;
+}
+
+.versionMeta {
+  font-size: 12px;
+  color: var(--c-muted);
+}
+
+.badgeParentVersion {
+  color: var(--c-yellow);
+  background: var(--prompts-branch-bg);
+  border: 1px solid rgba(249, 226, 175, 0.3);
+  border-radius: 999px;
+  padding: 2px 8px;
+  font-size: 11px;
 }
 
 .memoBox {
@@ -387,22 +630,6 @@
   margin-right: 6px;
 }
 
-.versionMeta {
-  font-size: 12px;
-  color: var(--c-muted);
-  margin-bottom: 6px;
-}
-
-.badgeParentVersion {
-  margin-left: 10px;
-  color: var(--c-yellow);
-  background: rgba(249, 226, 175, 0.1);
-  border: 1px solid rgba(249, 226, 175, 0.3);
-  border-radius: 4px;
-  padding: 1px 6px;
-  font-size: 11px;
-}
-
 .promptPre {
   margin: 0;
   padding: 14px;
@@ -415,7 +642,6 @@
   font-family: monospace;
   white-space: pre-wrap;
   word-break: break-word;
-  overflow-wrap: break-word;
 }
 
 .workflowPreview {
@@ -466,7 +692,6 @@
   word-break: break-word;
 }
 
-/* ==================== Editor form ==================== */
 .editorForm {
   display: flex;
   flex-direction: column;
@@ -485,28 +710,26 @@
 
 .fieldInput {
   composes: fieldInput from '../styles/shared.module.css';
-  padding: 8px 12px;
-  border-radius: 6px;
-  font-family: inherit;
 }
 
 .fieldTextareaWrapper {
-  flex: 0 0 auto;
   display: flex;
   flex-direction: column;
-  min-height: 0;
+}
+
+.fieldTextarea,
+.familyTextarea,
+.workflowTextarea {
+  composes: fieldTextarea from '../styles/shared.module.css';
+  font-family: monospace;
 }
 
 .fieldTextarea {
-  composes: fieldTextarea from '../styles/shared.module.css';
-  padding: 8px 12px;
-  border-radius: 6px;
-  resize: vertical;
-  line-height: 1.6;
-  font-family: monospace;
-  min-height: 160px;
-  max-height: 280px;
-  overflow: auto;
+  min-height: 200px;
+}
+
+.familyTextarea {
+  min-height: 120px;
 }
 
 .workflowSection {
@@ -595,23 +818,8 @@
   gap: 8px;
 }
 
-.workflowTextarea {
-  min-height: 120px;
-  padding: 8px 12px;
-  background: var(--c-card);
-  border: 1px solid var(--c-border);
-  border-radius: 6px;
-  color: var(--c-text);
-  font-size: 13px;
-  line-height: 1.6;
-  font-family: monospace;
-  resize: vertical;
-}
-
 .formActions {
   composes: formActions from '../styles/shared.module.css';
-  gap: 8px;
-  flex-shrink: 0;
 }
 
 .btnSave {
@@ -639,26 +847,23 @@
   composes: errorMsg from '../styles/shared.module.css';
 }
 
-/* ==================== Branch modal ==================== */
 .modalOverlay {
   composes: modalOverlay from '../styles/shared.module.css';
 }
 
 .modalContent {
   composes: modalContent from '../styles/shared.module.css';
-  width: 480px;
+  width: min(520px, calc(100vw - 32px));
 }
 
 .modalTitle {
   composes: modalTitle from '../styles/shared.module.css';
-  margin: 0 0 8px;
-  font-size: 17px;
 }
 
 .modalSubtext {
-  margin: 0 0 20px;
-  color: var(--c-muted);
+  margin: 0 0 16px;
   font-size: 13px;
+  color: var(--c-muted);
 }
 
 .modalForm {
@@ -669,8 +874,8 @@
 
 .modalActions {
   display: flex;
-  gap: 10px;
   justify-content: flex-end;
+  gap: 8px;
 }
 
 .btnBranchSubmit {
@@ -684,7 +889,6 @@
   cursor: pointer;
 }
 
-/* ==================== Compare view ==================== */
 .compareOverlay {
   position: fixed;
   inset: 0;
@@ -719,7 +923,6 @@
 .compareHeaderTitle {
   margin: 0;
   font-size: 16px;
-  color: var(--c-text);
 }
 
 .compareHeaderActions {
@@ -768,7 +971,6 @@
   display: flex;
 }
 
-/* Side-by-side */
 .sideBySide {
   display: flex;
   flex: 1;
@@ -793,7 +995,7 @@
   color: var(--c-subtext);
   display: flex;
   justify-content: space-between;
-  align-items: center;
+  gap: 12px;
 }
 
 .comparePanelHeaderA {
@@ -822,7 +1024,6 @@
   word-break: break-word;
 }
 
-/* Unified diff */
 .unifiedView {
   flex: 1;
   display: flex;
@@ -882,4 +1083,45 @@
   white-space: pre-wrap;
   word-break: break-word;
   flex: 1;
+}
+
+@media (max-width: 980px) {
+  .mainContent {
+    flex-direction: column;
+  }
+
+  .sidebarColumn {
+    width: 100%;
+  }
+
+  .treePanel {
+    min-height: 320px;
+  }
+
+  .panelHeader {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+}
+
+@media (max-width: 720px) {
+  .filterBar,
+  .compareBar,
+  .pageHeader,
+  .workflowHeader,
+  .compareHeader,
+  .compareHeaderActions,
+  .sideBySide {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .workflowFields {
+    grid-template-columns: 1fr;
+  }
+
+  .comparePanelLeft {
+    border-right: none;
+    border-bottom: 1px solid var(--c-border);
+  }
 }

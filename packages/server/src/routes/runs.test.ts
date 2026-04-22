@@ -721,6 +721,127 @@ describe("POST /api/projects/:projectId/runs", () => {
 });
 
 describe("POST /api/projects/:projectId/runs/execute", () => {
+  it("prompt_versions.project_id だけで紐づいた旧データでも実行できる", async () => {
+    const version = {
+      id: 1,
+      project_id: 1,
+      content: "あなたは親切なアシスタントです。",
+      workflow_definition: null,
+    };
+    const testCase = {
+      id: 1,
+      project_id: 1,
+      turns: JSON.stringify([{ role: "user", content: "要約してください" }]),
+      context_content: "",
+      title: "テストケース1",
+      expected_description: null,
+      display_order: 0,
+      created_at: 0,
+      updated_at: 0,
+    };
+    const projectSettings = {
+      id: 1,
+      project_id: 1,
+      model: "claude-opus-4-5",
+      temperature: 0.7,
+      api_provider: "anthropic" as const,
+      created_at: 0,
+      updated_at: 0,
+    };
+    const created = {
+      ...sampleRun,
+      conversation: JSON.stringify([
+        { role: "user", content: "要約してください" },
+        { role: "assistant", content: "要約結果です" },
+      ]),
+      model: projectSettings.model,
+      temperature: projectSettings.temperature,
+      api_provider: projectSettings.api_provider,
+      execution_profile_id: null,
+    };
+
+    let selectCallCount = 0;
+    const capturedRequests: LLMRequest[] = [];
+    const db = {
+      select: () => {
+        selectCallCount++;
+        if (selectCallCount === 1) {
+          return {
+            from: () => ({
+              where: () => Promise.resolve([]),
+            }),
+          };
+        }
+        if (selectCallCount === 2) {
+          return {
+            from: () => ({
+              where: () => Promise.resolve([{ id: version.id }]),
+            }),
+          };
+        }
+        if (selectCallCount === 3) {
+          return {
+            from: () => ({
+              where: () => Promise.resolve([{ test_case_id: 1, project_id: 1, created_at: 0 }]),
+            }),
+          };
+        }
+        if (selectCallCount === 4) {
+          return { from: () => ({ where: () => Promise.resolve([version]) }) };
+        }
+        if (selectCallCount === 5) {
+          return { from: () => ({ where: () => Promise.resolve([testCase]) }) };
+        }
+        return { from: () => ({ where: () => Promise.resolve([projectSettings]) }) };
+      },
+      insert: () => ({
+        values: () => ({
+          returning: () => Promise.resolve([created]),
+        }),
+      }),
+    };
+
+    const app = new Hono();
+    app.route(
+      "/api/projects/:projectId/runs",
+      createRunsRouter(db as unknown as DB, {
+        llmClientFactory: () => ({
+          async sendMessage() {
+            throw new Error("sendMessage should not be used for streaming execute");
+          },
+          async *stream(request: LLMRequest) {
+            capturedRequests.push(request);
+            yield {
+              type: "response" as const,
+              response: {
+                content: "要約結果です",
+                stopReason: "end_turn",
+                raw: {},
+              },
+            };
+          },
+        }),
+      }),
+    );
+    const res = await app.request("/api/projects/1/runs/execute", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        prompt_version_id: 1,
+        test_case_id: 1,
+        api_key: "sk-ant-test",
+      }),
+    });
+
+    expect(res.status).toBe(200);
+    await res.text();
+    expect(capturedRequests).toHaveLength(1);
+    expect(capturedRequests[0]).toMatchObject({
+      model: projectSettings.model,
+      temperature: projectSettings.temperature,
+    });
+  });
+
   it("execution_profile_id が未指定でも project_settings にフォールバックして実行できる", async () => {
     const version = {
       id: 1,
