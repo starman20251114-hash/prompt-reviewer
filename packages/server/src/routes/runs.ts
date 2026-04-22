@@ -80,6 +80,16 @@ const executeRunSchema = z.object({
     .optional(),
 });
 
+const legacyCreateRunSchema = createRunSchema.extend({
+  model: z.string().min(1, "modelは1文字以上必要です").optional(),
+  temperature: z.number().min(0).max(2).optional(),
+  api_provider: z.string().min(1, "api_providerは1文字以上必要です").optional(),
+});
+
+const legacyExecuteRunSchema = executeRunSchema.extend({
+  api_key: z.string().min(1, "api_keyは1文字以上必要です"),
+});
+
 type ExecuteRunBody = z.infer<typeof executeRunSchema>;
 type CandidateSourceType = "structured_json" | "final_answer" | "trace_step";
 
@@ -114,6 +124,7 @@ type RunExecutionClientFactoryInput = {
 
 type RunsRouterOptions = {
   llmClientFactory?: (input: RunExecutionClientFactoryInput) => LLMClient | null;
+  enableCandidateExtractRoute?: boolean;
 };
 
 type StoredPromptVersion = {
@@ -405,18 +416,147 @@ function buildExecutionRequest(params: {
 
 function serializeRun(run: typeof runs.$inferSelect): Omit<
   typeof run,
-  "conversation" | "execution_trace" | "structured_output"
+  "project_id" | "conversation" | "execution_trace" | "structured_output"
 > & {
   conversation: ConversationMessage[];
   execution_trace: ExecutionTraceStep[] | null;
   structured_output: StructuredOutput | null;
 } {
   return {
-    ...run,
+    id: run.id,
+    prompt_version_id: run.prompt_version_id,
+    test_case_id: run.test_case_id,
     conversation: parseConversation(run.conversation),
     execution_trace: parseExecutionTrace(run.execution_trace),
     structured_output: parseStructuredOutput(run.structured_output),
+    is_best: run.is_best,
+    is_discarded: run.is_discarded,
+    model: run.model,
+    temperature: run.temperature,
+    api_provider: run.api_provider,
+    execution_profile_id: run.execution_profile_id,
+    created_at: run.created_at,
   };
+}
+
+function serializeRunWithProjectId(run: typeof runs.$inferSelect, projectId: number) {
+  return {
+    ...serializeRun(run),
+    project_id: projectId,
+  };
+}
+
+function parseOptionalBooleanParam(value: string | undefined): boolean | null {
+  if (value === undefined) return null;
+  if (value === "true") return true;
+  if (value === "false") return false;
+  return null;
+}
+
+function parseProjectIdParam(c: {
+  req: {
+    param: (name: string) => string;
+    query: (name: string) => string | undefined;
+  };
+}): number | null | undefined {
+  const legacyProjectId = parseLegacyProjectId(c.req.param("projectId"));
+  if (legacyProjectId !== null) {
+    return legacyProjectId;
+  }
+
+  if (c.req.param("projectId") !== undefined) {
+    return null;
+  }
+
+  return parseIntParam(c.req.query("project_id"));
+}
+
+function parseLegacyProjectId(value: string | undefined): number | null | undefined {
+  if (value === undefined || value === "") {
+    return undefined;
+  }
+
+  return parseIntParam(value);
+}
+
+async function fetchRunById(db: DB, id: number): Promise<typeof runs.$inferSelect | null> {
+  const [run] = await db.select().from(runs).where(eq(runs.id, id));
+  return run ?? null;
+}
+
+async function fetchExecutionSettings(
+  db: DB,
+  params: {
+    executionProfileId?: number;
+    legacyProjectId?: number;
+    legacySnapshot?: Partial<Pick<ExecutionSettings, "model" | "temperature" | "api_provider">>;
+  },
+): Promise<
+  | { ok: true; settings: ExecutionSettings; executionProfileId: number | null }
+  | { ok: false; status: 400 | 404; error: string }
+> {
+  if (params.executionProfileId !== undefined) {
+    const [profile] = await db
+      .select()
+      .from(execution_profiles)
+      .where(eq(execution_profiles.id, params.executionProfileId));
+
+    if (!profile) {
+      return { ok: false, status: 404, error: "Execution profile not found" };
+    }
+
+    return {
+      ok: true,
+      settings: {
+        model: profile.model,
+        temperature: profile.temperature,
+        api_provider: profile.api_provider,
+        max_tokens: profile.max_tokens,
+      },
+      executionProfileId: profile.id,
+    };
+  }
+
+  if (
+    params.legacySnapshot?.model !== undefined &&
+    params.legacySnapshot.temperature !== undefined &&
+    params.legacySnapshot.api_provider !== undefined
+  ) {
+    return {
+      ok: true,
+      settings: {
+        model: params.legacySnapshot.model,
+        temperature: params.legacySnapshot.temperature,
+        api_provider: params.legacySnapshot.api_provider,
+        max_tokens: null,
+      },
+      executionProfileId: null,
+    };
+  }
+
+  if (params.legacyProjectId !== undefined) {
+    const [projectSettings] = await db
+      .select()
+      .from(project_settings)
+      .where(eq(project_settings.project_id, params.legacyProjectId));
+
+    if (!projectSettings) {
+      return { ok: false, status: 404, error: "Project settings not found" };
+    }
+
+    return {
+      ok: true,
+      settings: {
+        model: projectSettings.model,
+        temperature: projectSettings.temperature,
+        api_provider: projectSettings.api_provider,
+        max_tokens: projectSettings.max_tokens,
+      },
+      executionProfileId: null,
+    };
+  }
+
+  return { ok: false, status: 400, error: "execution_profile_id is required" };
 }
 
 function encodeSse(event: string, data: unknown): Uint8Array {
@@ -464,31 +604,40 @@ async function fetchTestCaseIdsByProject(db: DB, projectId: number): Promise<num
 export function createRunsRouter(db: DB, options: RunsRouterOptions = {}) {
   const router = new Hono();
   const llmClientFactory = options.llmClientFactory ?? defaultLLMClientFactory;
+  const enableCandidateExtractRoute = options.enableCandidateExtractRoute ?? true;
 
-  // GET /api/projects/:projectId/runs - Run一覧取得（prompt_version_id / test_case_id でフィルタ可能）
-  // project_id フィルタは prompt_version_projects 基準で実装
+  // GET /api/runs - 新 Runs API
+  // GET /api/projects/:projectId/runs - 旧API互換レイヤ
   router.get("/", async (c) => {
-    const projectId = parseIntParam(c.req.param("projectId"));
+    const legacyProjectId = parseLegacyProjectId(c.req.param("projectId"));
+    const queryProjectIdRaw = c.req.query("project_id");
+    const queryProjectId = parseIntParam(queryProjectIdRaw);
 
-    if (projectId === null) {
+    if (legacyProjectId === null || (queryProjectIdRaw !== undefined && queryProjectId === null)) {
       return c.json({ error: "Invalid projectId" }, 400);
     }
+    const filterProjectId = legacyProjectId ?? queryProjectId ?? undefined;
 
     const promptVersionIdParam = c.req.query("prompt_version_id");
     const testCaseIdParam = c.req.query("test_case_id");
-
-    // prompt_version_projects 経由でプロジェクトに紐づくバージョンIDを取得
-    const versionIds = await fetchVersionIdsByProject(db, projectId);
-
-    if (versionIds.length === 0) {
-      return c.json([]);
+    const includeDiscardedParam = c.req.query("include_discarded");
+    const includeDiscarded = parseOptionalBooleanParam(includeDiscardedParam);
+    if (includeDiscarded === null && includeDiscardedParam !== undefined) {
+      return c.json({ error: "Invalid include_discarded" }, 400);
     }
 
     const conditions = [
-      eq(runs.project_id, projectId),
-      inArray(runs.prompt_version_id, versionIds),
-      eq(runs.is_discarded, false),
+      ...(includeDiscarded === true ? [] : [eq(runs.is_discarded, false)]),
     ];
+
+    if (filterProjectId !== undefined) {
+      const versionIds = await fetchVersionIdsByProject(db, filterProjectId);
+      if (versionIds.length === 0) {
+        return c.json([]);
+      }
+
+      conditions.push(inArray(runs.prompt_version_id, versionIds));
+    }
 
     if (promptVersionIdParam !== undefined) {
       const promptVersionId = parseIntParam(promptVersionIdParam);
@@ -511,38 +660,92 @@ export function createRunsRouter(db: DB, options: RunsRouterOptions = {}) {
       .from(runs)
       .where(and(...conditions));
 
-    return c.json(result.map(serializeRun));
+    return c.json(
+      result.map((run) =>
+        legacyProjectId !== undefined
+          ? serializeRunWithProjectId(run, legacyProjectId)
+          : serializeRun(run),
+      ),
+    );
   });
 
-  // POST /api/projects/:projectId/runs - 新規Run作成
-  router.post("/", zValidator("json", createRunSchema), async (c) => {
-    const projectId = parseIntParam(c.req.param("projectId"));
+  // POST /api/runs - 新 Runs API
+  // POST /api/projects/:projectId/runs - 旧API互換レイヤ
+  router.post("/", zValidator("json", legacyCreateRunSchema), async (c) => {
+    const legacyProjectId = parseLegacyProjectId(c.req.param("projectId"));
 
-    if (projectId === null) {
+    if (legacyProjectId === null) {
       return c.json({ error: "Invalid projectId" }, 400);
     }
 
     const body = c.req.valid("json");
 
-    // prompt_version_projects でプロジェクトへの紐づきを確認
-    const [versionLink] = await db
-      .select()
-      .from(prompt_version_projects)
-      .where(
-        and(
-          eq(prompt_version_projects.prompt_version_id, body.prompt_version_id),
-          eq(prompt_version_projects.project_id, projectId),
-        ),
-      );
+    if (legacyProjectId !== undefined) {
+      const [versionLink] = await db
+        .select()
+        .from(prompt_version_projects)
+        .where(
+          and(
+            eq(prompt_version_projects.prompt_version_id, body.prompt_version_id),
+            eq(prompt_version_projects.project_id, legacyProjectId),
+          ),
+        );
 
-    if (!versionLink) {
-      return c.json({ error: "Prompt version not found in this project" }, 404);
+      if (!versionLink) {
+        return c.json({ error: "Prompt version not found in this project" }, 404);
+      }
+    }
+
+    const legacySnapshot: Partial<Pick<ExecutionSettings, "model" | "temperature" | "api_provider">> =
+      {};
+    if (body.model !== undefined) legacySnapshot.model = body.model;
+    if (body.temperature !== undefined) legacySnapshot.temperature = body.temperature;
+    if (body.api_provider !== undefined) legacySnapshot.api_provider = body.api_provider;
+
+    const resolvedSettings = await (async () => {
+      if (
+        legacyProjectId !== undefined &&
+        body.execution_profile_id !== undefined &&
+        legacySnapshot.model !== undefined &&
+        legacySnapshot.temperature !== undefined &&
+        legacySnapshot.api_provider !== undefined
+      ) {
+        const profileValidation = await fetchExecutionSettings(db, {
+          executionProfileId: body.execution_profile_id,
+        });
+        if (!profileValidation.ok) {
+          return profileValidation;
+        }
+
+        return {
+          ok: true as const,
+          settings: {
+            model: legacySnapshot.model,
+            temperature: legacySnapshot.temperature,
+            api_provider: legacySnapshot.api_provider,
+            max_tokens: null,
+          },
+          executionProfileId: profileValidation.executionProfileId,
+        };
+      }
+
+      return fetchExecutionSettings(db, {
+        ...(body.execution_profile_id !== undefined
+          ? { executionProfileId: body.execution_profile_id }
+          : {}),
+        ...(legacyProjectId !== undefined ? { legacyProjectId } : {}),
+        ...(Object.keys(legacySnapshot).length > 0 ? { legacySnapshot } : {}),
+      });
+    })();
+
+    if (!resolvedSettings.ok) {
+      return c.json({ error: resolvedSettings.error }, resolvedSettings.status);
     }
 
     const result = await db
       .insert(runs)
       .values({
-        project_id: projectId,
+        project_id: legacyProjectId ?? 0,
         prompt_version_id: body.prompt_version_id,
         test_case_id: body.test_case_id,
         conversation: JSON.stringify(body.conversation),
@@ -551,10 +754,10 @@ export function createRunsRouter(db: DB, options: RunsRouterOptions = {}) {
           body.structured_output === undefined ? null : JSON.stringify(body.structured_output),
         is_best: false,
         is_discarded: false,
-        model: body.model,
-        temperature: body.temperature,
-        api_provider: body.api_provider,
-        execution_profile_id: body.execution_profile_id ?? null,
+        model: resolvedSettings.settings.model,
+        temperature: resolvedSettings.settings.temperature,
+        api_provider: resolvedSettings.settings.api_provider,
+        execution_profile_id: resolvedSettings.executionProfileId,
         created_at: Date.now(),
       })
       .returning();
@@ -564,48 +767,53 @@ export function createRunsRouter(db: DB, options: RunsRouterOptions = {}) {
       return c.json({ error: "Failed to create Run" }, 500);
     }
 
-    return c.json(serializeRun(created), 201);
+    return c.json(
+      legacyProjectId !== undefined
+        ? serializeRunWithProjectId(created, legacyProjectId)
+        : serializeRun(created),
+      201,
+    );
   });
 
-  // POST /api/projects/:projectId/runs/execute - LLMに接続してRunを実行・保存
-  // execution_profile_id が指定された場合はそこから実行設定を取得する
-  router.post("/execute", zValidator("json", executeRunSchema), async (c) => {
-    const projectId = parseIntParam(c.req.param("projectId"));
+  // POST /api/runs/execute - 新 Runs API
+  // POST /api/projects/:projectId/runs/execute - 旧API互換レイヤ
+  router.post("/execute", zValidator("json", legacyExecuteRunSchema), async (c) => {
+    const legacyProjectId = parseLegacyProjectId(c.req.param("projectId"));
 
-    if (projectId === null) {
+    if (legacyProjectId === null) {
       return c.json({ error: "Invalid projectId" }, 400);
     }
 
     const body: ExecuteRunBody = c.req.valid("json");
 
-    // prompt_version_projects 経由でバージョンの所属を確認
-    const [versionLink] = await db
-      .select()
-      .from(prompt_version_projects)
-      .where(
-        and(
-          eq(prompt_version_projects.prompt_version_id, body.prompt_version_id),
-          eq(prompt_version_projects.project_id, projectId),
-        ),
-      );
+    if (legacyProjectId !== undefined) {
+      const [versionLink] = await db
+        .select()
+        .from(prompt_version_projects)
+        .where(
+          and(
+            eq(prompt_version_projects.prompt_version_id, body.prompt_version_id),
+            eq(prompt_version_projects.project_id, legacyProjectId),
+          ),
+        );
 
-    if (!versionLink) {
-      return c.json({ error: "Prompt version not found" }, 404);
-    }
+      if (!versionLink) {
+        return c.json({ error: "Prompt version not found" }, 404);
+      }
 
-    // test_case_projects 経由でテストケースの所属を確認
-    const [testCaseLink] = await db
-      .select()
-      .from(test_case_projects)
-      .where(
-        and(
-          eq(test_case_projects.test_case_id, body.test_case_id),
-          eq(test_case_projects.project_id, projectId),
-        ),
-      );
+      const [testCaseLink] = await db
+        .select()
+        .from(test_case_projects)
+        .where(
+          and(
+            eq(test_case_projects.test_case_id, body.test_case_id),
+            eq(test_case_projects.project_id, legacyProjectId),
+          ),
+        );
 
-    if (!testCaseLink) {
-      return c.json({ error: "Test case not found" }, 404);
+      if (!testCaseLink) {
+        return c.json({ error: "Test case not found" }, 404);
+      }
     }
 
     const [[version], [testCase]] = await Promise.all([
@@ -621,45 +829,19 @@ export function createRunsRouter(db: DB, options: RunsRouterOptions = {}) {
       return c.json({ error: "Test case not found" }, 404);
     }
 
-    // execution_profile_id が指定された場合はそこから設定を取得（snapshotとして保存）
-    // 未指定の場合はプロジェクト設定にフォールバック
-    let settings: ExecutionSettings;
-    let resolvedExecutionProfileId: number | null = null;
+    const resolvedSettings = await fetchExecutionSettings(db, {
+      ...(body.execution_profile_id !== undefined
+        ? { executionProfileId: body.execution_profile_id }
+        : {}),
+      ...(legacyProjectId !== undefined ? { legacyProjectId } : {}),
+    });
 
-    if (body.execution_profile_id !== undefined) {
-      const [profile] = await db
-        .select()
-        .from(execution_profiles)
-        .where(eq(execution_profiles.id, body.execution_profile_id));
-
-      if (!profile) {
-        return c.json({ error: "Execution profile not found" }, 404);
-      }
-
-      settings = {
-        model: profile.model,
-        temperature: profile.temperature,
-        api_provider: profile.api_provider,
-        max_tokens: profile.max_tokens,
-      };
-      resolvedExecutionProfileId = profile.id;
-    } else {
-      const [projectSettings] = await db
-        .select()
-        .from(project_settings)
-        .where(eq(project_settings.project_id, projectId));
-
-      if (!projectSettings) {
-        return c.json({ error: "Project settings not found" }, 404);
-      }
-
-      settings = {
-        model: projectSettings.model,
-        temperature: projectSettings.temperature,
-        api_provider: projectSettings.api_provider,
-        max_tokens: projectSettings.max_tokens,
-      };
+    if (!resolvedSettings.ok) {
+      return c.json({ error: resolvedSettings.error }, resolvedSettings.status);
     }
+
+    const settings = resolvedSettings.settings;
+    const resolvedExecutionProfileId = resolvedSettings.executionProfileId;
 
     const client = llmClientFactory({
       apiProvider: settings.api_provider,
@@ -793,7 +975,7 @@ export function createRunsRouter(db: DB, options: RunsRouterOptions = {}) {
             const [created] = await db
               .insert(runs)
               .values({
-                project_id: projectId,
+                project_id: legacyProjectId ?? 0,
                 prompt_version_id: body.prompt_version_id,
                 test_case_id: body.test_case_id,
                 conversation: JSON.stringify(conversation),
@@ -820,7 +1002,14 @@ export function createRunsRouter(db: DB, options: RunsRouterOptions = {}) {
               return;
             }
 
-            controller.enqueue(encodeSse("run", serializeRun(created)));
+            controller.enqueue(
+              encodeSse(
+                "run",
+                legacyProjectId !== undefined
+                  ? serializeRunWithProjectId(created, legacyProjectId)
+                  : serializeRun(created),
+              ),
+            );
           } catch (error) {
             controller.enqueue(encodeSse("error", normalizeExecuteError(error)));
           } finally {
@@ -838,62 +1027,76 @@ export function createRunsRouter(db: DB, options: RunsRouterOptions = {}) {
     );
   });
 
-  // GET /api/projects/:projectId/runs/:id - 特定Run取得
+  // GET /api/runs/:id - 新 Runs API
+  // GET /api/projects/:projectId/runs/:id - 旧API互換レイヤ
   router.get("/:id", async (c) => {
-    const projectId = parseIntParam(c.req.param("projectId"));
     const id = parseIntParam(c.req.param("id"));
+    const legacyProjectId = parseLegacyProjectId(c.req.param("projectId"));
 
-    if (projectId === null || id === null) {
+    if (legacyProjectId === null || id === null) {
       return c.json({ error: "Invalid ID" }, 400);
     }
 
-    // prompt_version_projects 経由でプロジェクトに紐づくバージョンIDを取得
-    const versionIds = await fetchVersionIdsByProject(db, projectId);
-
-    if (versionIds.length === 0) {
-      return c.json({ error: "Run not found" }, 404);
-    }
-
-    const [run] = await db
-      .select()
-      .from(runs)
-      .where(
-        and(
-          eq(runs.id, id),
-          eq(runs.project_id, projectId),
-          inArray(runs.prompt_version_id, versionIds),
-        ),
-      );
+    const run =
+      legacyProjectId !== undefined
+        ? await (async () => {
+            const versionIds = await fetchVersionIdsByProject(db, legacyProjectId);
+            if (versionIds.length === 0) return null;
+            return (
+              await db
+                .select()
+                .from(runs)
+                .where(
+                  and(
+                    eq(runs.id, id),
+                    eq(runs.project_id, legacyProjectId),
+                    inArray(runs.prompt_version_id, versionIds),
+                  ),
+                )
+            )[0] ?? null;
+          })()
+        : await fetchRunById(db, id);
 
     if (!run) {
       return c.json({ error: "Run not found" }, 404);
     }
 
-    return c.json(serializeRun(run));
+    return c.json(
+      legacyProjectId !== undefined
+        ? serializeRunWithProjectId(run, legacyProjectId)
+        : serializeRun(run),
+    );
   });
 
-  // PATCH /api/projects/:projectId/runs/:id/best - ベスト回答フラグ更新
+  // PATCH /api/runs/:id/best - 新 Runs API
+  // PATCH /api/projects/:projectId/runs/:id/best - 旧API互換レイヤ
   // バージョン×テストケースごとに1件のみ設定できる（既存フラグは自動解除）
   // { unset: true } を渡すと解除のみ行う
   router.patch("/:id/best", async (c) => {
-    const projectId = parseIntParam(c.req.param("projectId"));
     const id = parseIntParam(c.req.param("id"));
+    const legacyProjectId = parseLegacyProjectId(c.req.param("projectId"));
 
-    if (projectId === null || id === null) {
+    if (legacyProjectId === null || id === null) {
       return c.json({ error: "Invalid ID" }, 400);
     }
 
-    // prompt_version_projects 経由でプロジェクトに紐づくバージョンIDを取得
-    const versionIds = await fetchVersionIdsByProject(db, projectId);
+    const versionIds =
+      legacyProjectId !== undefined ? await fetchVersionIdsByProject(db, legacyProjectId) : null;
 
-    if (versionIds.length === 0) {
+    if (legacyProjectId !== undefined && versionIds !== null && versionIds.length === 0) {
       return c.json({ error: "Run not found" }, 404);
     }
 
     const [existing] = await db
       .select()
       .from(runs)
-      .where(and(eq(runs.id, id), inArray(runs.prompt_version_id, versionIds)));
+      .where(
+        and(
+          eq(runs.id, id),
+          ...(legacyProjectId !== undefined ? [eq(runs.project_id, legacyProjectId)] : []),
+          ...(versionIds !== null ? [inArray(runs.prompt_version_id, versionIds)] : []),
+        ),
+      );
 
     if (!existing) {
       return c.json({ error: "Run not found" }, 404);
@@ -906,11 +1109,20 @@ export function createRunsRouter(db: DB, options: RunsRouterOptions = {}) {
       const updateResult = await db
         .update(runs)
         .set({ is_best: false })
-        .where(and(eq(runs.id, id), eq(runs.project_id, projectId)))
+        .where(
+          and(
+            eq(runs.id, id),
+            ...(legacyProjectId !== undefined ? [eq(runs.project_id, legacyProjectId)] : []),
+          ),
+        )
         .returning();
       const updated = updateResult[0];
       if (!updated) return c.json({ error: "Failed to update Run" }, 500);
-      return c.json(serializeRun(updated));
+      return c.json(
+        legacyProjectId !== undefined
+          ? serializeRunWithProjectId(updated, legacyProjectId)
+          : serializeRun(updated),
+      );
     }
 
     // 同一 prompt_version_id × test_case_id の既存フラグを解除
@@ -919,9 +1131,9 @@ export function createRunsRouter(db: DB, options: RunsRouterOptions = {}) {
       .set({ is_best: false })
       .where(
         and(
-          eq(runs.project_id, projectId),
           eq(runs.prompt_version_id, existing.prompt_version_id),
           eq(runs.test_case_id, existing.test_case_id),
+          ...(legacyProjectId !== undefined ? [eq(runs.project_id, legacyProjectId)] : []),
         ),
       );
 
@@ -929,7 +1141,12 @@ export function createRunsRouter(db: DB, options: RunsRouterOptions = {}) {
     const updateResult = await db
       .update(runs)
       .set({ is_best: true })
-      .where(and(eq(runs.id, id), eq(runs.project_id, projectId)))
+      .where(
+        and(
+          eq(runs.id, id),
+          ...(legacyProjectId !== undefined ? [eq(runs.project_id, legacyProjectId)] : []),
+        ),
+      )
       .returning();
 
     const updated = updateResult[0];
@@ -937,251 +1154,269 @@ export function createRunsRouter(db: DB, options: RunsRouterOptions = {}) {
       return c.json({ error: "Failed to update Run" }, 500);
     }
 
-    return c.json(serializeRun(updated));
+    return c.json(
+      legacyProjectId !== undefined
+        ? serializeRunWithProjectId(updated, legacyProjectId)
+        : serializeRun(updated),
+    );
   });
 
   // POST /api/projects/:projectId/runs/:id/candidates/extract - annotation_candidates を抽出して保存
-  router.post("/:id/candidates/extract", async (c) => {
-    const projectId = parseIntParam(c.req.param("projectId"));
-    const id = parseIntParam(c.req.param("id"));
+  if (enableCandidateExtractRoute) {
+    router.post("/:id/candidates/extract", async (c) => {
+      const projectId = parseIntParam(c.req.param("projectId"));
+      const id = parseIntParam(c.req.param("id"));
 
-    if (projectId === null || id === null) {
-      return c.json({ error: "Invalid ID" }, 400);
-    }
-
-    let body: z.infer<typeof extractCandidatesSchema>;
-    try {
-      body = (await c.req.json()) as z.infer<typeof extractCandidatesSchema>;
-    } catch {
-      return c.json({ error: "Invalid JSON body" }, 400);
-    }
-
-    const parsedBody = extractCandidatesSchema.safeParse(body);
-    if (!parsedBody.success) {
-      return c.json({ error: parsedBody.error.issues[0]?.message ?? "Invalid request body" }, 400);
-    }
-    const { annotation_task_id, source_type, source_step_id } = parsedBody.data;
-
-    // run が存在し、該当プロジェクトに属することを確認
-    const versionIds = await fetchVersionIdsByProject(db, projectId);
-    if (versionIds.length === 0) {
-      return c.json({ error: "Run not found" }, 404);
-    }
-
-    const [run] = await db
-      .select()
-      .from(runs)
-      .where(
-        and(
-          eq(runs.id, id),
-          eq(runs.project_id, projectId),
-          inArray(runs.prompt_version_id, versionIds),
-        ),
-      );
-
-    if (!run) {
-      return c.json({ error: "Run not found" }, 404);
-    }
-
-    // annotation_task が存在することを確認
-    const [task] = await db
-      .select()
-      .from(annotation_tasks)
-      .where(eq(annotation_tasks.id, annotation_task_id));
-
-    if (!task) {
-      return c.json({ error: "Annotation task not found" }, 404);
-    }
-
-    // annotation_task に紐づく有効な label keys を取得
-    const labels = await db
-      .select({ key: annotation_labels.key })
-      .from(annotation_labels)
-      .where(eq(annotation_labels.annotation_task_id, annotation_task_id));
-    const validLabelKeys = new Set(labels.map((l) => l.key));
-
-    // ソースタイプ決定とアイテム抽出
-    let sourceType: CandidateSourceType;
-    let resolvedSourceStepId: string | null = null;
-    let items: z.infer<typeof structuredOutputSchema>["items"] | null = null;
-    const requestedSourceType =
-      source_type ?? (run.structured_output !== null ? "structured_json" : "final_answer");
-
-    if (requestedSourceType === "structured_json") {
-      sourceType = "structured_json";
-      const parsedItems = parseItemsFromStructuredOutput(run.structured_output);
-      if (parsedItems === null) {
-        return c.json({ error: "structured_output is not available for this run" }, 400);
-      }
-      items = parsedItems;
-    } else if (requestedSourceType === "final_answer") {
-      sourceType = "final_answer";
-      const conversation = parseConversation(run.conversation);
-      const lastAssistantMessage = [...conversation].reverse().find((m) => m.role === "assistant");
-      if (!lastAssistantMessage) {
-        return c.json({ error: "No assistant message found in conversation" }, 400);
+      if (projectId === null || id === null) {
+        return c.json({ error: "Invalid ID" }, 400);
       }
 
-      let parsedFinalAnswer: unknown;
+      let body: z.infer<typeof extractCandidatesSchema>;
       try {
-        parsedFinalAnswer = extractJsonFromText(lastAssistantMessage.content);
+        body = (await c.req.json()) as z.infer<typeof extractCandidatesSchema>;
       } catch {
-        const fallbackItems = parseItemsFromStructuredOutput(run.structured_output);
-        if (fallbackItems !== null) {
-          sourceType = "structured_json";
-          items = fallbackItems;
-        } else {
-          return c.json({ error: "Failed to parse assistant message as JSON" }, 400);
-        }
+        return c.json({ error: "Invalid JSON body" }, 400);
       }
-      if (items === null) {
-        const parsedItems = parseStructuredItems(parsedFinalAnswer);
+
+      const parsedBody = extractCandidatesSchema.safeParse(body);
+      if (!parsedBody.success) {
+        return c.json(
+          { error: parsedBody.error.issues[0]?.message ?? "Invalid request body" },
+          400,
+        );
+      }
+      const { annotation_task_id, source_type, source_step_id } = parsedBody.data;
+
+      // run が存在し、該当プロジェクトに属することを確認
+      const versionIds = await fetchVersionIdsByProject(db, projectId);
+      if (versionIds.length === 0) {
+        return c.json({ error: "Run not found" }, 404);
+      }
+
+      const [run] = await db
+        .select()
+        .from(runs)
+        .where(
+          and(
+            eq(runs.id, id),
+            eq(runs.project_id, projectId),
+            inArray(runs.prompt_version_id, versionIds),
+          ),
+        );
+
+      if (!run) {
+        return c.json({ error: "Run not found" }, 404);
+      }
+
+      // annotation_task が存在することを確認
+      const [task] = await db
+        .select()
+        .from(annotation_tasks)
+        .where(eq(annotation_tasks.id, annotation_task_id));
+
+      if (!task) {
+        return c.json({ error: "Annotation task not found" }, 404);
+      }
+
+      // annotation_task に紐づく有効な label keys を取得
+      const labels = await db
+        .select({ key: annotation_labels.key })
+        .from(annotation_labels)
+        .where(eq(annotation_labels.annotation_task_id, annotation_task_id));
+      const validLabelKeys = new Set(labels.map((l) => l.key));
+
+      // ソースタイプ決定とアイテム抽出
+      let sourceType: CandidateSourceType;
+      let resolvedSourceStepId: string | null = null;
+      let items: z.infer<typeof structuredOutputSchema>["items"] | null = null;
+      const requestedSourceType =
+        source_type ?? (run.structured_output !== null ? "structured_json" : "final_answer");
+
+      if (requestedSourceType === "structured_json") {
+        sourceType = "structured_json";
+        const parsedItems = parseItemsFromStructuredOutput(run.structured_output);
         if (parsedItems === null) {
+          return c.json({ error: "structured_output is not available for this run" }, 400);
+        }
+        items = parsedItems;
+      } else if (requestedSourceType === "final_answer") {
+        sourceType = "final_answer";
+        const conversation = parseConversation(run.conversation);
+        const lastAssistantMessage = [...conversation]
+          .reverse()
+          .find((m) => m.role === "assistant");
+        if (!lastAssistantMessage) {
+          return c.json({ error: "No assistant message found in conversation" }, 400);
+        }
+
+        let parsedFinalAnswer: unknown;
+        try {
+          parsedFinalAnswer = extractJsonFromText(lastAssistantMessage.content);
+        } catch {
           const fallbackItems = parseItemsFromStructuredOutput(run.structured_output);
           if (fallbackItems !== null) {
             sourceType = "structured_json";
             items = fallbackItems;
           } else {
-            return c.json(
-              {
-                error:
-                  "Assistant message JSON has invalid format (missing items field or invalid schema)",
-              },
-              400,
-            );
+            return c.json({ error: "Failed to parse assistant message as JSON" }, 400);
           }
-        } else {
-          items = parsedItems;
+        }
+        if (items === null) {
+          const parsedItems = parseStructuredItems(parsedFinalAnswer);
+          if (parsedItems === null) {
+            const fallbackItems = parseItemsFromStructuredOutput(run.structured_output);
+            if (fallbackItems !== null) {
+              sourceType = "structured_json";
+              items = fallbackItems;
+            } else {
+              return c.json(
+                {
+                  error:
+                    "Assistant message JSON has invalid format (missing items field or invalid schema)",
+                },
+                400,
+              );
+            }
+          } else {
+            items = parsedItems;
+          }
+        }
+      } else {
+        sourceType = "trace_step";
+        resolvedSourceStepId = source_step_id ?? null;
+
+        const executionTrace = parseExecutionTrace(run.execution_trace);
+        if (executionTrace === null) {
+          return c.json({ error: "execution_trace is not available for this run" }, 400);
+        }
+
+        const traceStep = executionTrace.find((step) => step.id === source_step_id);
+        if (!traceStep) {
+          return c.json({ error: `Trace step "${source_step_id}" not found` }, 400);
+        }
+
+        let parsedTraceStepOutput: unknown;
+        try {
+          parsedTraceStepOutput = JSON.parse(traceStep.output);
+        } catch {
+          return c.json({ error: "Failed to parse trace_step output as JSON" }, 400);
+        }
+
+        const parsedItems = parseStructuredItems(parsedTraceStepOutput);
+        if (parsedItems === null) {
+          return c.json({ error: "trace_step output has invalid format" }, 400);
+        }
+        items = parsedItems;
+      }
+
+      if (items === null) {
+        return c.json({ error: "Failed to resolve annotation candidate items" }, 500);
+      }
+
+      // label の存在チェック
+      for (const item of items) {
+        if (!validLabelKeys.has(item.label)) {
+          return c.json(
+            { error: `Label "${item.label}" is not valid for this annotation task` },
+            400,
+          );
         }
       }
-    } else {
-      sourceType = "trace_step";
-      resolvedSourceStepId = source_step_id ?? null;
 
-      const executionTrace = parseExecutionTrace(run.execution_trace);
-      if (executionTrace === null) {
-        return c.json({ error: "execution_trace is not available for this run" }, 400);
+      // line range チェック
+      for (const item of items) {
+        if (item.start_line > item.end_line) {
+          return c.json(
+            {
+              error: `start_line (${item.start_line}) must not be greater than end_line (${item.end_line})`,
+            },
+            400,
+          );
+        }
       }
 
-      const traceStep = executionTrace.find((step) => step.id === source_step_id);
-      if (!traceStep) {
-        return c.json({ error: `Trace step "${source_step_id}" not found` }, 400);
-      }
+      // 重複チェック: 同一 run / task / source からの重複取り込みを防ぐ
+      const [existing] = await db
+        .select({ id: annotation_candidates.id })
+        .from(annotation_candidates)
+        .where(
+          and(
+            eq(annotation_candidates.run_id, id),
+            eq(annotation_candidates.annotation_task_id, annotation_task_id),
+            eq(annotation_candidates.source_type, sourceType),
+          ),
+        );
 
-      let parsedTraceStepOutput: unknown;
-      try {
-        parsedTraceStepOutput = JSON.parse(traceStep.output);
-      } catch {
-        return c.json({ error: "Failed to parse trace_step output as JSON" }, 400);
-      }
-
-      const parsedItems = parseStructuredItems(parsedTraceStepOutput);
-      if (parsedItems === null) {
-        return c.json({ error: "trace_step output has invalid format" }, 400);
-      }
-      items = parsedItems;
-    }
-
-    if (items === null) {
-      return c.json({ error: "Failed to resolve annotation candidate items" }, 500);
-    }
-
-    // label の存在チェック
-    for (const item of items) {
-      if (!validLabelKeys.has(item.label)) {
+      if (existing) {
         return c.json(
-          { error: `Label "${item.label}" is not valid for this annotation task` },
-          400,
+          { error: "Candidates already extracted for this run/task/source combination" },
+          409,
         );
       }
-    }
 
-    // line range チェック
-    for (const item of items) {
-      if (item.start_line > item.end_line) {
-        return c.json(
-          {
-            error: `start_line (${item.start_line}) must not be greater than end_line (${item.end_line})`,
-          },
-          400,
-        );
-      }
-    }
+      const targetTextRef = `test_case:${run.test_case_id}`;
+      const now = Date.now();
 
-    // 重複チェック: 同一 run / task / source からの重複取り込みを防ぐ
-    const [existing] = await db
-      .select({ id: annotation_candidates.id })
-      .from(annotation_candidates)
-      .where(
-        and(
-          eq(annotation_candidates.run_id, id),
-          eq(annotation_candidates.annotation_task_id, annotation_task_id),
-          eq(annotation_candidates.source_type, sourceType),
-        ),
-      );
+      const inserted = await db
+        .insert(annotation_candidates)
+        .values(
+          items.map((item) => ({
+            run_id: id,
+            annotation_task_id,
+            target_text_ref: targetTextRef,
+            source_type: sourceType,
+            source_step_id: resolvedSourceStepId,
+            label: item.label,
+            start_line: item.start_line,
+            end_line: item.end_line,
+            quote: item.quote,
+            rationale: item.rationale ?? null,
+            status: "pending" as const,
+            note: null,
+            created_at: now,
+            updated_at: now,
+          })),
+        )
+        .returning();
 
-    if (existing) {
       return c.json(
-        { error: "Candidates already extracted for this run/task/source combination" },
-        409,
-      );
-    }
-
-    const targetTextRef = `test_case:${run.test_case_id}`;
-    const now = Date.now();
-
-    const inserted = await db
-      .insert(annotation_candidates)
-      .values(
-        items.map((item) => ({
+        {
+          candidates_created: inserted.length,
           run_id: id,
           annotation_task_id,
-          target_text_ref: targetTextRef,
-          source_type: sourceType,
-          source_step_id: resolvedSourceStepId,
-          label: item.label,
-          start_line: item.start_line,
-          end_line: item.end_line,
-          quote: item.quote,
-          rationale: item.rationale ?? null,
-          status: "pending" as const,
-          note: null,
-          created_at: now,
-          updated_at: now,
-        })),
-      )
-      .returning();
+        },
+        201,
+      );
+    });
+  }
 
-    return c.json(
-      {
-        candidates_created: inserted.length,
-        run_id: id,
-        annotation_task_id,
-      },
-      201,
-    );
-  });
-
-  // PATCH /api/projects/:projectId/runs/:id/discard - Run破棄
+  // PATCH /api/runs/:id/discard - 新 Runs API
+  // PATCH /api/projects/:projectId/runs/:id/discard - 旧API互換レイヤ
   router.patch("/:id/discard", async (c) => {
-    const projectId = parseIntParam(c.req.param("projectId"));
     const id = parseIntParam(c.req.param("id"));
+    const legacyProjectId = parseLegacyProjectId(c.req.param("projectId"));
 
-    if (projectId === null || id === null) {
+    if (legacyProjectId === null || id === null) {
       return c.json({ error: "Invalid ID" }, 400);
     }
 
-    // prompt_version_projects 経由でプロジェクトに紐づくバージョンIDを取得
-    const versionIds = await fetchVersionIdsByProject(db, projectId);
+    const versionIds =
+      legacyProjectId !== undefined ? await fetchVersionIdsByProject(db, legacyProjectId) : null;
 
-    if (versionIds.length === 0) {
+    if (legacyProjectId !== undefined && versionIds !== null && versionIds.length === 0) {
       return c.json({ error: "Run not found" }, 404);
     }
 
     const [existing] = await db
       .select()
       .from(runs)
-      .where(and(eq(runs.id, id), inArray(runs.prompt_version_id, versionIds)));
+      .where(
+        and(
+          eq(runs.id, id),
+          ...(legacyProjectId !== undefined ? [eq(runs.project_id, legacyProjectId)] : []),
+          ...(versionIds !== null ? [inArray(runs.prompt_version_id, versionIds)] : []),
+        ),
+      );
 
     if (!existing) {
       return c.json({ error: "Run not found" }, 404);
@@ -1190,7 +1425,12 @@ export function createRunsRouter(db: DB, options: RunsRouterOptions = {}) {
     const updateResult = await db
       .update(runs)
       .set({ is_discarded: true })
-      .where(and(eq(runs.id, id), eq(runs.project_id, projectId)))
+      .where(
+        and(
+          eq(runs.id, id),
+          ...(legacyProjectId !== undefined ? [eq(runs.project_id, legacyProjectId)] : []),
+        ),
+      )
       .returning();
 
     const updated = updateResult[0];
@@ -1198,7 +1438,11 @@ export function createRunsRouter(db: DB, options: RunsRouterOptions = {}) {
       return c.json({ error: "Failed to update Run" }, 500);
     }
 
-    return c.json(serializeRun(updated));
+    return c.json(
+      legacyProjectId !== undefined
+        ? serializeRunWithProjectId(updated, legacyProjectId)
+        : serializeRun(updated),
+    );
   });
 
   return router;
