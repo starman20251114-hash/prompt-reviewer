@@ -1,7 +1,12 @@
-/* ==================== Page layout ==================== */
+.root {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
 .pageHeader {
   composes: pageHeader from '../styles/shared.module.css';
-  margin-bottom: 8px;
+  margin-bottom: 0;
 }
 
 .pageTitle {
@@ -10,7 +15,46 @@
 
 .pageDescription {
   color: var(--c-subtext);
-  margin: 0 0 24px;
+  margin: 6px 0 0;
+  max-width: 720px;
+  line-height: 1.6;
+}
+
+.filterBar {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 16px;
+  border: 1px solid var(--c-border);
+  border-radius: 14px;
+  background: color-mix(in srgb, var(--c-card) 82%, transparent);
+}
+
+.searchRow {
+  display: flex;
+  gap: 10px;
+}
+
+.filterTags {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.filterTag {
+  padding: 7px 12px;
+  border-radius: 999px;
+  border: 1px solid var(--c-border);
+  background: transparent;
+  color: var(--c-subtext);
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.filterTagActive {
+  background: var(--c-accent);
+  color: var(--c-overlay);
+  border-color: transparent;
 }
 
 .statusText {
@@ -48,7 +92,6 @@
   gap: 12px;
 }
 
-/* ==================== Shared buttons ==================== */
 .btnPrimary {
   composes: btnPrimary from '../styles/shared.module.css';
   padding: 8px 18px;
@@ -57,7 +100,7 @@
 
 .btnSecondary {
   composes: btnSecondary from '../styles/shared.module.css';
-  padding: 8px 20px;
+  padding: 8px 18px;
   font-size: 14px;
 }
 
@@ -76,11 +119,10 @@
   composes: btnDisabled from '../styles/shared.module.css';
 }
 
-/* ==================== Modal ==================== */
 .modalOverlay {
   position: fixed;
   inset: 0;
-  background: rgba(0, 0, 0, 0.6);
+  background: rgb(0 0 0 / 0.6);
   display: flex;
   align-items: flex-start;
   justify-content: center;
@@ -95,25 +137,24 @@
 
 .modalContent {
   composes: modalContent from '../styles/shared.module.css';
-  width: 600px;
+  width: min(760px, calc(100vw - 32px));
 }
 
 .modalContentSm {
   composes: modalContent from '../styles/shared.module.css';
-  width: 420px;
+  width: min(420px, calc(100vw - 32px));
 }
 
 .modalTitle {
   composes: modalTitle from '../styles/shared.module.css';
 }
 
-/* ==================== Form ==================== */
 .formActions {
   composes: formActions from '../styles/shared.module.css';
 }
 
 .fieldGroup {
-  margin-bottom: 16px;
+  margin-bottom: 18px;
 }
 
 .fieldGroupLg {
@@ -148,16 +189,12 @@
   resize: vertical;
   box-sizing: border-box;
   font-family: monospace;
-}
-
-.contextImportRow {
-  margin-bottom: 10px;
+  margin-top: 10px;
 }
 
 .contextImportControls {
   display: flex;
   gap: 8px;
-  margin-bottom: 6px;
 }
 
 .contextFileSelect {
@@ -175,62 +212,92 @@
 }
 
 .contextImportNotice {
-  margin: 6px 0 0;
+  margin: 8px 0 0;
   font-size: 12px;
   color: var(--c-accent);
 }
 
 .contextImportError {
-  margin: 6px 0 0;
+  margin: 8px 0 0;
   font-size: 12px;
   color: var(--c-danger);
 }
 
-/* ==================== Input mode toggle ==================== */
-.modeLabel {
-  font-size: 14px;
-  color: var(--c-subtext);
-  margin: 0 0 8px;
+.modeHint {
+  margin: 8px 0 0;
+  font-size: 12px;
+  color: var(--c-muted);
+  line-height: 1.5;
 }
 
-.modeToggle {
+.tagGroup {
   display: flex;
-  border-radius: 8px;
-  overflow: hidden;
-  border: 1px solid var(--c-border);
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-top: 10px;
 }
 
-.btnModeBase {
-  flex: 1;
-  padding: 7px 0;
-  border: none;
+.tagButton {
+  padding: 7px 12px;
+  border-radius: 999px;
+  border: 1px solid var(--c-border);
+  background: var(--c-bg);
+  color: var(--c-subtext);
   font-size: 13px;
   cursor: pointer;
 }
 
-.btnModeRight {
-  border-left: 1px solid var(--c-border);
+.tagButtonActive {
+  background: color-mix(in srgb, var(--c-accent) 22%, var(--c-card));
+  color: var(--c-text);
+  border-color: color-mix(in srgb, var(--c-accent) 55%, var(--c-border));
 }
 
-.btnModeActive {
-  background: var(--c-accent);
-  color: var(--c-overlay);
-  font-weight: 600;
+.assetSection {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 14px;
+  border: 1px solid var(--c-border);
+  border-radius: 12px;
+  background: color-mix(in srgb, var(--c-bg) 55%, transparent);
 }
 
-.btnModeInactive {
+.selectedAssets,
+.availableAssets {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.selectedAssetsLabel {
+  margin: 0;
+  font-size: 12px;
+  color: var(--c-subtext);
+}
+
+.assetTagList {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.assetTag {
+  padding: 6px 10px;
+  border-radius: 999px;
+  border: 1px solid var(--c-border);
   background: transparent;
   color: var(--c-subtext);
-  font-weight: 400;
-}
-
-.modeHint {
-  margin: 6px 0 0;
   font-size: 12px;
-  color: var(--c-muted);
+  cursor: pointer;
 }
 
-/* ==================== Turn editor ==================== */
+.assetTagSelected {
+  background: color-mix(in srgb, var(--c-green) 20%, var(--c-card));
+  color: var(--c-text);
+  border-color: color-mix(in srgb, var(--c-green) 55%, var(--c-border));
+}
+
 .turnItem {
   margin-bottom: 12px;
   padding: 12px;
@@ -324,15 +391,14 @@
   margin-top: 4px;
 }
 
-/* ==================== Test case card ==================== */
 .card {
   background: var(--c-card);
   border: 1px solid var(--c-border);
-  border-radius: 12px;
-  padding: 16px 20px;
+  border-radius: 14px;
+  padding: 18px 20px;
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: 12px;
 }
 
 .cardHeader {
@@ -344,10 +410,9 @@
 
 .cardTitle {
   margin: 0;
-  font-size: 15px;
+  font-size: 16px;
   font-weight: 600;
   color: var(--c-text);
-  word-break: break-word;
   line-height: 1.4;
 }
 
@@ -381,6 +446,7 @@
   display: flex;
   gap: 8px;
   flex-wrap: wrap;
+  margin-top: 10px;
 }
 
 .badge {
@@ -403,18 +469,50 @@
   color: var(--c-green);
 }
 
+.badgeLinkedAsset {
+  color: var(--c-green);
+}
+
 .badgeExpected {
   color: var(--c-yellow);
+}
+
+.metaGroup {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.metaLabel {
+  font-size: 12px;
+  color: var(--c-subtext);
+}
+
+.projectPill,
+.assetPill {
+  padding: 5px 10px;
+  border-radius: 999px;
+  font-size: 12px;
+}
+
+.projectPill {
+  background: color-mix(in srgb, var(--c-accent) 18%, var(--c-card));
+  color: var(--c-text);
+}
+
+.assetPill {
+  background: color-mix(in srgb, var(--c-green) 18%, var(--c-card));
+  color: var(--c-text);
 }
 
 .preview {
   margin: 0;
   font-size: 13px;
   color: var(--c-muted);
-  line-height: 1.5;
+  line-height: 1.6;
   overflow: hidden;
   display: -webkit-box;
-  -webkit-line-clamp: 2;
+  -webkit-line-clamp: 3;
   -webkit-box-orient: vertical;
 }
 
@@ -422,7 +520,6 @@
   font-family: monospace;
 }
 
-/* ==================== Delete dialog ==================== */
 .deleteDescription {
   margin: 0 0 8px;
   color: var(--c-subtext);
@@ -443,4 +540,21 @@
   margin: 0 0 24px;
   color: var(--c-danger);
   font-size: 13px;
+}
+
+@media (max-width: 720px) {
+  .searchRow,
+  .contextImportControls,
+  .cardHeader {
+    flex-direction: column;
+  }
+
+  .cardActions {
+    width: 100%;
+  }
+
+  .btnCardEdit,
+  .btnCardDelete {
+    flex: 1;
+  }
 }

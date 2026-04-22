@@ -37,6 +37,7 @@ export function App() {
             {/* プロジェクト詳細 */}
             <Route path="projects/:id" element={<ProjectDetailPage />} />
             <Route path="projects/:id/context-files" element={<ContextFilesPage />} />
+            <Route path="test-cases" element={<TestCasesPage />} />
             <Route path="projects/:id/test-cases" element={<TestCasesPage />} />
             <Route path="prompts" element={<PromptsPage />} />
             <Route path="projects/:id/prompts" element={<PromptsPage />} />

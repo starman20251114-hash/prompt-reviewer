@@ -27,7 +27,7 @@ function ProjectSubNav({ projectId }: { projectId: string }) {
   const subNavItems = [
     { to: `/projects/${projectId}`, label: "ホーム", end: true },
     { to: `/projects/${projectId}/context-files`, label: "コンテキスト" },
-    { to: `/projects/${projectId}/test-cases`, label: "テストケース" },
+    { to: `/test-cases?project_id=${projectId}`, label: "テストケース" },
     { to: `/projects/${projectId}/prompts`, label: "プロンプト" },
     { to: `/projects/${projectId}/runs`, label: "Run" },
     { to: `/projects/${projectId}/score`, label: "採点" },
@@ -81,6 +81,7 @@ function SidebarNav() {
 
   const topNavItems = [
     { to: "/", label: "プロジェクト一覧", end: true },
+    { to: "/test-cases", label: "テストケース", end: false },
     { to: "/prompts", label: "プロンプト", end: false },
     { to: "/context-assets", label: "コンテキスト素材", end: false },
     { to: "/execution-profiles", label: "実行設定", end: false },
