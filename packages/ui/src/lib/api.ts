@@ -534,7 +534,7 @@ export type StructuredOutput = {
 
 export type Run = {
   id: number;
-  project_id: number;
+  project_id: number | null;
   prompt_version_id: number;
   test_case_id: number;
   conversation: ConversationMessage[];
@@ -545,7 +545,15 @@ export type Run = {
   model: string;
   temperature: number;
   api_provider: string;
+  execution_profile_id: number | null;
   created_at: number;
+};
+
+export type RunFilters = {
+  prompt_version_id?: number;
+  test_case_id?: number;
+  project_id?: number;
+  include_discarded?: boolean;
 };
 
 export function getRuns(
@@ -745,6 +753,142 @@ export function setBestRun(projectId: number, id: number, unset = false): Promis
 
 export function discardRun(projectId: number, id: number): Promise<Run> {
   return api.patch<Run>(`/projects/${projectId}/runs/${id}/discard`, {});
+}
+
+export function getRunsIndependent(filters?: RunFilters): Promise<Run[]> {
+  const params = new URLSearchParams();
+  if (filters?.prompt_version_id !== undefined) {
+    params.set("prompt_version_id", String(filters.prompt_version_id));
+  }
+  if (filters?.test_case_id !== undefined) {
+    params.set("test_case_id", String(filters.test_case_id));
+  }
+  if (filters?.project_id !== undefined) {
+    params.set("project_id", String(filters.project_id));
+  }
+  if (filters?.include_discarded !== undefined) {
+    params.set("include_discarded", String(filters.include_discarded));
+  }
+  const query = params.toString();
+  return api.get<Run[]>(query ? `/runs?${query}` : "/runs");
+}
+
+export function createRunIndependent(data: {
+  prompt_version_id: number;
+  test_case_id: number;
+  conversation: ConversationMessage[];
+  execution_trace?: ExecutionTraceStep[];
+  structured_output?: StructuredOutput | null;
+  execution_profile_id: number;
+}): Promise<Run> {
+  return api.post<Run>("/runs", data);
+}
+
+type ExecuteRunStreamIndependentOptions = {
+  prompt_version_id: number;
+  test_case_id: number;
+  api_key: string;
+  execution_profile_id: number;
+  structured_output?: StructuredOutput | null;
+  onDelta: (text: string) => void;
+  onStepStart?: (step: Omit<ExecutionTraceStep, "output">) => void;
+  onStepDelta?: (input: { id: string; title: string; text: string }) => void;
+  onStepComplete?: (step: ExecutionTraceStep) => void;
+};
+
+export async function executeRunStreamIndependent(
+  options: ExecuteRunStreamIndependentOptions,
+): Promise<Run> {
+  const response = await fetch(`${API_BASE_URL}/runs/execute`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      prompt_version_id: options.prompt_version_id,
+      test_case_id: options.test_case_id,
+      api_key: options.api_key,
+      execution_profile_id: options.execution_profile_id,
+      structured_output: options.structured_output,
+    }),
+  });
+
+  if (!response.ok) {
+    let message = `API error: ${response.status} ${response.statusText}`;
+    try {
+      const body = (await response.json()) as { error?: string };
+      if (body.error) {
+        message = body.error;
+      }
+    } catch {
+      // ignore
+    }
+    throw new ApiError(response.status, message);
+  }
+
+  if (!response.body) {
+    throw new ApiError(502, "API error: empty streaming response");
+  }
+
+  const reader = response.body.getReader();
+  const decoder = new TextDecoder();
+  let buffer = "";
+  let savedRun: Run | null = null;
+
+  while (true) {
+    const { value, done } = await reader.read();
+    if (value) {
+      buffer += decoder.decode(value, { stream: !done });
+    }
+
+    const chunks = buffer.split("\n\n");
+    buffer = chunks.pop() ?? "";
+
+    for (const chunk of chunks) {
+      const parsed = parseSseEvent(chunk.trim());
+      if (!parsed) continue;
+
+      if (parsed.event === "delta") {
+        options.onDelta(parsed.data.text);
+      }
+      if (parsed.event === "step-start") {
+        options.onStepStart?.(parsed.data);
+      }
+      if (parsed.event === "step-delta") {
+        options.onStepDelta?.(parsed.data);
+      }
+      if (parsed.event === "step-complete") {
+        options.onStepComplete?.(parsed.data);
+      }
+      if (parsed.event === "run") {
+        savedRun = parsed.data;
+      }
+      if (parsed.event === "error") {
+        throw new ApiError(
+          parsed.data.status ?? 502,
+          parsed.data.message ?? "Run execution failed",
+        );
+      }
+    }
+
+    if (done) {
+      break;
+    }
+  }
+
+  if (!savedRun) {
+    throw new ApiError(502, "API error: run was not returned");
+  }
+
+  return savedRun;
+}
+
+export function setBestRunIndependent(id: number, unset = false): Promise<Run> {
+  return api.patch<Run>(`/runs/${id}/best`, { unset });
+}
+
+export function discardRunIndependent(id: number): Promise<Run> {
+  return api.patch<Run>(`/runs/${id}/discard`, {});
 }
 
 export function setSelectedVersion(projectId: number, id: number): Promise<PromptVersion> {
@@ -1133,4 +1277,21 @@ export type ScoreProgressionResponse = {
 
 export function getScoreProgression(projectId: number): Promise<ScoreProgressionResponse> {
   return api.get<ScoreProgressionResponse>(`/projects/${projectId}/score-progression`);
+}
+
+export type ScoreProgressionFilters = {
+  project_id?: number;
+};
+
+export function getScoreProgressionIndependent(
+  filters?: ScoreProgressionFilters,
+): Promise<ScoreProgressionResponse> {
+  const params = new URLSearchParams();
+  if (filters?.project_id !== undefined) {
+    params.set("project_id", String(filters.project_id));
+  }
+  const query = params.toString();
+  return api.get<ScoreProgressionResponse>(
+    query ? `/score-progression?${query}` : "/score-progression",
+  );
 }

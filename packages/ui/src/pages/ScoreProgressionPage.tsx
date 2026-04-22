@@ -12,7 +12,7 @@ import {
   YAxis,
 } from "recharts";
 import { ScoreSectionTabs } from "../components/ScoreSectionTabs";
-import { type VersionSummary, getProject, getScoreProgression } from "../lib/api";
+import { type VersionSummary, getProject, getScoreProgressionIndependent } from "../lib/api";
 import styles from "./ScoreProgressionPage.module.css";
 
 type ScoreType = "human" | "judge";
@@ -247,14 +247,14 @@ function TestCaseBreakdownTable({
 
 // --------------- ScoreProgressionPage ---------------
 export function ScoreProgressionPage() {
-  const { id } = useParams<{ id: string }>();
-  const projectId = Number(id);
+  const { id } = useParams<{ id?: string }>();
+  const projectId = id !== undefined ? Number(id) : null;
   const [scoreType, setScoreType] = useState<ScoreType>("human");
 
   const { data: project } = useQuery({
     queryKey: ["project", projectId],
-    queryFn: () => getProject(projectId),
-    enabled: !Number.isNaN(projectId),
+    queryFn: () => getProject(projectId as number),
+    enabled: projectId !== null && !Number.isNaN(projectId),
   });
 
   const {
@@ -262,9 +262,9 @@ export function ScoreProgressionPage() {
     isLoading,
     isError,
   } = useQuery({
-    queryKey: ["score-progression", projectId],
-    queryFn: () => getScoreProgression(projectId),
-    enabled: !Number.isNaN(projectId),
+    queryKey: ["score-progression-independent", projectId],
+    queryFn: () =>
+      getScoreProgressionIndependent(projectId !== null ? { project_id: projectId } : undefined),
     staleTime: 1000 * 30,
   });
 

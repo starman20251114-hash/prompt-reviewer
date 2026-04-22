@@ -41,8 +41,11 @@ export function App() {
             <Route path="projects/:id/test-cases" element={<TestCasesPage />} />
             <Route path="prompts" element={<PromptsPage />} />
             <Route path="projects/:id/prompts" element={<PromptsPage />} />
+            <Route path="runs" element={<RunsPage />} />
             <Route path="projects/:id/runs" element={<RunsPage />} />
+            <Route path="score" element={<ScorePage />} />
             <Route path="projects/:id/score" element={<ScorePage />} />
+            <Route path="score-progression" element={<ScoreProgressionPage />} />
             <Route path="projects/:id/score-progression" element={<ScoreProgressionPage />} />
             <Route path="projects/:id/annotation-tasks" element={<AnnotationTaskSettingsPage />} />
             <Route path="projects/:id/annotation-review" element={<AnnotationReviewPage />} />
