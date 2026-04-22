@@ -36,6 +36,9 @@ const updateContextAssetProjectsSchema = z.object({
 
 type ContextAssetRecord = typeof context_assets.$inferSelect;
 type ContextAssetSummary = Omit<ContextAssetRecord, "content">;
+type ContextAssetDetail = ContextAssetRecord & {
+  project_ids: number[];
+};
 
 function parseIdParam(value: string): number | null {
   const parsed = Number(value);
@@ -117,6 +120,24 @@ function serializeContextAssetSummary(asset: ContextAssetRecord): ContextAssetSu
   return summary;
 }
 
+async function getProjectIdsByAssetId(db: DB, assetId: number): Promise<number[]> {
+  const links = await db
+    .select({ project_id: context_asset_projects.project_id })
+    .from(context_asset_projects)
+    .where(eq(context_asset_projects.context_asset_id, assetId));
+  return links.map((link) => link.project_id).sort((a, b) => a - b);
+}
+
+async function serializeContextAssetDetail(
+  db: DB,
+  asset: ContextAssetRecord,
+): Promise<ContextAssetDetail> {
+  return {
+    ...asset,
+    project_ids: await getProjectIdsByAssetId(db, asset.id),
+  };
+}
+
 export function createContextAssetsRouter(db: DB) {
   const router = new Hono();
 
@@ -195,7 +216,7 @@ export function createContextAssetsRouter(db: DB) {
       return c.json({ error: "Failed to create ContextAsset" }, 500);
     }
 
-    return c.json(created, 201);
+    return c.json(await serializeContextAssetDetail(db, created), 201);
   });
 
   router.get("/:id", async (c) => {
@@ -209,7 +230,7 @@ export function createContextAssetsRouter(db: DB) {
       return c.json({ error: "ContextAsset not found" }, 404);
     }
 
-    return c.json(asset);
+    return c.json(await serializeContextAssetDetail(db, asset));
   });
 
   router.patch("/:id", zValidator("json", updateContextAssetSchema), async (c) => {
@@ -254,7 +275,7 @@ export function createContextAssetsRouter(db: DB) {
       return c.json({ error: "Failed to update ContextAsset" }, 500);
     }
 
-    return c.json(updated);
+    return c.json(await serializeContextAssetDetail(db, updated));
   });
 
   router.delete("/:id", async (c) => {
@@ -311,7 +332,7 @@ export function createContextAssetsRouter(db: DB) {
       });
     }
 
-    return c.json(existing);
+    return c.json(await serializeContextAssetDetail(db, existing));
   });
 
   return router;

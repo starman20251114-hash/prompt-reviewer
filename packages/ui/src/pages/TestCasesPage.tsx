@@ -6,8 +6,8 @@ import {
   type Turn,
   createTestCase,
   deleteTestCase,
-  getContextFile,
-  getContextFiles,
+  getContextAsset,
+  getContextAssets,
   getTestCases,
   updateTestCase,
 } from "../lib/api";
@@ -162,34 +162,33 @@ type TestCaseModalProps = {
 
 function TestCaseModal({ projectId, testCase, onClose, onSubmit, isLoading }: TestCaseModalProps) {
   const [formData, setFormData] = useState<TestCaseFormData>(() => getInitialFormData(testCase));
-  const [selectedContextFilePath, setSelectedContextFilePath] = useState("");
+  const [selectedContextAssetId, setSelectedContextAssetId] = useState<number | null>(null);
   const [importNotice, setImportNotice] = useState<string | null>(null);
   const isEdit = !!testCase;
 
-  const contextFilesQuery = useQuery({
-    queryKey: ["context-files", projectId],
-    queryFn: () => getContextFiles(projectId),
+  const contextAssetsQuery = useQuery({
+    queryKey: ["context-assets", { project_id: projectId }],
+    queryFn: () => getContextAssets({ project_id: projectId }),
     enabled: !Number.isNaN(projectId),
   });
 
   useEffect(() => {
-    const files = contextFilesQuery.data ?? [];
-    if (files.length === 0) {
-      setSelectedContextFilePath("");
+    const assets = contextAssetsQuery.data ?? [];
+    if (assets.length === 0) {
+      setSelectedContextAssetId(null);
       return;
     }
-
-    if (!selectedContextFilePath || !files.some((file) => file.path === selectedContextFilePath)) {
-      setSelectedContextFilePath(files[0]?.path ?? "");
+    if (!selectedContextAssetId || !assets.some((a) => a.id === selectedContextAssetId)) {
+      setSelectedContextAssetId(assets[0]?.id ?? null);
     }
-  }, [contextFilesQuery.data, selectedContextFilePath]);
+  }, [contextAssetsQuery.data, selectedContextAssetId]);
 
   const importContextMutation = useMutation({
-    mutationFn: (filePath: string) => getContextFile(projectId, filePath),
-    onSuccess: (file) => {
-      setFormData((prev) => ({ ...prev, context_content: file.content }));
+    mutationFn: (assetId: number) => getContextAsset(assetId),
+    onSuccess: (asset) => {
+      setFormData((prev) => ({ ...prev, context_content: asset.content }));
       setImportNotice(
-        `${file.path} の内容を取り込みました。保存するとこのスナップショットがテストケースに保存されます。`,
+        `${asset.name} の内容を取り込みました。保存するとこのスナップショットがテストケースに保存されます。`,
       );
     },
   });
@@ -247,22 +246,22 @@ function TestCaseModal({ projectId, testCase, onClose, onSubmit, isLoading }: Te
             <div className={styles.contextImportRow}>
               <div className={styles.contextImportControls}>
                 <select
-                  value={selectedContextFilePath}
+                  value={selectedContextAssetId ?? ""}
                   onChange={(e) => {
                     setImportNotice(null);
-                    setSelectedContextFilePath(e.target.value);
+                    setSelectedContextAssetId(e.target.value ? Number(e.target.value) : null);
                   }}
                   disabled={
-                    (contextFilesQuery.data?.length ?? 0) === 0 || importContextMutation.isPending
+                    (contextAssetsQuery.data?.length ?? 0) === 0 || importContextMutation.isPending
                   }
                   className={styles.contextFileSelect}
                 >
-                  {(contextFilesQuery.data?.length ?? 0) === 0 ? (
-                    <option value="">利用可能なコンテキストファイルはありません</option>
+                  {(contextAssetsQuery.data?.length ?? 0) === 0 ? (
+                    <option value="">利用可能なコンテキスト素材はありません</option>
                   ) : (
-                    (contextFilesQuery.data ?? []).map((file) => (
-                      <option key={file.path} value={file.path}>
-                        {file.path}
+                    (contextAssetsQuery.data ?? []).map((asset) => (
+                      <option key={asset.id} value={asset.id}>
+                        {asset.name}
                       </option>
                     ))
                   )}
@@ -270,21 +269,21 @@ function TestCaseModal({ projectId, testCase, onClose, onSubmit, isLoading }: Te
                 <button
                   type="button"
                   onClick={() => {
-                    if (!selectedContextFilePath) return;
-                    importContextMutation.mutate(selectedContextFilePath);
+                    if (!selectedContextAssetId) return;
+                    importContextMutation.mutate(selectedContextAssetId);
                   }}
-                  disabled={!selectedContextFilePath || importContextMutation.isPending}
+                  disabled={!selectedContextAssetId || importContextMutation.isPending}
                   className={`${styles.btnSecondary} ${styles.contextImportButton}`}
                 >
                   {importContextMutation.isPending ? "取込中..." : "取り込む"}
                 </button>
               </div>
               <p className={styles.modeHint}>
-                コンテキスト管理で取り込んだファイルをここへコピーします。取り込み後に編集して保存できます。
+                コンテキスト素材管理で登録した素材をここへコピーします。取り込み後に編集して保存できます。
               </p>
-              {contextFilesQuery.isError && (
+              {contextAssetsQuery.isError && (
                 <p className={styles.contextImportError}>
-                  コンテキストファイル一覧の取得に失敗しました。
+                  コンテキスト素材一覧の取得に失敗しました。
                 </p>
               )}
               {importContextMutation.isError && (
