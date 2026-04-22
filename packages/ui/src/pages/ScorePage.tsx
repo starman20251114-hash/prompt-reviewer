@@ -2,6 +2,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useRef, useState } from "react";
 import { useParams, useSearchParams } from "react-router";
 import { RunCompareView } from "../components/RunCompareView";
+import { ScoreSectionTabs } from "../components/ScoreSectionTabs";
 import {
   type Run,
   type Score,
@@ -12,7 +13,6 @@ import {
   getScore,
   updateScore,
 } from "../lib/api";
-import { ScoreSectionTabs } from "../components/ScoreSectionTabs";
 import styles from "./ScorePage.module.css";
 
 function formatDate(timestamp: number): string {

@@ -511,22 +511,24 @@ function AnnotationReviewContent({
               <p className={styles.emptyMsg}>候補がありません。Run ページから抽出してください。</p>
             ) : (
               <div className={styles.candidateList}>
-                {[...candidates].sort((a, b) => a.start_line - b.start_line).map((c) => (
-                  <CandidateCard
-                    key={c.id}
-                    candidate={c}
-                    labels={labels}
-                    onStatusChange={(status) =>
-                      updateMutation.mutate({ candidateId: c.id, data: { status } })
-                    }
-                    onEdit={(data) => updateMutation.mutate({ candidateId: c.id, data })}
-                    isUpdating={updateMutation.isPending}
-                    onHover={setActiveRange}
-                    isActive={
-                      activeRange?.start === c.start_line && activeRange?.end === c.end_line
-                    }
-                  />
-                ))}
+                {[...candidates]
+                  .sort((a, b) => a.start_line - b.start_line)
+                  .map((c) => (
+                    <CandidateCard
+                      key={c.id}
+                      candidate={c}
+                      labels={labels}
+                      onStatusChange={(status) =>
+                        updateMutation.mutate({ candidateId: c.id, data: { status } })
+                      }
+                      onEdit={(data) => updateMutation.mutate({ candidateId: c.id, data })}
+                      isUpdating={updateMutation.isPending}
+                      onHover={setActiveRange}
+                      isActive={
+                        activeRange?.start === c.start_line && activeRange?.end === c.end_line
+                      }
+                    />
+                  ))}
               </div>
             )}
           </div>
@@ -540,14 +542,16 @@ function AnnotationReviewContent({
               <p className={styles.emptyMsg}>まだ Gold Annotation がありません</p>
             ) : (
               <div className={styles.goldList}>
-                {[...goldAnnotations].sort((a, b) => a.start_line - b.start_line).map((g) => (
-                  <GoldAnnotationCard
-                    key={g.id}
-                    gold={g}
-                    labels={labels}
-                    onDelete={() => deleteGoldMutation.mutate(g.id)}
-                  />
-                ))}
+                {[...goldAnnotations]
+                  .sort((a, b) => a.start_line - b.start_line)
+                  .map((g) => (
+                    <GoldAnnotationCard
+                      key={g.id}
+                      gold={g}
+                      labels={labels}
+                      onDelete={() => deleteGoldMutation.mutate(g.id)}
+                    />
+                  ))}
               </div>
             )}
           </div>
@@ -830,16 +834,18 @@ function GoldAnnotationBrowse({ projectId }: { projectId: number }) {
                 <p className={styles.emptyMsg}>Gold Annotation がありません</p>
               ) : (
                 <div className={styles.goldList}>
-                  {[...goldAnnotations].sort((a, b) => a.start_line - b.start_line).map((g) => (
-                    <GoldAnnotationCard
-                      key={g.id}
-                      gold={g}
-                      labels={labels}
-                      onHover={(range) => setActiveRange(range)}
-                      onLeave={() => setActiveRange(null)}
-                      onDelete={() => deleteGoldMutation.mutate(g.id)}
-                    />
-                  ))}
+                  {[...goldAnnotations]
+                    .sort((a, b) => a.start_line - b.start_line)
+                    .map((g) => (
+                      <GoldAnnotationCard
+                        key={g.id}
+                        gold={g}
+                        labels={labels}
+                        onHover={(range) => setActiveRange(range)}
+                        onLeave={() => setActiveRange(null)}
+                        onDelete={() => deleteGoldMutation.mutate(g.id)}
+                      />
+                    ))}
                 </div>
               )}
 
