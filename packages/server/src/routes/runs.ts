@@ -291,7 +291,9 @@ function parseStructuredItems(
   return parsed.data.items;
 }
 
-function parseItemsFromStructuredOutput(json: string | null): z.infer<typeof structuredOutputSchema>["items"] | null {
+function parseItemsFromStructuredOutput(
+  json: string | null,
+): z.infer<typeof structuredOutputSchema>["items"] | null {
   const parsedStructuredOutput = parseStructuredOutput(json);
   if (parsedStructuredOutput === null) {
     return null;
@@ -626,9 +628,7 @@ export function createRunsRouter(db: DB, options: RunsRouterOptions = {}) {
       return c.json({ error: "Invalid include_discarded" }, 400);
     }
 
-    const conditions = [
-      ...(includeDiscarded === true ? [] : [eq(runs.is_discarded, false)]),
-    ];
+    const conditions = [...(includeDiscarded === true ? [] : [eq(runs.is_discarded, false)])];
 
     if (filterProjectId !== undefined) {
       const versionIds = await fetchVersionIdsByProject(db, filterProjectId);
@@ -696,8 +696,9 @@ export function createRunsRouter(db: DB, options: RunsRouterOptions = {}) {
       }
     }
 
-    const legacySnapshot: Partial<Pick<ExecutionSettings, "model" | "temperature" | "api_provider">> =
-      {};
+    const legacySnapshot: Partial<
+      Pick<ExecutionSettings, "model" | "temperature" | "api_provider">
+    > = {};
     if (body.model !== undefined) legacySnapshot.model = body.model;
     if (body.temperature !== undefined) legacySnapshot.temperature = body.temperature;
     if (body.api_provider !== undefined) legacySnapshot.api_provider = body.api_provider;
@@ -1043,17 +1044,19 @@ export function createRunsRouter(db: DB, options: RunsRouterOptions = {}) {
             const versionIds = await fetchVersionIdsByProject(db, legacyProjectId);
             if (versionIds.length === 0) return null;
             return (
-              await db
-                .select()
-                .from(runs)
-                .where(
-                  and(
-                    eq(runs.id, id),
-                    eq(runs.project_id, legacyProjectId),
-                    inArray(runs.prompt_version_id, versionIds),
-                  ),
-                )
-            )[0] ?? null;
+              (
+                await db
+                  .select()
+                  .from(runs)
+                  .where(
+                    and(
+                      eq(runs.id, id),
+                      eq(runs.project_id, legacyProjectId),
+                      inArray(runs.prompt_version_id, versionIds),
+                    ),
+                  )
+              )[0] ?? null
+            );
           })()
         : await fetchRunById(db, id);
 

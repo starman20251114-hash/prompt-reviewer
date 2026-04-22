@@ -672,10 +672,7 @@ export function AnnotationTaskSettingsPage() {
                     const currentForm = isEditing ? editingLabelForm : buildLabelForm(label);
 
                     return (
-                      <div
-                        key={label.id}
-                        className={styles.labelCard}
-                      >
+                      <div key={label.id} className={styles.labelCard}>
                         <div className={styles.labelCardHeader}>
                           <div>
                             <h4 className={styles.labelTitle}>{label.name}</h4>
@@ -913,7 +910,11 @@ export function AnnotationTaskSettingsPage() {
                     </div>
 
                     <div className={styles.formFooter}>
-                      <button type="submit" className={styles.primaryButton} disabled={!canCreateLabel}>
+                      <button
+                        type="submit"
+                        className={styles.primaryButton}
+                        disabled={!canCreateLabel}
+                      >
                         {createLabelMutation.isPending ? "追加中..." : "ラベルを追加"}
                       </button>
                       <button
