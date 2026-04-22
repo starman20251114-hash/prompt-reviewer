@@ -224,7 +224,8 @@ export function deleteProject(id: number): Promise<void> {
 // PromptVersion
 export type PromptVersion = {
   id: number;
-  project_id: number;
+  prompt_family_id: number;
+  project_id: number | null;
   version: number;
   name: string | null;
   memo: string | null;
@@ -243,6 +244,14 @@ export type PromptExecutionStepDefinition = {
 
 export type PromptWorkflowDefinition = {
   steps: PromptExecutionStepDefinition[];
+};
+
+export type PromptFamily = {
+  id: number;
+  name: string | null;
+  description: string | null;
+  created_at: number;
+  updated_at: number;
 };
 
 export function getPromptVersions(projectId: number): Promise<PromptVersion[]> {
@@ -286,6 +295,84 @@ export function branchPromptVersion(
   return api.post<PromptVersion>(`/projects/${projectId}/prompt-versions/${id}/branch`, data);
 }
 
+export function getPromptFamilies(): Promise<PromptFamily[]> {
+  return api.get<PromptFamily[]>("/prompt-families");
+}
+
+export function getPromptFamily(id: number): Promise<PromptFamily> {
+  return api.get<PromptFamily>(`/prompt-families/${id}`);
+}
+
+export function createPromptFamily(data: {
+  name?: string | null;
+  description?: string | null;
+}): Promise<PromptFamily> {
+  return api.post<PromptFamily>("/prompt-families", data);
+}
+
+export function updatePromptFamily(
+  id: number,
+  data: {
+    name?: string | null;
+    description?: string | null;
+  },
+): Promise<PromptFamily> {
+  return api.patch<PromptFamily>(`/prompt-families/${id}`, data);
+}
+
+export function deletePromptFamily(id: number): Promise<void> {
+  return api.delete<void>(`/prompt-families/${id}`);
+}
+
+export function getPromptVersionsByFamily(promptFamilyId: number): Promise<PromptVersion[]> {
+  const params = new URLSearchParams({ prompt_family_id: String(promptFamilyId) });
+  return api.get<PromptVersion[]>(`/prompt-versions?${params}`);
+}
+
+export function getIndependentPromptVersion(id: number): Promise<PromptVersion> {
+  return api.get<PromptVersion>(`/prompt-versions/${id}`);
+}
+
+export function createIndependentPromptVersion(data: {
+  prompt_family_id: number;
+  content: string;
+  name?: string;
+  memo?: string;
+  workflow_definition?: PromptWorkflowDefinition;
+}): Promise<PromptVersion> {
+  return api.post<PromptVersion>("/prompt-versions", data);
+}
+
+export function updateIndependentPromptVersion(
+  id: number,
+  data: {
+    content?: string;
+    name?: string | null;
+    memo?: string | null;
+    workflow_definition?: PromptWorkflowDefinition | null;
+  },
+): Promise<PromptVersion> {
+  return api.patch<PromptVersion>(`/prompt-versions/${id}`, data);
+}
+
+export function branchIndependentPromptVersion(
+  id: number,
+  data: { name?: string; memo?: string },
+): Promise<PromptVersion> {
+  return api.post<PromptVersion>(`/prompt-versions/${id}/branch`, data);
+}
+
+export function setSelectedIndependentPromptVersion(id: number): Promise<PromptVersion> {
+  return api.patch<PromptVersion>(`/prompt-versions/${id}/selected`, {});
+}
+
+export function setPromptVersionProjects(
+  id: number,
+  data: { project_id: number | null },
+): Promise<PromptVersion> {
+  return api.put<PromptVersion>(`/prompt-versions/${id}/projects`, data);
+}
+
 // TestCase API
 
 export type Turn = {
@@ -302,6 +389,12 @@ export type TestCase = {
   display_order: number;
   created_at: number;
   updated_at: number;
+};
+
+export type TestCaseFilters = {
+  q?: string;
+  project_id?: number;
+  unclassified?: boolean;
 };
 
 export function getTestCases(projectId: number): Promise<TestCase[]> {
@@ -348,6 +441,67 @@ export function updateTestCase(
 export function deleteTestCase(projectId: number, id: number): Promise<void> {
   void projectId;
   return api.delete<void>(`/test-cases/${id}`);
+}
+
+export function getIndependentTestCases(filters?: TestCaseFilters): Promise<TestCase[]> {
+  const params = new URLSearchParams();
+  if (filters?.q) {
+    params.set("q", filters.q);
+  }
+  if (filters?.project_id !== undefined) {
+    params.set("project_id", String(filters.project_id));
+  }
+  if (filters?.unclassified !== undefined) {
+    params.set("unclassified", String(filters.unclassified));
+  }
+  const query = params.toString();
+  return api.get<TestCase[]>(query ? `/test-cases?${query}` : "/test-cases");
+}
+
+export function getIndependentTestCase(id: number): Promise<TestCase> {
+  return api.get<TestCase>(`/test-cases/${id}`);
+}
+
+export function createIndependentTestCase(data: {
+  title: string;
+  turns?: Turn[];
+  context_content?: string;
+  expected_description?: string;
+  display_order?: number;
+  project_ids?: number[];
+}): Promise<TestCase> {
+  return api.post<TestCase>("/test-cases", data);
+}
+
+export function updateIndependentTestCase(
+  id: number,
+  data: {
+    title?: string;
+    turns?: Turn[];
+    context_content?: string;
+    expected_description?: string | null;
+    display_order?: number;
+  },
+): Promise<TestCase> {
+  return api.patch<TestCase>(`/test-cases/${id}`, data);
+}
+
+export function deleteIndependentTestCase(id: number): Promise<void> {
+  return api.delete<void>(`/test-cases/${id}`);
+}
+
+export function setTestCaseProjects(
+  id: number,
+  data: { project_ids: number[] },
+): Promise<TestCase> {
+  return api.put<TestCase>(`/test-cases/${id}/projects`, data);
+}
+
+export function setTestCaseContextAssets(
+  id: number,
+  data: { context_asset_ids: number[] },
+): Promise<TestCase> {
+  return api.put<TestCase>(`/test-cases/${id}/context-assets`, data);
 }
 
 // Run API
@@ -663,6 +817,39 @@ export type LLMModelOption = {
   createdAt?: string;
 };
 
+export type ExecutionProfile = {
+  id: number;
+  name: string;
+  description: string | null;
+  model: string;
+  temperature: number;
+  api_provider: ApiProvider;
+  max_tokens: number | null;
+  created_at: number;
+  updated_at: number;
+};
+
+export type ContextAssetSummary = {
+  id: number;
+  name: string;
+  path: string;
+  mime_type: string;
+  content_hash: string;
+  created_at: number;
+  updated_at: number;
+};
+
+export type ContextAssetDetail = ContextAssetSummary & {
+  content: string;
+};
+
+export type ContextAssetFilters = {
+  q?: string;
+  project_id?: number;
+  unclassified?: boolean;
+  linked_to?: `test_case:${number}` | `prompt_family:${number}`;
+};
+
 export function getProjectSettings(projectId: number): Promise<ProjectSettings> {
   return api.get<ProjectSettings>(`/projects/${projectId}/settings`);
 }
@@ -684,6 +871,104 @@ export function listProjectSettingsModels(
   data: { api_provider: ApiProvider; api_key: string },
 ): Promise<{ models: LLMModelOption[] }> {
   return api.post<{ models: LLMModelOption[] }>(`/projects/${projectId}/settings/models`, data);
+}
+
+export function getExecutionProfiles(): Promise<ExecutionProfile[]> {
+  return api.get<ExecutionProfile[]>("/execution-profiles");
+}
+
+export function getExecutionProfile(id: number): Promise<ExecutionProfile> {
+  return api.get<ExecutionProfile>(`/execution-profiles/${id}`);
+}
+
+export function createExecutionProfile(data: {
+  name: string;
+  description?: string | null;
+  model: string;
+  temperature: number;
+  api_provider: ApiProvider;
+  max_tokens?: number | null;
+}): Promise<ExecutionProfile> {
+  return api.post<ExecutionProfile>("/execution-profiles", data);
+}
+
+export function updateExecutionProfile(
+  id: number,
+  data: {
+    name?: string;
+    description?: string | null;
+    model?: string;
+    temperature?: number;
+    api_provider?: ApiProvider;
+    max_tokens?: number | null;
+  },
+): Promise<ExecutionProfile> {
+  return api.patch<ExecutionProfile>(`/execution-profiles/${id}`, data);
+}
+
+export function deleteExecutionProfile(id: number): Promise<void> {
+  return api.delete<void>(`/execution-profiles/${id}`);
+}
+
+export function listExecutionProfileModels(data: {
+  api_provider: ApiProvider;
+  api_key: string;
+}): Promise<{ models: LLMModelOption[] }> {
+  return api.post<{ models: LLMModelOption[] }>("/execution-profiles/models", data);
+}
+
+export function getContextAssets(filters?: ContextAssetFilters): Promise<ContextAssetSummary[]> {
+  const params = new URLSearchParams();
+  if (filters?.q) {
+    params.set("q", filters.q);
+  }
+  if (filters?.project_id !== undefined) {
+    params.set("project_id", String(filters.project_id));
+  }
+  if (filters?.unclassified !== undefined) {
+    params.set("unclassified", String(filters.unclassified));
+  }
+  if (filters?.linked_to) {
+    params.set("linked_to", filters.linked_to);
+  }
+  const query = params.toString();
+  return api.get<ContextAssetSummary[]>(query ? `/context-assets?${query}` : "/context-assets");
+}
+
+export function getContextAsset(id: number): Promise<ContextAssetDetail> {
+  return api.get<ContextAssetDetail>(`/context-assets/${id}`);
+}
+
+export function createContextAsset(data: {
+  name: string;
+  path: string;
+  content: string;
+  mime_type: string;
+}): Promise<ContextAssetDetail> {
+  return api.post<ContextAssetDetail>("/context-assets", data);
+}
+
+export function updateContextAsset(
+  id: number,
+  data: {
+    name?: string;
+    path?: string;
+    content?: string;
+    mime_type?: string;
+  },
+): Promise<ContextAssetDetail> {
+  return api.patch<ContextAssetDetail>(`/context-assets/${id}`, data);
+}
+
+export function deleteContextAsset(id: number): Promise<void> {
+  return api.delete<void>(`/context-assets/${id}`);
+}
+
+export function setContextAssetProjects(
+  id: number,
+  data: { project_ids: number[] },
+): Promise<ContextAssetDetail> {
+  return api.put<ContextAssetDetail>(`/context-assets/${id}/projects`, data);
 }
 
 // Annotation Candidate API
