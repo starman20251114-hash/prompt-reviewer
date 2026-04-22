@@ -39,7 +39,7 @@ function ProjectSubNav({ projectId }: { projectId: string }) {
         `/projects/${projectId}/annotation-tasks`,
       ],
     },
-    { to: `/projects/${projectId}/settings`, label: "設定" },
+    { to: "/execution-profiles", label: "実行設定" },
   ];
 
   return (
@@ -81,6 +81,7 @@ function SidebarNav() {
 
   const topNavItems = [
     { to: "/", label: "プロジェクト一覧", end: true },
+    { to: "/execution-profiles", label: "実行設定", end: false },
     { to: "/health", label: "ヘルスチェック", end: false },
   ];
 
