@@ -40,6 +40,10 @@ function formatBytes(size: number): string {
   return `${(size / (1024 * 1024)).toFixed(1)} MB`;
 }
 
+function getContentSize(content: string): number {
+  return new TextEncoder().encode(content).length;
+}
+
 function getLanguageExtensions(filePath: string) {
   const lowerPath = filePath.toLowerCase();
   const baseExtensions = [EditorView.lineWrapping];
@@ -134,6 +138,7 @@ export function ContextAssetsPage() {
       setDraftName(detail.name);
       setDraftPath(detail.path);
       setDraftMimeType(detail.mime_type);
+      setSelectedProjectIds(detail.project_ids);
     }
   }, [selectedDetailQuery.data]);
 
@@ -253,7 +258,6 @@ export function ContextAssetsPage() {
     setStatusMessage(null);
     setDeleteConfirmId(null);
     setSelectedId(id);
-    setSelectedProjectIds([]);
   }
 
   async function handleFileSelection(event: React.ChangeEvent<HTMLInputElement>) {
@@ -484,7 +488,7 @@ export function ContextAssetsPage() {
                   </div>
                   {selectedSummary && (
                     <p className={styles.panelSubtitle}>
-                      {formatBytes(selectedSummary.content_hash.length)} / 更新:{" "}
+                      {formatBytes(getContentSize(selectedDetail.content))} / 更新:{" "}
                       {formatDate(selectedSummary.updated_at)}
                     </p>
                   )}

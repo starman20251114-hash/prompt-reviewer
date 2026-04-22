@@ -850,6 +850,7 @@ export type ContextAssetSummary = {
 
 export type ContextAssetDetail = ContextAssetSummary & {
   content: string;
+  project_ids: number[];
 };
 
 export type ContextAssetFilters = {

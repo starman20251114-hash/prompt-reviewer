@@ -21,6 +21,7 @@ type MockContextAsset = {
 };
 
 type MockContextAssetSummary = Omit<MockContextAsset, "content">;
+type MockContextAssetDetail = MockContextAsset & { project_ids: number[] };
 
 function buildApp(db: unknown) {
   const app = new Hono();
@@ -47,6 +48,11 @@ const sampleAssetSummary: MockContextAssetSummary = {
   content_hash: "sha256:old",
   created_at: 1000000,
   updated_at: 1000000,
+};
+
+const sampleAssetDetail: MockContextAssetDetail = {
+  ...sampleAsset,
+  project_ids: [],
 };
 
 describe("GET /api/context-assets", () => {
@@ -233,6 +239,11 @@ describe("POST /api/context-assets", () => {
     let capturedValues: Record<string, unknown> = {};
 
     const db = {
+      select: () => ({
+        from: () => ({
+          where: () => Promise.resolve([]),
+        }),
+      }),
       insert: () => ({
         values: (values: Record<string, unknown>) => {
           capturedValues = values;
@@ -255,6 +266,7 @@ describe("POST /api/context-assets", () => {
     });
 
     expect(res.status).toBe(201);
+    await expect(res.json()).resolves.toEqual(sampleAssetDetail);
     expect(capturedValues.name).toBe(sampleAsset.name);
     expect(capturedValues.path).toBe(sampleAsset.path);
     expect(capturedValues.mime_type).toBe(sampleAsset.mime_type);
@@ -279,10 +291,14 @@ describe("POST /api/context-assets", () => {
 
 describe("GET /api/context-assets/:id", () => {
   it("詳細を返す", async () => {
+    let selectCallCount = 0;
     const db = {
       select: () => ({
         from: () => ({
-          where: () => Promise.resolve([sampleAsset]),
+          where: () => {
+            selectCallCount++;
+            return Promise.resolve(selectCallCount === 1 ? [sampleAsset] : []);
+          },
         }),
       }),
     };
@@ -290,7 +306,7 @@ describe("GET /api/context-assets/:id", () => {
     const res = await buildApp(db).request("/api/context-assets/1");
 
     expect(res.status).toBe(200);
-    await expect(res.json()).resolves.toEqual(sampleAsset);
+    await expect(res.json()).resolves.toEqual(sampleAssetDetail);
   });
 
   it("見つからない場合は 404 を返す", async () => {
@@ -313,11 +329,15 @@ describe("PATCH /api/context-assets/:id", () => {
   it("更新して 200 を返す", async () => {
     const updated = { ...sampleAsset, name: "refund-policy-v2.md", updated_at: 2000000 };
     let capturedValues: Record<string, unknown> = {};
+    let selectCallCount = 0;
 
     const db = {
       select: () => ({
         from: () => ({
-          where: () => Promise.resolve([sampleAsset]),
+          where: () => {
+            selectCallCount++;
+            return Promise.resolve(selectCallCount === 1 ? [sampleAsset] : []);
+          },
         }),
       }),
       update: () => ({
@@ -339,6 +359,10 @@ describe("PATCH /api/context-assets/:id", () => {
     });
 
     expect(res.status).toBe(200);
+    await expect(res.json()).resolves.toEqual({
+      ...updated,
+      project_ids: [],
+    });
     expect(capturedValues.name).toBe("refund-policy-v2.md");
     expect(capturedValues.content).toBe("更新後本文");
     expect(typeof capturedValues.content_hash).toBe("string");
@@ -396,7 +420,10 @@ describe("PUT /api/context-assets/:id/projects", () => {
             if (selectCallCount === 1) {
               return Promise.resolve([sampleAsset]);
             }
-            return Promise.resolve([{ id: 10 }]);
+            if (selectCallCount <= 3) {
+              return Promise.resolve([{ id: 10 }]);
+            }
+            return Promise.resolve([{ project_id: 10 }, { project_id: 11 }]);
           },
         }),
       }),
@@ -421,6 +448,10 @@ describe("PUT /api/context-assets/:id/projects", () => {
     });
 
     expect(res.status).toBe(200);
+    await expect(res.json()).resolves.toEqual({
+      ...sampleAsset,
+      project_ids: [10, 11],
+    });
     expect(deleteCalled).toBe(true);
     expect(inserted).toHaveLength(2);
     expect(inserted[0]).toMatchObject({ context_asset_id: 1, project_id: 10 });
