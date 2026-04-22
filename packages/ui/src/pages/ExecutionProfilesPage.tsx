@@ -70,7 +70,7 @@ export function ExecutionProfilesPage() {
     isFetching: isFetchingModels,
     error: modelsError,
   } = useQuery({
-    queryKey: ["execution-profile-models", formState.apiProvider, hasApiKey],
+    queryKey: ["execution-profile-models", formState.apiProvider, hasApiKey, apiKey],
     queryFn: () =>
       listExecutionProfileModels({
         api_provider: formState.apiProvider,
