@@ -874,10 +874,10 @@ export function RunsPage() {
                 {!hasApiKey && (
                   <p className={styles.fieldHint}>
                     APIキーが未設定です。
-                    <Link to={`/projects/${projectId}/settings`} className={styles.settingsLink}>
-                      設定画面
+                    <Link to="/execution-profiles" className={styles.settingsLink}>
+                      実行設定
                     </Link>
-                    で入力してください。
+                    で API キーを入力してください。
                   </p>
                 )}
               </div>
