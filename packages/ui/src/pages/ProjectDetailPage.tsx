@@ -42,7 +42,7 @@ export function ProjectDetailPage() {
           { to: "runs", label: "Run 実行・管理" },
           { to: "score", label: "採点" },
           { to: "annotation-tasks", label: "アノテーション設定" },
-          { to: "/execution-profiles", label: "実行設定" },
+          { to: "settings", label: "実行設定" },
         ].map(({ to, label }) => (
           <Link
             key={to}

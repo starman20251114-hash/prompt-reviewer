@@ -665,7 +665,16 @@ export async function executeRunStream(
   });
 
   if (!response.ok) {
-    throw new ApiError(response.status, `API error: ${response.status} ${response.statusText}`);
+    let message = `API error: ${response.status} ${response.statusText}`;
+    try {
+      const body = (await response.json()) as { error?: string };
+      if (body.error) {
+        message = body.error;
+      }
+    } catch {
+      // ignore JSON parse errors and keep the HTTP status text
+    }
+    throw new ApiError(response.status, message);
   }
 
   if (!response.body) {

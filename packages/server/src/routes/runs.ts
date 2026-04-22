@@ -580,14 +580,21 @@ function normalizeExecuteError(error: unknown): { status: number; message: strin
 }
 
 /**
- * projectIdに紐づく prompt_version_id 一覧を prompt_version_projects 経由で取得する
+ * legacy project 紐づけは中間テーブルと旧 prompt_versions.project_id の両方を許容する。
  */
 async function fetchVersionIdsByProject(db: DB, projectId: number): Promise<number[]> {
-  const links = await db
-    .select({ prompt_version_id: prompt_version_projects.prompt_version_id })
-    .from(prompt_version_projects)
-    .where(eq(prompt_version_projects.project_id, projectId));
-  return links.map((l) => l.prompt_version_id);
+  const [links, directVersions] = await Promise.all([
+    db
+      .select({ prompt_version_id: prompt_version_projects.prompt_version_id })
+      .from(prompt_version_projects)
+      .where(eq(prompt_version_projects.project_id, projectId)),
+    db
+      .select({ prompt_version_id: prompt_versions.id })
+      .from(prompt_versions)
+      .where(eq(prompt_versions.project_id, projectId)),
+  ]);
+
+  return [...new Set([...links.map((l) => l.prompt_version_id), ...directVersions.map((v) => v.prompt_version_id)])];
 }
 
 /**
@@ -599,6 +606,33 @@ async function fetchTestCaseIdsByProject(db: DB, projectId: number): Promise<num
     .from(test_case_projects)
     .where(eq(test_case_projects.project_id, projectId));
   return links.map((l) => l.test_case_id);
+}
+
+async function hasLegacyProjectPromptVersion(
+  db: DB,
+  projectId: number,
+  promptVersionId: number,
+): Promise<boolean> {
+  const [link] = await db
+    .select({ prompt_version_id: prompt_version_projects.prompt_version_id })
+    .from(prompt_version_projects)
+    .where(
+      and(
+        eq(prompt_version_projects.prompt_version_id, promptVersionId),
+        eq(prompt_version_projects.project_id, projectId),
+      ),
+    );
+
+  if (link) {
+    return true;
+  }
+
+  const [directVersion] = await db
+    .select({ id: prompt_versions.id })
+    .from(prompt_versions)
+    .where(and(eq(prompt_versions.id, promptVersionId), eq(prompt_versions.project_id, projectId)));
+
+  return directVersion !== undefined;
 }
 
 export function createRunsRouter(db: DB, options: RunsRouterOptions = {}) {
@@ -681,17 +715,13 @@ export function createRunsRouter(db: DB, options: RunsRouterOptions = {}) {
     const body = c.req.valid("json");
 
     if (legacyProjectId !== undefined) {
-      const [versionLink] = await db
-        .select()
-        .from(prompt_version_projects)
-        .where(
-          and(
-            eq(prompt_version_projects.prompt_version_id, body.prompt_version_id),
-            eq(prompt_version_projects.project_id, legacyProjectId),
-          ),
-        );
+      const hasVersionLink = await hasLegacyProjectPromptVersion(
+        db,
+        legacyProjectId,
+        body.prompt_version_id,
+      );
 
-      if (!versionLink) {
+      if (!hasVersionLink) {
         return c.json({ error: "Prompt version not found in this project" }, 404);
       }
     }
@@ -787,17 +817,13 @@ export function createRunsRouter(db: DB, options: RunsRouterOptions = {}) {
     const body: ExecuteRunBody = c.req.valid("json");
 
     if (legacyProjectId !== undefined) {
-      const [versionLink] = await db
-        .select()
-        .from(prompt_version_projects)
-        .where(
-          and(
-            eq(prompt_version_projects.prompt_version_id, body.prompt_version_id),
-            eq(prompt_version_projects.project_id, legacyProjectId),
-          ),
-        );
+      const hasVersionLink = await hasLegacyProjectPromptVersion(
+        db,
+        legacyProjectId,
+        body.prompt_version_id,
+      );
 
-      if (!versionLink) {
+      if (!hasVersionLink) {
         return c.json({ error: "Prompt version not found" }, 404);
       }
 
