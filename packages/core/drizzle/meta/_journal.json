@@ -120,6 +120,13 @@
       "when": 1745193600000,
       "tag": "0016_max_tokens",
       "breakpoints": true
+    },
+    {
+      "idx": 17,
+      "version": "6",
+      "when": 1776851067202,
+      "tag": "0017_abnormal_firebird",
+      "breakpoints": true
     }
   ]
 }

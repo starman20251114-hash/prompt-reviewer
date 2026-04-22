@@ -811,10 +811,8 @@ export function PromptsPage() {
   const familyFilterParam = searchParams.get("family_id");
   const selectedProjectId =
     routeProjectId ?? (projectFilterParam ? Number(projectFilterParam) : null);
+  const isProjectScopedView = routeProjectId !== null;
 
-  const [selectedFamilyId, setSelectedFamilyId] = useState<number | null>(
-    familyFilterParam ? Number(familyFilterParam) : null,
-  );
   const [selectedVersion, setSelectedVersion] = useState<PromptVersion | null>(null);
   const [compareVersion, setCompareVersion] = useState<PromptVersion | null>(null);
   const [panelMode, setPanelMode] = useState<PanelMode>(null);
@@ -836,36 +834,27 @@ export function PromptsPage() {
     queryFn: getPromptFamilies,
   });
 
+  const requestedFamilyId = familyFilterParam ? Number(familyFilterParam) : null;
+  const selectedFamilyId =
+    requestedFamilyId !== null && families.some((family) => family.id === requestedFamilyId)
+      ? requestedFamilyId
+      : (families[0]?.id ?? null);
   const selectedFamily = families.find((family) => family.id === selectedFamilyId) ?? null;
 
   useEffect(() => {
-    if (families.length === 0) {
-      if (selectedFamilyId !== null) {
-        setSelectedFamilyId(null);
-      }
-      return;
-    }
-
-    if (selectedFamilyId !== null && families.some((family) => family.id === selectedFamilyId)) {
-      return;
-    }
-
-    const nextFamilyId = familyFilterParam ? Number(familyFilterParam) : (families[0]?.id ?? null);
-    setSelectedFamilyId(nextFamilyId);
-  }, [families, familyFilterParam, selectedFamilyId]);
-
-  useEffect(() => {
+    const nextParams = new URLSearchParams(searchParams);
     if (selectedFamilyId === null) {
-      searchParams.delete("family_id");
-      setSearchParams(searchParams, { replace: true });
+      if (!nextParams.has("family_id")) {
+        return;
+      }
+      nextParams.delete("family_id");
+      setSearchParams(nextParams, { replace: true });
       return;
     }
 
     if (searchParams.get("family_id") === String(selectedFamilyId)) {
       return;
     }
-
-    const nextParams = new URLSearchParams(searchParams);
     nextParams.set("family_id", String(selectedFamilyId));
     setSearchParams(nextParams, { replace: true });
   }, [searchParams, selectedFamilyId, setSearchParams]);
@@ -926,7 +915,9 @@ export function PromptsPage() {
           }),
     onSuccess: (family) => {
       void queryClient.invalidateQueries({ queryKey: ["promptFamilies"] });
-      setSelectedFamilyId(family.id);
+      const nextParams = new URLSearchParams(searchParams);
+      nextParams.set("family_id", String(family.id));
+      setSearchParams(nextParams, { replace: true });
       setEditingFamily(undefined);
     },
   });
@@ -963,7 +954,9 @@ export function PromptsPage() {
   }
 
   function handleSelectFamily(familyId: number) {
-    setSelectedFamilyId(familyId);
+    const nextParams = new URLSearchParams(searchParams);
+    nextParams.set("family_id", String(familyId));
+    setSearchParams(nextParams);
     setSelectedVersion(null);
     setCompareVersion(null);
     setPanelMode(null);
@@ -1033,6 +1026,7 @@ export function PromptsPage() {
             id="project-filter"
             value={selectedProjectId ?? ""}
             onChange={(event) => handleProjectFilterChange(event.target.value)}
+            disabled={isProjectScopedView}
             className={styles.filterSelect}
           >
             <option value="">すべてのプロジェクト</option>
@@ -1045,8 +1039,10 @@ export function PromptsPage() {
         </div>
         {selectedProjectName ? (
           <p className={styles.filterHint}>
-            現在は <span className={styles.projectTag}>{selectedProjectName}</span> の付いた
-            バージョンだけを表示しています。
+            現在は <span className={styles.projectTag}>{selectedProjectName}</span>
+            {isProjectScopedView
+              ? " 固定の画面として表示しています。"
+              : " の付いたバージョンだけを表示しています。"}
           </p>
         ) : (
           <p className={styles.filterHint}>未分類を含む全バージョンを表示しています。</p>
