@@ -21,10 +21,31 @@
   font-size: 14px;
 }
 
+.headerActions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.fileInput {
+  display: none;
+}
+
 .btnPrimary {
   composes: btnPrimary from '../styles/shared.module.css';
   padding: 9px 16px;
   font-size: 13px;
+}
+
+.btnSecondary {
+  padding: 9px 16px;
+  font-size: 13px;
+  background: transparent;
+  border: 1px solid var(--c-border);
+  border-radius: 6px;
+  color: var(--c-subtext);
+  cursor: pointer;
+  font-family: inherit;
 }
 
 .btnSave {

@@ -8,7 +8,7 @@ import { sql } from "@codemirror/lang-sql";
 import { EditorView } from "@codemirror/view";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import CodeMirror from "@uiw/react-codemirror";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   type ContextAssetDetail,
   type ContextAssetFilters,
@@ -82,6 +82,7 @@ const EMPTY_CREATE_FORM: CreateFormState = {
 
 export function ContextAssetsPage() {
   const queryClient = useQueryClient();
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
 
   const [selectedId, setSelectedId] = useState<number | null>(null);
   const [draftContent, setDraftContent] = useState("");
@@ -136,14 +137,22 @@ export function ContextAssetsPage() {
     }
   }, [selectedDetailQuery.data]);
 
-  useEffect(() => {
-    if (selectedId !== null && selectedDetailQuery.data) {
-      const asset = assetsQuery.data?.find((a) => a.id === selectedId);
-      if (!asset) return;
-      // project assignment は detail にないため projects query の情報は使えない
-      // setContextAssetProjects 後の invalidate で再取得される
-    }
-  }, [selectedId, selectedDetailQuery.data, assetsQuery.data]);
+  const uploadMutation = useMutation({
+    mutationFn: async (file: File) => {
+      const content = await file.text();
+      return createContextAsset({
+        name: file.name,
+        path: file.webkitRelativePath || file.name,
+        content,
+        mime_type: file.type || "text/plain",
+      });
+    },
+    onSuccess: (created) => {
+      setStatusMessage(`取り込みました: ${created.name}`);
+      void queryClient.invalidateQueries({ queryKey: ["context-assets"] });
+      setSelectedId(created.id);
+    },
+  });
 
   const createMutation = useMutation({
     mutationFn: () =>
@@ -247,6 +256,16 @@ export function ContextAssetsPage() {
     setSelectedProjectIds([]);
   }
 
+  async function handleFileSelection(event: React.ChangeEvent<HTMLInputElement>) {
+    const files = Array.from(event.target.files ?? []);
+    if (files.length === 0) return;
+    setStatusMessage(null);
+    const results = await Promise.all(files.map((f) => uploadMutation.mutateAsync(f)));
+    const last = results[results.length - 1];
+    if (last) setSelectedId(last.id);
+    if (fileInputRef.current) fileInputRef.current.value = "";
+  }
+
   const projects: Project[] = projectsQuery.data ?? [];
 
   return (
@@ -256,16 +275,36 @@ export function ContextAssetsPage() {
           <h2 className={styles.pageTitle}>コンテキスト素材</h2>
           <p className={styles.pageDescription}>グローバルなコンテキスト素材を管理します。</p>
         </div>
-        <button
-          type="button"
-          onClick={() => {
-            setShowCreateForm((v) => !v);
-            setStatusMessage(null);
-          }}
-          className={styles.btnPrimary}
-        >
-          {showCreateForm ? "キャンセル" : "新規作成"}
-        </button>
+        <div className={styles.headerActions}>
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept=".txt,.md,.json,.ts,.tsx,.js,.jsx,.py,.sql,.css,.html,.yml,.yaml"
+            multiple
+            className={styles.fileInput}
+            onChange={(e) => {
+              void handleFileSelection(e);
+            }}
+          />
+          <button
+            type="button"
+            onClick={() => fileInputRef.current?.click()}
+            className={styles.btnPrimary}
+            disabled={uploadMutation.isPending}
+          >
+            {uploadMutation.isPending ? "取込中..." : "ファイルを取り込む"}
+          </button>
+          <button
+            type="button"
+            onClick={() => {
+              setShowCreateForm((v) => !v);
+              setStatusMessage(null);
+            }}
+            className={styles.btnSecondary}
+          >
+            {showCreateForm ? "キャンセル" : "テキストで作成"}
+          </button>
+        </div>
       </div>
 
       {statusMessage && <p className={styles.statusMessage}>{statusMessage}</p>}
