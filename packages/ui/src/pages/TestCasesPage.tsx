@@ -41,6 +41,7 @@ type TestCaseFormData = {
 function getInitialFormData(
   testCase?: TestCase,
   defaultProjectId?: number | null,
+  initialProjectIds: number[] = [],
   initialContextAssetIds: number[] = [],
 ): TestCaseFormData {
   if (testCase) {
@@ -49,7 +50,7 @@ function getInitialFormData(
       turns: testCase.turns,
       context_content: testCase.context_content ?? "",
       expected_description: testCase.expected_description ?? "",
-      project_ids: [],
+      project_ids: initialProjectIds,
       context_asset_ids: initialContextAssetIds,
     };
   }
@@ -350,6 +351,7 @@ function TestCaseModal({
     getInitialFormData(
       testCase,
       defaultProjectId,
+      initialProjectIds,
       linkedAssets.map((asset) => asset.id),
     ),
   );
@@ -362,14 +364,11 @@ function TestCaseModal({
       getInitialFormData(
         testCase,
         defaultProjectId,
+        initialProjectIds,
         linkedAssets.map((asset) => asset.id),
       ),
     );
-  }, [defaultProjectId, linkedAssets, testCase]);
-
-  useEffect(() => {
-    setFormData((prev) => ({ ...prev, project_ids: initialProjectIds }));
-  }, [initialProjectIds]);
+  }, [defaultProjectId, initialProjectIds, testCase?.id]);
 
   useEffect(() => {
     if (availableAssets.length === 0) {
@@ -795,6 +794,12 @@ export function TestCasesPage() {
     linkedAssetMap[testCase.id] = linkedAssetQueries[index]?.data ?? [];
   });
 
+  const isEditAssociationsLoading =
+    editTarget !== null &&
+    (projectsQuery.isLoading ||
+      projectMembershipQueries.some((query) => query.isPending) ||
+      editLinkedAssetsQuery.isLoading);
+
   function updateSearchParams(nextValues: {
     project_id?: number | null;
     unclassified?: boolean;
@@ -1006,7 +1011,16 @@ export function TestCasesPage() {
       )}
 
       {editTarget && (
+        isEditAssociationsLoading ? (
+          <div className={styles.modalOverlay}>
+            <div className={styles.modalContentSm}>
+              <h3 className={styles.modalTitle}>テストケースを編集</h3>
+              <p className={styles.statusText}>関連情報を読み込み中...</p>
+            </div>
+          </div>
+        ) : (
         <TestCaseModal
+          key={`edit-${editTarget.id}`}
           testCase={editTarget}
           defaultProjectId={selectedProjectId}
           initialProjectIds={projectMembershipMap[editTarget.id] ?? []}
@@ -1015,8 +1029,9 @@ export function TestCasesPage() {
           linkedAssets={editLinkedAssetsQuery.data ?? []}
           onClose={() => setEditTarget(null)}
           onSubmit={(data) => updateMutation.mutate({ id: editTarget.id, data })}
-          isLoading={updateMutation.isPending || editLinkedAssetsQuery.isLoading}
+          isLoading={updateMutation.isPending}
         />
+        )
       )}
 
       {deleteTarget && (
