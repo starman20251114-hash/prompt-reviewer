@@ -80,8 +80,8 @@ schema: [
 
 ### 1. 前準備（Worktree作成前）
 - 現在のブランチがmasterでなければ、masterブランチをチェックアウトしてください。
-  - **すでにworktreeに配置されている場合**: `git checkout -b issue-番号-内容 master` でworktree内にissueブランチを作成してください。
-- リモートの最新のmasterブランチをpullしてください。
+- **必ず** `git fetch origin && git pull origin master`（またはworktree内では `git fetch origin master`）でリモートの最新masterを取得してから作業を開始してください。ローカルのmasterが古いままブランチを切ると、マージ済みの変更が欠落します。
+  - **すでにworktreeに配置されている場合**: `git fetch origin master` でリモートを最新化した上で、`git checkout -b issue-番号-内容 origin/master` でworktree内にissueブランチを作成してください（`master` ではなく `origin/master` を起点にすること）。
 - 最新のmasterブランチからIssueに対応するブランチを作成してください。ブランチ名は `issue-番号-内容` の形式にしてください（例: `issue-118-runs-api-migration`）。
 
 ### 2. Worktree作成と環境構築
