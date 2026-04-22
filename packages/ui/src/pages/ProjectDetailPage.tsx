@@ -37,7 +37,7 @@ export function ProjectDetailPage() {
       >
         {[
           { to: "context-files", label: "コンテキスト管理" },
-          { to: "test-cases", label: "テストケース管理" },
+          { to: `/test-cases?project_id=${id}`, label: "テストケース管理" },
           { to: `/prompts?project_id=${id}`, label: "プロンプト管理" },
           { to: "runs", label: "Run 実行・管理" },
           { to: "score", label: "採点" },
