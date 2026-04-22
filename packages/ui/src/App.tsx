@@ -3,6 +3,7 @@ import { BrowserRouter, Route, Routes } from "react-router";
 import { Layout } from "./components/Layout";
 import { AnnotationReviewPage } from "./pages/AnnotationReviewPage";
 import { AnnotationTaskSettingsPage } from "./pages/AnnotationTaskSettingsPage";
+import { ContextAssetsPage } from "./pages/ContextAssetsPage";
 import { ContextFilesPage } from "./pages/ContextFilesPage";
 import { ExecutionProfilesPage } from "./pages/ExecutionProfilesPage";
 import { HealthPage } from "./pages/HealthPage";
@@ -46,6 +47,7 @@ export function App() {
             <Route path="projects/:id/annotation-review" element={<AnnotationReviewPage />} />
             <Route path="projects/:id/settings" element={<ProjectSettingsPage />} />
             <Route path="execution-profiles" element={<ExecutionProfilesPage />} />
+            <Route path="context-assets" element={<ContextAssetsPage />} />
             {/* ユーティリティ */}
             <Route path="health" element={<HealthPage />} />
             {/* 404 */}
