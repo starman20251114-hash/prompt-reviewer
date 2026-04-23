@@ -758,6 +758,10 @@ export function discardRun(projectId: number, id: number): Promise<Run> {
   return api.patch<Run>(`/projects/${projectId}/runs/${id}/discard`, {});
 }
 
+export function getRunIndependent(id: number): Promise<Run> {
+  return api.get<Run>(`/runs/${id}`);
+}
+
 export function getRunsIndependent(filters?: RunFilters): Promise<Run[]> {
   const params = new URLSearchParams();
   if (filters?.prompt_version_id !== undefined) {
