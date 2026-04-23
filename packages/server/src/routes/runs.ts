@@ -7,6 +7,7 @@ import {
   LLMConfigurationError,
   type PromptExecutionStepDefinition,
   type PromptWorkflowDefinition,
+  type RunMode,
   type StructuredOutput,
   annotation_candidates,
   annotation_labels,
@@ -43,7 +44,8 @@ const structuredOutputSchema = z.object({
 
 const createRunSchema = z.object({
   prompt_version_id: z.number().int().positive("prompt_version_idは正の整数が必要です"),
-  test_case_id: z.number().int().positive("test_case_idは正の整数が必要です"),
+  test_case_id: z.number().int().positive("test_case_idは正の整数が必要です").optional(),
+  ad_hoc_input: z.string().optional(),
   conversation: z.array(conversationMessageSchema).min(1, "conversationは1件以上必要です"),
   execution_trace: z
     .array(
@@ -70,7 +72,8 @@ const createRunSchema = z.object({
 
 const executeRunSchema = z.object({
   prompt_version_id: z.number().int().positive("prompt_version_idは正の整数が必要です"),
-  test_case_id: z.number().int().positive("test_case_idは正の整数が必要です"),
+  test_case_id: z.number().int().positive("test_case_idは正の整数が必要です").optional(),
+  ad_hoc_input: z.string().optional(),
   api_key: z.string().min(1, "api_keyは1文字以上必要です"),
   structured_output: structuredOutputSchema.nullable().optional(),
   execution_profile_id: z
@@ -135,7 +138,7 @@ type StoredPromptVersion = {
 };
 
 type StoredTestCase = {
-  id: number;
+  id: number | null;
   turns: string;
   context_content: string;
 };
@@ -167,6 +170,14 @@ function parseIntParam(value: string | undefined): number | null {
 /** JSON 文字列を ConversationMessage[] に変換する */
 function parseConversation(json: string): ConversationMessage[] {
   return JSON.parse(json) as ConversationMessage[];
+}
+
+function buildAdHocConversation(adHocInput: string | undefined): ConversationMessage[] {
+  if (!adHocInput || adHocInput.trim().length === 0) {
+    return [];
+  }
+
+  return [{ role: "user", content: adHocInput.trim() }];
 }
 
 function parseWorkflowDefinition(json: string | null): PromptWorkflowDefinition | null {
@@ -412,7 +423,7 @@ function buildExecutionRequest(params: {
       temperature: params.temperature,
       ...(maxTokens !== undefined ? { maxTokens } : {}),
     },
-    conversationBase: fallbackMessages,
+    conversationBase: [],
   };
 }
 
@@ -426,8 +437,11 @@ function serializeRun(run: typeof runs.$inferSelect): Omit<
 } {
   return {
     id: run.id,
+    run_mode: run.run_mode as RunMode,
     prompt_version_id: run.prompt_version_id,
     test_case_id: run.test_case_id,
+    ad_hoc_input: run.ad_hoc_input,
+    prompt_snapshot: run.prompt_snapshot,
     conversation: parseConversation(run.conversation),
     execution_trace: parseExecutionTrace(run.execution_trace),
     structured_output: parseStructuredOutput(run.structured_output),
@@ -713,6 +727,7 @@ export function createRunsRouter(db: DB, options: RunsRouterOptions = {}) {
     }
 
     const body = c.req.valid("json");
+    const runMode: RunMode = body.test_case_id !== undefined ? "evaluation" : "quick";
 
     if (legacyProjectId !== undefined) {
       const hasVersionLink = await hasLegacyProjectPromptVersion(
@@ -724,6 +739,31 @@ export function createRunsRouter(db: DB, options: RunsRouterOptions = {}) {
       if (!hasVersionLink) {
         return c.json({ error: "Prompt version not found in this project" }, 404);
       }
+
+      if (body.test_case_id !== undefined) {
+        const [testCaseLink] = await db
+          .select()
+          .from(test_case_projects)
+          .where(
+            and(
+              eq(test_case_projects.test_case_id, body.test_case_id),
+              eq(test_case_projects.project_id, legacyProjectId),
+            ),
+          );
+
+        if (!testCaseLink) {
+          return c.json({ error: "Test case not found in this project" }, 404);
+        }
+      }
+    }
+
+    const [version] = await db
+      .select()
+      .from(prompt_versions)
+      .where(eq(prompt_versions.id, body.prompt_version_id));
+
+    if (!version) {
+      return c.json({ error: "Prompt version not found" }, 404);
     }
 
     const legacySnapshot: Partial<
@@ -777,8 +817,11 @@ export function createRunsRouter(db: DB, options: RunsRouterOptions = {}) {
       .insert(runs)
       .values({
         project_id: legacyProjectId ?? null,
+        run_mode: runMode,
         prompt_version_id: body.prompt_version_id,
-        test_case_id: body.test_case_id,
+        test_case_id: body.test_case_id ?? null,
+        ad_hoc_input: body.ad_hoc_input?.trim() || null,
+        prompt_snapshot: version.content,
         conversation: JSON.stringify(body.conversation),
         execution_trace: body.execution_trace ? JSON.stringify(body.execution_trace) : null,
         structured_output:
@@ -816,6 +859,7 @@ export function createRunsRouter(db: DB, options: RunsRouterOptions = {}) {
     }
 
     const body: ExecuteRunBody = c.req.valid("json");
+    const runMode: RunMode = body.test_case_id !== undefined ? "evaluation" : "quick";
 
     if (legacyProjectId !== undefined) {
       const hasVersionLink = await hasLegacyProjectPromptVersion(
@@ -828,31 +872,35 @@ export function createRunsRouter(db: DB, options: RunsRouterOptions = {}) {
         return c.json({ error: "Prompt version not found" }, 404);
       }
 
-      const [testCaseLink] = await db
-        .select()
-        .from(test_case_projects)
-        .where(
-          and(
-            eq(test_case_projects.test_case_id, body.test_case_id),
-            eq(test_case_projects.project_id, legacyProjectId),
-          ),
-        );
+      if (body.test_case_id !== undefined) {
+        const [testCaseLink] = await db
+          .select()
+          .from(test_case_projects)
+          .where(
+            and(
+              eq(test_case_projects.test_case_id, body.test_case_id),
+              eq(test_case_projects.project_id, legacyProjectId),
+            ),
+          );
 
-      if (!testCaseLink) {
-        return c.json({ error: "Test case not found" }, 404);
+        if (!testCaseLink) {
+          return c.json({ error: "Test case not found" }, 404);
+        }
       }
     }
 
     const [[version], [testCase]] = await Promise.all([
       db.select().from(prompt_versions).where(eq(prompt_versions.id, body.prompt_version_id)),
-      db.select().from(test_cases).where(eq(test_cases.id, body.test_case_id)),
+      body.test_case_id !== undefined
+        ? db.select().from(test_cases).where(eq(test_cases.id, body.test_case_id))
+        : Promise.resolve([]),
     ]);
 
     if (!version) {
       return c.json({ error: "Prompt version not found" }, 404);
     }
 
-    if (!testCase) {
+    if (body.test_case_id !== undefined && !testCase) {
       return c.json({ error: "Test case not found" }, 404);
     }
 
@@ -880,9 +928,9 @@ export function createRunsRouter(db: DB, options: RunsRouterOptions = {}) {
     }
 
     const storedTestCase: StoredTestCase = {
-      id: testCase.id,
-      turns: testCase.turns,
-      context_content: testCase.context_content,
+      id: testCase?.id ?? null,
+      turns: testCase ? testCase.turns : JSON.stringify(buildAdHocConversation(body.ad_hoc_input)),
+      context_content: testCase?.context_content ?? "",
     };
 
     const execution = buildExecutionRequest({
@@ -1003,8 +1051,11 @@ export function createRunsRouter(db: DB, options: RunsRouterOptions = {}) {
               .insert(runs)
               .values({
                 project_id: legacyProjectId ?? null,
+                run_mode: runMode,
                 prompt_version_id: body.prompt_version_id,
-                test_case_id: body.test_case_id,
+                test_case_id: body.test_case_id ?? null,
+                ad_hoc_input: body.ad_hoc_input?.trim() || null,
+                prompt_snapshot: version.content,
                 conversation: JSON.stringify(conversation),
                 execution_trace: executionTrace.length > 0 ? JSON.stringify(executionTrace) : null,
                 structured_output:
@@ -1131,6 +1182,10 @@ export function createRunsRouter(db: DB, options: RunsRouterOptions = {}) {
       return c.json({ error: "Run not found" }, 404);
     }
 
+    if (existing.test_case_id === null) {
+      return c.json({ error: "Quick run cannot be marked as best" }, 400);
+    }
+
     const body = (await c.req.json().catch(() => ({}))) as { unset?: boolean };
 
     if (body.unset) {
@@ -1235,6 +1290,10 @@ export function createRunsRouter(db: DB, options: RunsRouterOptions = {}) {
 
       if (!run) {
         return c.json({ error: "Run not found" }, 404);
+      }
+
+      if (run.test_case_id === null) {
+        return c.json({ error: "Quick run does not support annotation extraction" }, 400);
       }
 
       // annotation_task が存在することを確認

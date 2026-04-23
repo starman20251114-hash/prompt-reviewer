@@ -16,12 +16,13 @@ export const runs = sqliteTable("runs", {
   // 互換期間中は nullable で追加し、後続 Issue で必須化する。
   execution_profile_id: integer("execution_profile_id").references(() => execution_profiles.id),
   project_id: integer("project_id").references(() => projects.id),
+  run_mode: text("run_mode").notNull().default("evaluation"),
   prompt_version_id: integer("prompt_version_id")
     .notNull()
     .references(() => prompt_versions.id),
-  test_case_id: integer("test_case_id")
-    .notNull()
-    .references(() => test_cases.id),
+  test_case_id: integer("test_case_id").references(() => test_cases.id),
+  ad_hoc_input: text("ad_hoc_input"),
+  prompt_snapshot: text("prompt_snapshot").notNull(),
   conversation: text("conversation").notNull(),
   execution_trace: text("execution_trace"),
   structured_output: text("structured_output"),
@@ -67,3 +68,5 @@ export type StructuredOutputItem = {
 export type StructuredOutput = {
   items: StructuredOutputItem[];
 };
+
+export type RunMode = "evaluation" | "quick";

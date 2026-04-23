@@ -850,7 +850,7 @@ export function ScorePage() {
               key={run.id}
               run={run}
               versionName={getVersionName(run.prompt_version_id)}
-              testCaseTitle={`テストケース #${run.test_case_id}`}
+              testCaseTitle={run.test_case_id === null ? "かんたん実行" : `テストケース #${run.test_case_id}`}
               autoFocus={focusedRunId === run.id}
               scoreMode={scoreMode}
             />
@@ -915,7 +915,7 @@ export function ScorePage() {
               key={run.id}
               run={run}
               versionName={getVersionName(run.prompt_version_id)}
-              testCaseTitle={`テストケース #${run.test_case_id}`}
+              testCaseTitle={run.test_case_id === null ? "かんたん実行" : `テストケース #${run.test_case_id}`}
               score={scoresMap.get(run.id) ?? null}
               bulkState={getBulkState(run.id)}
               onBulkChange={(patch) => updateBulkEdit(run.id, patch)}

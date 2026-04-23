@@ -398,15 +398,15 @@ function AnnotationReviewContent({
     queryFn: () =>
       getGoldAnnotations({
         annotation_task_id: taskId,
-        test_case_id: run?.test_case_id,
+        test_case_id: run?.test_case_id ?? undefined,
       }),
-    enabled: !Number.isNaN(taskId) && run !== undefined,
+    enabled: !Number.isNaN(taskId) && run !== undefined && run.test_case_id !== null,
   });
 
   const { data: testCase, isLoading: isTestCaseLoading } = useQuery({
     queryKey: ["test-cases", projectId, run?.test_case_id],
     queryFn: () => getTestCase(projectId, run?.test_case_id as number),
-    enabled: run !== undefined && run.test_case_id !== undefined,
+    enabled: run !== undefined && run.test_case_id !== null,
   });
 
   const updateMutation = useMutation({

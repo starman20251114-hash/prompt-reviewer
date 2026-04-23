@@ -205,8 +205,11 @@ async function seed() {
       .insert(schema.runs)
       .values({
         project_id: project.id,
+        run_mode: "evaluation",
         prompt_version_id: promptV1.id,
         test_case_id: testCase1.id,
+        ad_hoc_input: null,
+        prompt_snapshot: promptV1.content,
         conversation: conversation1,
         is_best: false,
         created_at: now + 2000,
@@ -233,8 +236,11 @@ async function seed() {
       .insert(schema.runs)
       .values({
         project_id: project.id,
+        run_mode: "evaluation",
         prompt_version_id: promptV2.id,
         test_case_id: testCase1.id,
+        ad_hoc_input: null,
+        prompt_snapshot: promptV2.content,
         conversation: conversation2,
         is_best: true,
         created_at: now + 3000,
