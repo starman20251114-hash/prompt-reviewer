@@ -31,27 +31,36 @@ export function AnnotationSectionTabs() {
     }
   }, [id, reviewContextFromSearch]);
 
-  if (!id) {
-    return null;
-  }
-
-  const tabs = [
-    {
-      to: buildAnnotationReviewPath(id, reviewContext),
-      label: "レビュー",
-      isActive: isReviewPath && hasRunId,
-    },
-    {
-      to: `/projects/${id}/${annotationRoutes.review}`,
-      label: "ゴールドアノテーション",
-      isActive: isReviewPath && !hasRunId,
-    },
-    {
-      to: `/projects/${id}/${annotationRoutes.settings}`,
-      label: "設定",
-      isActive: isSettingsPath,
-    },
-  ];
+  const tabs = id
+    ? [
+        {
+          to: buildAnnotationReviewPath(id, reviewContext),
+          label: "レビュー",
+          isActive: isReviewPath && hasRunId,
+        },
+        {
+          to: `/projects/${id}/${annotationRoutes.review}`,
+          label: "ゴールドアノテーション",
+          isActive: isReviewPath && !hasRunId,
+        },
+        {
+          to: `/projects/${id}/${annotationRoutes.settings}`,
+          label: "設定",
+          isActive: isSettingsPath,
+        },
+      ]
+    : [
+        {
+          to: `/${annotationRoutes.review}`,
+          label: "ゴールドアノテーション",
+          isActive: isReviewPath,
+        },
+        {
+          to: `/${annotationRoutes.settings}`,
+          label: "設定",
+          isActive: isSettingsPath,
+        },
+      ];
 
   return (
     <div className={styles.tabList} aria-label="抽出ページ切り替え">
