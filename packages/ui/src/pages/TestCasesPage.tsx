@@ -60,7 +60,8 @@ function getInitialFormData(
     turns: [createEmptyTurn()],
     context_content: "",
     expected_description: "",
-    project_ids: defaultProjectId !== null && defaultProjectId !== undefined ? [defaultProjectId] : [],
+    project_ids:
+      defaultProjectId !== null && defaultProjectId !== undefined ? [defaultProjectId] : [],
     context_asset_ids: [],
   };
 }
@@ -72,7 +73,9 @@ type TurnEditorProps = {
 
 function TurnEditor({ turns, onChange }: TurnEditorProps) {
   function handleRoleChange(index: number, role: "user" | "assistant") {
-    onChange(turns.map((turn, currentIndex) => (currentIndex === index ? { ...turn, role } : turn)));
+    onChange(
+      turns.map((turn, currentIndex) => (currentIndex === index ? { ...turn, role } : turn)),
+    );
   }
 
   function handleContentChange(index: number, content: string) {
@@ -280,7 +283,8 @@ function ContextAssetPicker({
       </div>
 
       <p className={styles.modeHint}>
-        `context_assets` の内容をスナップショットとして `context_content` に取り込みます。関連付けだけ残したい場合は下のタグを切り替えてください。
+        `context_assets` の内容をスナップショットとして `context_content`
+        に取り込みます。関連付けだけ残したい場合は下のタグを切り替えてください。
       </p>
 
       {selectedAssets.length > 0 ? (
@@ -368,7 +372,7 @@ function TestCaseModal({
         linkedAssets.map((asset) => asset.id),
       ),
     );
-  }, [defaultProjectId, initialProjectIds, testCase?.id]);
+  }, [defaultProjectId, initialProjectIds, testCase, linkedAssets]);
 
   useEffect(() => {
     if (availableAssets.length === 0) {
@@ -449,9 +453,7 @@ function TestCaseModal({
               id="test-case-title"
               type="text"
               value={formData.title}
-              onChange={(event) =>
-                setFormData((prev) => ({ ...prev, title: event.target.value }))
-              }
+              onChange={(event) => setFormData((prev) => ({ ...prev, title: event.target.value }))}
               placeholder="例: 基本的な挨拶テスト"
               className={styles.fieldInput}
             />
@@ -465,7 +467,9 @@ function TestCaseModal({
             <ProjectTagEditor
               projects={projects}
               selectedProjectIds={formData.project_ids}
-              onChange={(projectIds) => setFormData((prev) => ({ ...prev, project_ids: projectIds }))}
+              onChange={(projectIds) =>
+                setFormData((prev) => ({ ...prev, project_ids: projectIds }))
+              }
             />
           </div>
 
@@ -487,7 +491,9 @@ function TestCaseModal({
               onToggleLink={handleToggleAsset}
             />
             {importContextMutation.isError && (
-              <p className={styles.contextImportError}>選択したコンテキスト素材の取り込みに失敗しました。</p>
+              <p className={styles.contextImportError}>
+                選択したコンテキスト素材の取り込みに失敗しました。
+              </p>
             )}
             {importNotice && <p className={styles.contextImportNotice}>{importNotice}</p>}
             <textarea
@@ -726,7 +732,10 @@ export function TestCasesPage() {
 
   const filters: TestCaseFilters = {
     q: searchQuery || undefined,
-    project_id: selectedProjectId !== null && !Number.isNaN(selectedProjectId) ? selectedProjectId : undefined,
+    project_id:
+      selectedProjectId !== null && !Number.isNaN(selectedProjectId)
+        ? selectedProjectId
+        : undefined,
     unclassified: selectedUnclassified || undefined,
   };
 
@@ -912,7 +921,8 @@ export function TestCasesPage() {
         <div>
           <h2 className={styles.pageTitle}>テストケース管理</h2>
           <p className={styles.pageDescription}>
-            独立資産としてテストケースを管理し、必要な project や context assets をあとから関連付けます。
+            独立資産としてテストケースを管理し、必要な project や context assets
+            をあとから関連付けます。
           </p>
         </div>
         <button type="button" onClick={() => setIsCreateOpen(true)} className={styles.btnPrimary}>
@@ -999,7 +1009,9 @@ export function TestCasesPage() {
         <TestCaseModal
           defaultProjectId={selectedProjectId}
           initialProjectIds={
-            selectedProjectId !== null && !Number.isNaN(selectedProjectId) ? [selectedProjectId] : []
+            selectedProjectId !== null && !Number.isNaN(selectedProjectId)
+              ? [selectedProjectId]
+              : []
           }
           projects={projects}
           availableAssets={availableAssetsQuery.data ?? []}
@@ -1010,8 +1022,8 @@ export function TestCasesPage() {
         />
       )}
 
-      {editTarget && (
-        isEditAssociationsLoading ? (
+      {editTarget &&
+        (isEditAssociationsLoading ? (
           <div className={styles.modalOverlay}>
             <div className={styles.modalContentSm}>
               <h3 className={styles.modalTitle}>テストケースを編集</h3>
@@ -1019,20 +1031,19 @@ export function TestCasesPage() {
             </div>
           </div>
         ) : (
-        <TestCaseModal
-          key={`edit-${editTarget.id}`}
-          testCase={editTarget}
-          defaultProjectId={selectedProjectId}
-          initialProjectIds={projectMembershipMap[editTarget.id] ?? []}
-          projects={projects}
-          availableAssets={availableAssetsQuery.data ?? []}
-          linkedAssets={editLinkedAssetsQuery.data ?? []}
-          onClose={() => setEditTarget(null)}
-          onSubmit={(data) => updateMutation.mutate({ id: editTarget.id, data })}
-          isLoading={updateMutation.isPending}
-        />
-        )
-      )}
+          <TestCaseModal
+            key={`edit-${editTarget.id}`}
+            testCase={editTarget}
+            defaultProjectId={selectedProjectId}
+            initialProjectIds={projectMembershipMap[editTarget.id] ?? []}
+            projects={projects}
+            availableAssets={availableAssetsQuery.data ?? []}
+            linkedAssets={editLinkedAssetsQuery.data ?? []}
+            onClose={() => setEditTarget(null)}
+            onSubmit={(data) => updateMutation.mutate({ id: editTarget.id, data })}
+            isLoading={updateMutation.isPending}
+          />
+        ))}
 
       {deleteTarget && (
         <DeleteDialog
