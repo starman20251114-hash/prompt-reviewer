@@ -675,9 +675,11 @@ function GoldAnnotationBrowse({ projectId }: { projectId: number }) {
   });
 
   const { data: testCases = [] } = useQuery({
-    queryKey: ["test-cases-independent", { project_id: projectId }],
-    queryFn: () => getIndependentTestCases({ project_id: projectId }),
-    enabled: !Number.isNaN(projectId),
+    queryKey: ["test-cases-independent", Number.isNaN(projectId) ? {} : { project_id: projectId }],
+    queryFn: () =>
+      Number.isNaN(projectId)
+        ? getIndependentTestCases()
+        : getIndependentTestCases({ project_id: projectId }),
   });
 
   const selectedTestCase = testCases.find((tc) => tc.id === selectedTestCaseId) ?? null;
