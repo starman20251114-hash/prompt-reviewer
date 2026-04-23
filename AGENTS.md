@@ -62,22 +62,6 @@ schema: [
 - worktree でテスト・型チェック・Lint を実行する前に、その worktree 自身で `pnpm install` を実行して `node_modules` を用意する
 - 検証コマンドはメインディレクトリではなく、対象 worktree を `cwd` にして実行する
 
-### Git 実行順序
-
-- `git add`、`git commit`、`git push` は必ずこの順番で直列に実行する
-- `git add` と `git commit`、`git commit` と `git push` を並列実行してはいけない
-- `git add` の後は `git status --short` や `git diff --cached` でステージ状態を確認してから `git commit` する
-- `git commit` の後はコミット成功を確認してから `git push` する
-- worktree 配下の Git 操作で権限エラーが出た場合は、同じ順序を保ったまま必要なコマンドだけ権限昇格して再実行する
-
-### GitHub 連携ツールの権限ルール
-
-- GitHub 連携ツールで `403` や `Resource not accessible` などの権限エラーが出た場合、同じ操作を漫然と繰り返さない
-- まず「権限不足なのか」「自分の PR なので GitHub 側の制約に引っかかったのか」を切り分ける
-- Connector でレビュー投稿に失敗した場合は、必要に応じて `gh` CLI で代替できるか確認する
-- 自分の PR では `Request changes` できないため、その場合は通常コメントで代替する
-- 書き込み系操作の前に、どのツールで実行するかと必要権限を確認する
-
 ### 作業開始前チェック
 
 - 対応対象の Issue 番号または PR 番号を確認する
