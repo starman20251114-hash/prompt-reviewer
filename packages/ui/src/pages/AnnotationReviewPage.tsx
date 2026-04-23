@@ -345,7 +345,10 @@ function AnnotationReviewStartPage({ projectId }: { projectId: number }) {
           Run ページで候補抽出を実行するか、既存の候補レビューリンクからこの画面を開いてください。
         </p>
         <div style={{ padding: "0 16px 16px" }}>
-          <Link to={`/projects/${projectId}/runs`} className={styles.backLink}>
+          <Link
+            to={Number.isNaN(projectId) ? "/runs" : `/projects/${projectId}/runs`}
+            className={styles.backLink}
+          >
             ← Run に戻る
           </Link>
         </div>

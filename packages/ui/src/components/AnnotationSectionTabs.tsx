@@ -58,9 +58,14 @@ export function AnnotationSectionTabs() {
       ]
     : [
         {
+          to: `/${annotationRoutes.review}?mode=review`,
+          label: "レビュー",
+          isActive: isReviewPath && (hasRunId || modeParam === "review"),
+        },
+        {
           to: `/${annotationRoutes.review}`,
           label: "ゴールドアノテーション",
-          isActive: isReviewPath,
+          isActive: isReviewPath && !hasRunId && modeParam !== "review",
         },
         {
           to: `/${annotationRoutes.settings}`,
