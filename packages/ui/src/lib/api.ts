@@ -1252,6 +1252,20 @@ export function extractAnnotationCandidates(
   );
 }
 
+export function extractAnnotationCandidatesIndependent(
+  runId: number,
+  data: {
+    annotation_task_id: number;
+    source_type?: "structured_json" | "final_answer" | "trace_step";
+    source_step_id?: string;
+  },
+): Promise<{ candidates_created: number; annotation_task_id: number }> {
+  return api.post<{ candidates_created: number; annotation_task_id: number }>(
+    `/runs/${runId}/candidates/extract`,
+    data,
+  );
+}
+
 // Score Progression API
 
 export type VersionSummary = {

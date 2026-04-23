@@ -596,7 +596,12 @@ async function fetchVersionIdsByProject(db: DB, projectId: number): Promise<numb
       .where(eq(prompt_versions.project_id, projectId)),
   ]);
 
-  return [...new Set([...links.map((l) => l.prompt_version_id), ...directVersions.map((v) => v.prompt_version_id)])];
+  return [
+    ...new Set([
+      ...links.map((l) => l.prompt_version_id),
+      ...directVersions.map((v) => v.prompt_version_id),
+    ]),
+  ];
 }
 
 /**
@@ -1193,10 +1198,10 @@ export function createRunsRouter(db: DB, options: RunsRouterOptions = {}) {
   // POST /api/projects/:projectId/runs/:id/candidates/extract - annotation_candidates を抽出して保存
   if (enableCandidateExtractRoute) {
     router.post("/:id/candidates/extract", async (c) => {
-      const projectId = parseIntParam(c.req.param("projectId"));
+      const projectId = parseIntParam(c.req.param("projectId")); // null OK（トップレベルルートの場合）
       const id = parseIntParam(c.req.param("id"));
 
-      if (projectId === null || id === null) {
+      if (id === null) {
         return c.json({ error: "Invalid ID" }, 400);
       }
 
@@ -1216,22 +1221,26 @@ export function createRunsRouter(db: DB, options: RunsRouterOptions = {}) {
       }
       const { annotation_task_id, source_type, source_step_id } = parsedBody.data;
 
-      // run が存在し、該当プロジェクトに属することを確認
-      const versionIds = await fetchVersionIdsByProject(db, projectId);
-      if (versionIds.length === 0) {
-        return c.json({ error: "Run not found" }, 404);
+      // Run の取得: projectId がある場合はプロジェクトスコープでフィルタ、ない場合は id のみで取得
+      let run: typeof runs.$inferSelect | undefined;
+      if (projectId !== null) {
+        const versionIds = await fetchVersionIdsByProject(db, projectId);
+        if (versionIds.length === 0) {
+          return c.json({ error: "Run not found" }, 404);
+        }
+        [run] = await db
+          .select()
+          .from(runs)
+          .where(
+            and(
+              eq(runs.id, id),
+              eq(runs.project_id, projectId),
+              inArray(runs.prompt_version_id, versionIds),
+            ),
+          );
+      } else {
+        [run] = await db.select().from(runs).where(eq(runs.id, id));
       }
-
-      const [run] = await db
-        .select()
-        .from(runs)
-        .where(
-          and(
-            eq(runs.id, id),
-            eq(runs.project_id, projectId),
-            inArray(runs.prompt_version_id, versionIds),
-          ),
-        );
 
       if (!run) {
         return c.json({ error: "Run not found" }, 404);
