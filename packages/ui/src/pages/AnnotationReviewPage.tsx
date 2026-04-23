@@ -13,9 +13,9 @@ import {
   getAnnotationTask,
   getAnnotationTasks,
   getGoldAnnotations,
-  getRun,
-  getTestCase,
-  getTestCases,
+  getIndependentTestCase,
+  getIndependentTestCases,
+  getRunIndependent,
   updateAnnotationCandidate,
 } from "../lib/api";
 import styles from "./AnnotationReviewPage.module.css";
@@ -345,7 +345,10 @@ function AnnotationReviewStartPage({ projectId }: { projectId: number }) {
           Run ページで候補抽出を実行するか、既存の候補レビューリンクからこの画面を開いてください。
         </p>
         <div style={{ padding: "0 16px 16px" }}>
-          <Link to={`/projects/${projectId}/runs`} className={styles.backLink}>
+          <Link
+            to={Number.isNaN(projectId) ? "/runs" : `/projects/${projectId}/runs`}
+            className={styles.backLink}
+          >
             ← Run に戻る
           </Link>
         </div>
@@ -364,13 +367,14 @@ function AnnotationReviewContent({
   taskId: number;
 }) {
   const queryClient = useQueryClient();
+  const runsPath = Number.isNaN(projectId) ? "/runs" : `/projects/${projectId}/runs`;
 
   const [activeRange, setActiveRange] = useState<{ start: number; end: number } | null>(null);
 
   const { data: run, isLoading: isRunLoading } = useQuery({
-    queryKey: ["runs", projectId, runId],
-    queryFn: () => getRun(projectId, runId),
-    enabled: !Number.isNaN(projectId) && !Number.isNaN(runId),
+    queryKey: ["runs-independent", runId],
+    queryFn: () => getRunIndependent(runId),
+    enabled: !Number.isNaN(runId),
   });
 
   const { data: annotationTask, isLoading: isTaskLoading } = useQuery({
@@ -404,8 +408,8 @@ function AnnotationReviewContent({
   });
 
   const { data: testCase, isLoading: isTestCaseLoading } = useQuery({
-    queryKey: ["test-cases", projectId, run?.test_case_id],
-    queryFn: () => getTestCase(projectId, run?.test_case_id as number),
+    queryKey: ["test-cases-independent", run?.test_case_id],
+    queryFn: () => getIndependentTestCase(run?.test_case_id as number),
     enabled: run !== undefined && run.test_case_id !== undefined,
   });
 
@@ -455,7 +459,7 @@ function AnnotationReviewContent({
       <div className={styles.root}>
         <div className={styles.pageHeader}>
           <div>
-            <Link to={`/projects/${projectId}/runs`} className={styles.backLink}>
+            <Link to={runsPath} className={styles.backLink}>
               ← Run 一覧に戻る
             </Link>
             <h2 className={styles.pageTitle}>抽出</h2>
@@ -472,7 +476,7 @@ function AnnotationReviewContent({
       {/* ヘッダー */}
       <div className={styles.pageHeader}>
         <div>
-          <Link to={`/projects/${projectId}/runs`} className={styles.backLink}>
+          <Link to={runsPath} className={styles.backLink}>
             ← Run 一覧に戻る
           </Link>
           <h2 className={styles.pageTitle}>抽出</h2>
@@ -675,9 +679,11 @@ function GoldAnnotationBrowse({ projectId }: { projectId: number }) {
   });
 
   const { data: testCases = [] } = useQuery({
-    queryKey: ["test-cases", projectId],
-    queryFn: () => getTestCases(projectId),
-    enabled: !Number.isNaN(projectId),
+    queryKey: ["test-cases-independent", Number.isNaN(projectId) ? {} : { project_id: projectId }],
+    queryFn: () =>
+      Number.isNaN(projectId)
+        ? getIndependentTestCases()
+        : getIndependentTestCases({ project_id: projectId }),
   });
 
   const selectedTestCase = testCases.find((tc) => tc.id === selectedTestCaseId) ?? null;

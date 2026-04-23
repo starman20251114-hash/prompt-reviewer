@@ -22,6 +22,7 @@ export function AnnotationSectionTabs() {
   const persistedReviewContext = id ? loadLastAnnotationReviewContext(id) : null;
   const reviewContext = reviewContextFromSearch ?? persistedReviewContext;
   const hasRunId = searchParams.get("runId") !== null;
+  const modeParam = searchParams.get("mode");
   const isReviewPath = location.pathname.endsWith(`/${annotationRoutes.review}`);
   const isSettingsPath = location.pathname.endsWith(`/${annotationRoutes.settings}`);
 
@@ -31,27 +32,47 @@ export function AnnotationSectionTabs() {
     }
   }, [id, reviewContextFromSearch]);
 
-  if (!id) {
-    return null;
-  }
+  const reviewTabTo = id
+    ? reviewContext
+      ? buildAnnotationReviewPath(id, reviewContext)
+      : `/projects/${id}/${annotationRoutes.review}?mode=review`
+    : null;
 
-  const tabs = [
-    {
-      to: buildAnnotationReviewPath(id, reviewContext),
-      label: "レビュー",
-      isActive: isReviewPath && hasRunId,
-    },
-    {
-      to: `/projects/${id}/${annotationRoutes.review}`,
-      label: "ゴールドアノテーション",
-      isActive: isReviewPath && !hasRunId,
-    },
-    {
-      to: `/projects/${id}/${annotationRoutes.settings}`,
-      label: "設定",
-      isActive: isSettingsPath,
-    },
-  ];
+  const tabs = id
+    ? [
+        {
+          to: reviewTabTo as string,
+          label: "レビュー",
+          isActive: isReviewPath && (hasRunId || modeParam === "review"),
+        },
+        {
+          to: `/projects/${id}/${annotationRoutes.review}`,
+          label: "ゴールドアノテーション",
+          isActive: isReviewPath && !hasRunId && modeParam !== "review",
+        },
+        {
+          to: `/projects/${id}/${annotationRoutes.settings}`,
+          label: "設定",
+          isActive: isSettingsPath,
+        },
+      ]
+    : [
+        {
+          to: `/${annotationRoutes.review}?mode=review`,
+          label: "レビュー",
+          isActive: isReviewPath && (hasRunId || modeParam === "review"),
+        },
+        {
+          to: `/${annotationRoutes.review}`,
+          label: "ゴールドアノテーション",
+          isActive: isReviewPath && !hasRunId && modeParam !== "review",
+        },
+        {
+          to: `/${annotationRoutes.settings}`,
+          label: "設定",
+          isActive: isSettingsPath,
+        },
+      ];
 
   return (
     <div className={styles.tabList} aria-label="抽出ページ切り替え">
