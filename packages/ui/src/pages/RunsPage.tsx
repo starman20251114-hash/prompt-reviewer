@@ -833,40 +833,6 @@ export function RunsPage() {
               <div className={styles.selectCard}>
                 <h3 className={styles.selectCardTitle}>Run を取得する</h3>
 
-                {/* 実行プロファイル選択 */}
-                <div className={styles.fieldGroup}>
-                  <label htmlFor="select-profile" className={styles.fieldLabel}>
-                    実行プロファイル
-                  </label>
-                  <select
-                    id="select-profile"
-                    value={selectedProfileId}
-                    onChange={(e) =>
-                      setSelectedProfileId(e.target.value === "" ? "" : Number(e.target.value))
-                    }
-                    className={styles.fieldSelect}
-                  >
-                    <option value="">
-                      {executionProfiles.length > 0
-                        ? "-- 選択してください（未選択時は先頭を使用）--"
-                        : "-- 実行プロファイルがありません --"}
-                    </option>
-                    {executionProfiles.map((p: ExecutionProfile) => (
-                      <option key={p.id} value={p.id}>
-                        {p.name} ({p.model})
-                      </option>
-                    ))}
-                  </select>
-                  {executionProfiles.length === 0 && (
-                    <p className={styles.fieldHint}>
-                      <Link to="/execution-profiles" className={styles.settingsLink}>
-                        実行設定
-                      </Link>
-                      でプロファイルを作成してください。
-                    </p>
-                  )}
-                </div>
-
                 {/* プロンプトファミリー選択 */}
                 <div className={styles.fieldGroup}>
                   <label htmlFor="select-family" className={styles.fieldLabel}>
@@ -941,6 +907,40 @@ export function RunsPage() {
                   {testCases.length === 0 && (
                     <p className={styles.fieldHint}>
                       テストケースがありません。先にテストケースを作成してください。
+                    </p>
+                  )}
+                </div>
+
+                {/* 実行プロファイル選択 */}
+                <div className={styles.fieldGroup}>
+                  <label htmlFor="select-profile" className={styles.fieldLabel}>
+                    実行プロファイル
+                  </label>
+                  <select
+                    id="select-profile"
+                    value={selectedProfileId}
+                    onChange={(e) =>
+                      setSelectedProfileId(e.target.value === "" ? "" : Number(e.target.value))
+                    }
+                    className={styles.fieldSelect}
+                  >
+                    <option value="">
+                      {executionProfiles.length > 0
+                        ? "-- 選択してください（未選択時は先頭を使用）--"
+                        : "-- 実行プロファイルがありません --"}
+                    </option>
+                    {executionProfiles.map((p: ExecutionProfile) => (
+                      <option key={p.id} value={p.id}>
+                        {p.name} ({p.model})
+                      </option>
+                    ))}
+                  </select>
+                  {executionProfiles.length === 0 && (
+                    <p className={styles.fieldHint}>
+                      <Link to="/execution-profiles" className={styles.settingsLink}>
+                        実行設定
+                      </Link>
+                      でプロファイルを作成してください。
                     </p>
                   )}
                 </div>
