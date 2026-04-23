@@ -596,7 +596,12 @@ async function fetchVersionIdsByProject(db: DB, projectId: number): Promise<numb
       .where(eq(prompt_versions.project_id, projectId)),
   ]);
 
-  return [...new Set([...links.map((l) => l.prompt_version_id), ...directVersions.map((v) => v.prompt_version_id)])];
+  return [
+    ...new Set([
+      ...links.map((l) => l.prompt_version_id),
+      ...directVersions.map((v) => v.prompt_version_id),
+    ]),
+  ];
 }
 
 /**
