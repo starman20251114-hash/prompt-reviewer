@@ -70,9 +70,7 @@
       "indexes": {
         "project_settings_project_id_unique": {
           "name": "project_settings_project_id_unique",
-          "columns": [
-            "project_id"
-          ],
+          "columns": ["project_id"],
           "isUnique": true
         }
       },
@@ -81,12 +79,8 @@
           "name": "project_settings_project_id_projects_id_fk",
           "tableFrom": "project_settings",
           "tableTo": "projects",
-          "columnsFrom": [
-            "project_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["project_id"],
+          "columnsTo": ["id"],
           "onDelete": "no action",
           "onUpdate": "no action"
         }
@@ -258,9 +252,7 @@
       "indexes": {
         "execution_profiles_name_unique": {
           "name": "execution_profiles_name_unique",
-          "columns": [
-            "name"
-          ],
+          "columns": ["name"],
           "isUnique": true
         }
       },
@@ -366,12 +358,8 @@
           "name": "context_asset_projects_context_asset_id_context_assets_id_fk",
           "tableFrom": "context_asset_projects",
           "tableTo": "context_assets",
-          "columnsFrom": [
-            "context_asset_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["context_asset_id"],
+          "columnsTo": ["id"],
           "onDelete": "no action",
           "onUpdate": "no action"
         },
@@ -379,22 +367,15 @@
           "name": "context_asset_projects_project_id_projects_id_fk",
           "tableFrom": "context_asset_projects",
           "tableTo": "projects",
-          "columnsFrom": [
-            "project_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["project_id"],
+          "columnsTo": ["id"],
           "onDelete": "no action",
           "onUpdate": "no action"
         }
       },
       "compositePrimaryKeys": {
         "context_asset_projects_context_asset_id_project_id_pk": {
-          "columns": [
-            "context_asset_id",
-            "project_id"
-          ],
+          "columns": ["context_asset_id", "project_id"],
           "name": "context_asset_projects_context_asset_id_project_id_pk"
         }
       },
@@ -432,12 +413,8 @@
           "name": "prompt_family_context_assets_prompt_family_id_prompt_families_id_fk",
           "tableFrom": "prompt_family_context_assets",
           "tableTo": "prompt_families",
-          "columnsFrom": [
-            "prompt_family_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["prompt_family_id"],
+          "columnsTo": ["id"],
           "onDelete": "no action",
           "onUpdate": "no action"
         },
@@ -445,22 +422,15 @@
           "name": "prompt_family_context_assets_context_asset_id_context_assets_id_fk",
           "tableFrom": "prompt_family_context_assets",
           "tableTo": "context_assets",
-          "columnsFrom": [
-            "context_asset_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["context_asset_id"],
+          "columnsTo": ["id"],
           "onDelete": "no action",
           "onUpdate": "no action"
         }
       },
       "compositePrimaryKeys": {
         "prompt_family_context_assets_prompt_family_id_context_asset_id_pk": {
-          "columns": [
-            "prompt_family_id",
-            "context_asset_id"
-          ],
+          "columns": ["prompt_family_id", "context_asset_id"],
           "name": "prompt_family_context_assets_prompt_family_id_context_asset_id_pk"
         }
       },
@@ -498,12 +468,8 @@
           "name": "prompt_version_projects_prompt_version_id_prompt_versions_id_fk",
           "tableFrom": "prompt_version_projects",
           "tableTo": "prompt_versions",
-          "columnsFrom": [
-            "prompt_version_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["prompt_version_id"],
+          "columnsTo": ["id"],
           "onDelete": "no action",
           "onUpdate": "no action"
         },
@@ -511,22 +477,15 @@
           "name": "prompt_version_projects_project_id_projects_id_fk",
           "tableFrom": "prompt_version_projects",
           "tableTo": "projects",
-          "columnsFrom": [
-            "project_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["project_id"],
+          "columnsTo": ["id"],
           "onDelete": "no action",
           "onUpdate": "no action"
         }
       },
       "compositePrimaryKeys": {
         "prompt_version_projects_prompt_version_id_project_id_pk": {
-          "columns": [
-            "prompt_version_id",
-            "project_id"
-          ],
+          "columns": ["prompt_version_id", "project_id"],
           "name": "prompt_version_projects_prompt_version_id_project_id_pk"
         }
       },
@@ -564,12 +523,8 @@
           "name": "test_case_context_assets_test_case_id_test_cases_id_fk",
           "tableFrom": "test_case_context_assets",
           "tableTo": "test_cases",
-          "columnsFrom": [
-            "test_case_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["test_case_id"],
+          "columnsTo": ["id"],
           "onDelete": "no action",
           "onUpdate": "no action"
         },
@@ -577,22 +532,15 @@
           "name": "test_case_context_assets_context_asset_id_context_assets_id_fk",
           "tableFrom": "test_case_context_assets",
           "tableTo": "context_assets",
-          "columnsFrom": [
-            "context_asset_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["context_asset_id"],
+          "columnsTo": ["id"],
           "onDelete": "no action",
           "onUpdate": "no action"
         }
       },
       "compositePrimaryKeys": {
         "test_case_context_assets_test_case_id_context_asset_id_pk": {
-          "columns": [
-            "test_case_id",
-            "context_asset_id"
-          ],
+          "columns": ["test_case_id", "context_asset_id"],
           "name": "test_case_context_assets_test_case_id_context_asset_id_pk"
         }
       },
@@ -630,12 +578,8 @@
           "name": "test_case_projects_test_case_id_test_cases_id_fk",
           "tableFrom": "test_case_projects",
           "tableTo": "test_cases",
-          "columnsFrom": [
-            "test_case_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["test_case_id"],
+          "columnsTo": ["id"],
           "onDelete": "no action",
           "onUpdate": "no action"
         },
@@ -643,22 +587,15 @@
           "name": "test_case_projects_project_id_projects_id_fk",
           "tableFrom": "test_case_projects",
           "tableTo": "projects",
-          "columnsFrom": [
-            "project_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["project_id"],
+          "columnsTo": ["id"],
           "onDelete": "no action",
           "onUpdate": "no action"
         }
       },
       "compositePrimaryKeys": {
         "test_case_projects_test_case_id_project_id_pk": {
-          "columns": [
-            "test_case_id",
-            "project_id"
-          ],
+          "columns": ["test_case_id", "project_id"],
           "name": "test_case_projects_test_case_id_project_id_pk"
         }
       },
@@ -821,12 +758,8 @@
           "name": "prompt_versions_prompt_family_id_prompt_families_id_fk",
           "tableFrom": "prompt_versions",
           "tableTo": "prompt_families",
-          "columnsFrom": [
-            "prompt_family_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["prompt_family_id"],
+          "columnsTo": ["id"],
           "onDelete": "no action",
           "onUpdate": "no action"
         },
@@ -834,12 +767,8 @@
           "name": "prompt_versions_project_id_projects_id_fk",
           "tableFrom": "prompt_versions",
           "tableTo": "projects",
-          "columnsFrom": [
-            "project_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["project_id"],
+          "columnsTo": ["id"],
           "onDelete": "no action",
           "onUpdate": "no action"
         },
@@ -847,12 +776,8 @@
           "name": "prompt_versions_parent_version_id_prompt_versions_id_fk",
           "tableFrom": "prompt_versions",
           "tableTo": "prompt_versions",
-          "columnsFrom": [
-            "parent_version_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["parent_version_id"],
+          "columnsTo": ["id"],
           "onDelete": "no action",
           "onUpdate": "no action"
         }
@@ -993,12 +918,8 @@
           "name": "runs_execution_profile_id_execution_profiles_id_fk",
           "tableFrom": "runs",
           "tableTo": "execution_profiles",
-          "columnsFrom": [
-            "execution_profile_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["execution_profile_id"],
+          "columnsTo": ["id"],
           "onDelete": "no action",
           "onUpdate": "no action"
         },
@@ -1006,12 +927,8 @@
           "name": "runs_project_id_projects_id_fk",
           "tableFrom": "runs",
           "tableTo": "projects",
-          "columnsFrom": [
-            "project_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["project_id"],
+          "columnsTo": ["id"],
           "onDelete": "no action",
           "onUpdate": "no action"
         },
@@ -1019,12 +936,8 @@
           "name": "runs_prompt_version_id_prompt_versions_id_fk",
           "tableFrom": "runs",
           "tableTo": "prompt_versions",
-          "columnsFrom": [
-            "prompt_version_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["prompt_version_id"],
+          "columnsTo": ["id"],
           "onDelete": "no action",
           "onUpdate": "no action"
         },
@@ -1032,12 +945,8 @@
           "name": "runs_test_case_id_test_cases_id_fk",
           "tableFrom": "runs",
           "tableTo": "test_cases",
-          "columnsFrom": [
-            "test_case_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["test_case_id"],
+          "columnsTo": ["id"],
           "onDelete": "no action",
           "onUpdate": "no action"
         }
@@ -1120,12 +1029,8 @@
           "name": "scores_run_id_runs_id_fk",
           "tableFrom": "scores",
           "tableTo": "runs",
-          "columnsFrom": [
-            "run_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["run_id"],
+          "columnsTo": ["id"],
           "onDelete": "no action",
           "onUpdate": "no action"
         }
@@ -1250,12 +1155,8 @@
           "name": "annotation_candidates_run_id_runs_id_fk",
           "tableFrom": "annotation_candidates",
           "tableTo": "runs",
-          "columnsFrom": [
-            "run_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["run_id"],
+          "columnsTo": ["id"],
           "onDelete": "no action",
           "onUpdate": "no action"
         },
@@ -1263,12 +1164,8 @@
           "name": "annotation_candidates_annotation_task_id_annotation_tasks_id_fk",
           "tableFrom": "annotation_candidates",
           "tableTo": "annotation_tasks",
-          "columnsFrom": [
-            "annotation_task_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["annotation_task_id"],
+          "columnsTo": ["id"],
           "onDelete": "no action",
           "onUpdate": "no action"
         }
@@ -1350,10 +1247,7 @@
       "indexes": {
         "annotation_labels_task_key_unique": {
           "name": "annotation_labels_task_key_unique",
-          "columns": [
-            "annotation_task_id",
-            "key"
-          ],
+          "columns": ["annotation_task_id", "key"],
           "isUnique": true
         }
       },
@@ -1362,12 +1256,8 @@
           "name": "annotation_labels_annotation_task_id_annotation_tasks_id_fk",
           "tableFrom": "annotation_labels",
           "tableTo": "annotation_tasks",
-          "columnsFrom": [
-            "annotation_task_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["annotation_task_id"],
+          "columnsTo": ["id"],
           "onDelete": "no action",
           "onUpdate": "no action"
         }
@@ -1521,12 +1411,8 @@
           "name": "gold_annotations_annotation_task_id_annotation_tasks_id_fk",
           "tableFrom": "gold_annotations",
           "tableTo": "annotation_tasks",
-          "columnsFrom": [
-            "annotation_task_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["annotation_task_id"],
+          "columnsTo": ["id"],
           "onDelete": "no action",
           "onUpdate": "no action"
         },
@@ -1534,12 +1420,8 @@
           "name": "gold_annotations_source_candidate_id_annotation_candidates_id_fk",
           "tableFrom": "gold_annotations",
           "tableTo": "annotation_candidates",
-          "columnsFrom": [
-            "source_candidate_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["source_candidate_id"],
+          "columnsTo": ["id"],
           "onDelete": "no action",
           "onUpdate": "no action"
         }

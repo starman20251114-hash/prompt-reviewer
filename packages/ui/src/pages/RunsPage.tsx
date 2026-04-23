@@ -367,6 +367,7 @@ function RunCard({
   const [showAnnotation, setShowAnnotation] = useState(false);
   const hasTrace = (run.execution_trace?.length ?? 0) > 0;
   const isQuickRun = run.run_mode === "quick";
+  const isScoreDisabled = isQuickRun;
 
   return (
     <div
@@ -405,9 +406,15 @@ function RunCard({
               {isCompareSelected ? "比較解除" : "比較"}
             </button>
           )}
-          <Link to={`${scorePath}?runId=${run.id}`} className={styles.btnScore}>
-            採点
-          </Link>
+          {isScoreDisabled ? (
+            <span className={styles.btnScore} aria-disabled="true">
+              かんたん実行は採点対象外
+            </span>
+          ) : (
+            <Link to={`${scorePath}?runId=${run.id}`} className={styles.btnScore}>
+              採点
+            </Link>
+          )}
           {annotationTasks.length > 0 && !isQuickRun && (
             <button
               type="button"
@@ -658,7 +665,11 @@ export function RunsPage() {
   });
 
   const executeRunMutation = useMutation({
-    mutationFn: (data: { prompt_version_id: number; test_case_id?: number; ad_hoc_input?: string }) => {
+    mutationFn: (data: {
+      prompt_version_id: number;
+      test_case_id?: number;
+      ad_hoc_input?: string;
+    }) => {
       const profileId = selectedProfileId !== "" ? selectedProfileId : executionProfiles[0]?.id;
       if (!profileId) throw new Error("実行プロファイルを選択してください");
       const options = {
@@ -1028,7 +1039,9 @@ export function RunsPage() {
                 <div className={styles.twoColumns}>
                   <div className={styles.panel}>
                     <h3 className={styles.panelTitle}>
-                      {selectedTestCase ? `テストケース: ${selectedTestCase.title}` : "かんたん実行"}
+                      {selectedTestCase
+                        ? `テストケース: ${selectedTestCase.title}`
+                        : "かんたん実行"}
                     </h3>
 
                     {selectedTestCase ? (
@@ -1057,7 +1070,9 @@ export function RunsPage() {
                         {selectedTestCase.context_content && (
                           <div className={styles.expectedBox}>
                             <p className={styles.expectedLabel}>コンテキスト</p>
-                            <p className={styles.expectedText}>{selectedTestCase.context_content}</p>
+                            <p className={styles.expectedText}>
+                              {selectedTestCase.context_content}
+                            </p>
                           </div>
                         )}
 
@@ -1073,7 +1088,8 @@ export function RunsPage() {
                     ) : (
                       <>
                         <p className={styles.inputDescription}>
-                          テストケース未選択のため quick run です。必要ならユーザー入力を1件だけ付けて実行できます。
+                          テストケース未選択のため quick run
+                          です。必要ならユーザー入力を1件だけ付けて実行できます。
                         </p>
                         <div className={styles.fieldGroupLg}>
                           <label htmlFor="ad-hoc-input" className={styles.fieldLabel}>
