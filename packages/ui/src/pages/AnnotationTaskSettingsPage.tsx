@@ -8,12 +8,13 @@ import {
   ApiError,
   createAnnotationLabel,
   createAnnotationTask,
-  createPromptVersion,
+  createIndependentPromptVersion,
   deleteAnnotationLabel,
   deleteAnnotationTask,
   getAnnotationTask,
   getAnnotationTasks,
   getProject,
+  getPromptFamilies,
   updateAnnotationLabel,
   updateAnnotationTask,
 } from "../lib/api";
@@ -318,11 +319,18 @@ export function AnnotationTaskSettingsPage() {
   const [generatedPrompt, setGeneratedPrompt] = useState<string | null>(null);
   const [promptGenCopied, setPromptGenCopied] = useState(false);
   const [promptSaveMessage, setPromptSaveMessage] = useState<string | null>(null);
+  const [saveTargetFamilyId, setSaveTargetFamilyId] = useState<number | null>(null);
+
+  const { data: promptFamilies = [] } = useQuery({
+    queryKey: ["prompt-families"],
+    queryFn: () => getPromptFamilies(),
+  });
 
   const savePromptVersionMutation = useMutation({
     mutationFn: (content: string) => {
       const taskName = taskDetailQuery.data?.name ?? "アノテーション";
-      return createPromptVersion(projectId, {
+      return createIndependentPromptVersion({
+        prompt_family_id: saveTargetFamilyId as number,
         content,
         name: `アノテーション: ${taskName}`,
       });
@@ -1011,6 +1019,30 @@ export function AnnotationTaskSettingsPage() {
                           value={generatedPrompt}
                           rows={14}
                         />
+                        <div className={styles.fieldGroup}>
+                          <label className={styles.fieldLabel} htmlFor="save-prompt-family">
+                            保存先プロンプトファミリー
+                            <span className={styles.requiredMark}>必須</span>
+                          </label>
+                          <select
+                            id="save-prompt-family"
+                            className={styles.fieldInput}
+                            value={saveTargetFamilyId ?? ""}
+                            onChange={(e) =>
+                              setSaveTargetFamilyId(
+                                e.target.value === "" ? null : Number(e.target.value),
+                              )
+                            }
+                            disabled={savePromptVersionMutation.isPending}
+                          >
+                            <option value="">選択してください...</option>
+                            {promptFamilies.map((f) => (
+                              <option key={f.id} value={f.id}>
+                                {f.name}
+                              </option>
+                            ))}
+                          </select>
+                        </div>
                         <div className={styles.formFooter}>
                           <button
                             type="button"
@@ -1023,7 +1055,9 @@ export function AnnotationTaskSettingsPage() {
                             type="button"
                             className={styles.primaryButton}
                             onClick={() => savePromptVersionMutation.mutate(generatedPrompt)}
-                            disabled={savePromptVersionMutation.isPending}
+                            disabled={
+                              savePromptVersionMutation.isPending || saveTargetFamilyId === null
+                            }
                           >
                             {savePromptVersionMutation.isPending
                               ? "保存中..."
