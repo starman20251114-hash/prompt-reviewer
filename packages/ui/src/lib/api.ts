@@ -584,9 +584,10 @@ export function createRun(
     conversation: ConversationMessage[];
     execution_trace?: ExecutionTraceStep[];
     structured_output?: StructuredOutput | null;
-    model: string;
-    temperature: number;
-    api_provider: string;
+    execution_profile_id?: number;
+    model?: string;
+    temperature?: number;
+    api_provider?: string;
   },
 ): Promise<Run> {
   return api.post<Run>(`/projects/${projectId}/runs`, data);
@@ -596,6 +597,7 @@ type ExecuteRunStreamOptions = {
   prompt_version_id: number;
   test_case_id: number;
   api_key: string;
+  execution_profile_id?: number;
   structured_output?: StructuredOutput | null;
   onDelta: (text: string) => void;
   onStepStart?: (step: Omit<ExecutionTraceStep, "output">) => void;
@@ -668,6 +670,7 @@ export async function executeRunStream(
       prompt_version_id: options.prompt_version_id,
       test_case_id: options.test_case_id,
       api_key: options.api_key,
+      execution_profile_id: options.execution_profile_id,
       structured_output: options.structured_output,
     }),
   });

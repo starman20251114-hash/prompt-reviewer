@@ -12,8 +12,11 @@ import {
   type PromptVersion,
   type Run,
   type TestCase,
+  createRun,
   createRunIndependent,
+  discardRun,
   discardRunIndependent,
+  executeRunStream,
   executeRunStreamIndependent,
   extractAnnotationCandidates,
   getAnnotationTasks,
@@ -23,6 +26,7 @@ import {
   getPromptFamilies,
   getPromptVersionsByFamily,
   getRunsIndependent,
+  setBestRun,
   setBestRunIndependent,
 } from "../lib/api";
 import styles from "./RunsPage.module.css";
@@ -613,6 +617,13 @@ export function RunsPage() {
     }) => {
       const profileId = selectedProfileId !== "" ? selectedProfileId : executionProfiles[0]?.id;
       if (!profileId) throw new Error("実行プロファイルを選択してください");
+      if (projectId !== null) {
+        return createRun(projectId, {
+          ...data,
+          execution_trace: executionTrace.length > 0 ? executionTrace : undefined,
+          execution_profile_id: profileId,
+        });
+      }
       return createRunIndependent({
         ...data,
         execution_trace: executionTrace.length > 0 ? executionTrace : undefined,
@@ -630,19 +641,19 @@ export function RunsPage() {
     mutationFn: (data: { prompt_version_id: number; test_case_id: number }) => {
       const profileId = selectedProfileId !== "" ? selectedProfileId : executionProfiles[0]?.id;
       if (!profileId) throw new Error("実行プロファイルを選択してください");
-      return executeRunStreamIndependent({
+      const options = {
         ...data,
         api_key: apiKey,
         execution_profile_id: profileId,
-        onDelta: (text) => {
+        onDelta: (text: string) => {
           setLlmResponse((prev) => `${prev}${text}`);
         },
-        onStepStart: (stepInfo) => {
+        onStepStart: (stepInfo: Omit<ExecutionTraceStep, "output">) => {
           setStreamingStepId(stepInfo.id);
           setExecutionTrace((prev) => [...prev, { ...stepInfo, output: "" }]);
           setLlmResponse("");
         },
-        onStepDelta: (stepDelta) => {
+        onStepDelta: (stepDelta: { id: string; title: string; text: string }) => {
           setExecutionTrace((prev) =>
             prev.map((s) =>
               s.id === stepDelta.id ? { ...s, output: `${s.output}${stepDelta.text}` } : s,
@@ -650,12 +661,16 @@ export function RunsPage() {
           );
           setLlmResponse((prev) => `${prev}${stepDelta.text}`);
         },
-        onStepComplete: (stepInfo) => {
+        onStepComplete: (stepInfo: ExecutionTraceStep) => {
           setExecutionTrace((prev) => prev.map((s) => (s.id === stepInfo.id ? stepInfo : s)));
           setStreamingStepId(null);
           setLlmResponse(stepInfo.output);
         },
-      });
+      };
+      if (projectId !== null) {
+        return executeRunStream(projectId, options);
+      }
+      return executeRunStreamIndependent(options);
     },
     onMutate: () => {
       setExecuteError(null);
@@ -676,15 +691,24 @@ export function RunsPage() {
   });
 
   const setBestMutation = useMutation({
-    mutationFn: ({ runId, unset }: { runId: number; unset: boolean }) =>
-      setBestRunIndependent(runId, unset),
+    mutationFn: ({ runId, unset }: { runId: number; unset: boolean }) => {
+      if (projectId !== null) {
+        return setBestRun(projectId, runId, unset);
+      }
+      return setBestRunIndependent(runId, unset);
+    },
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: ["runs-independent"] });
     },
   });
 
   const discardMutation = useMutation({
-    mutationFn: (runId: number) => discardRunIndependent(runId),
+    mutationFn: (runId: number) => {
+      if (projectId !== null) {
+        return discardRun(projectId, runId);
+      }
+      return discardRunIndependent(runId);
+    },
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: ["runs-independent"] });
     },
