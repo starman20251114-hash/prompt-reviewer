@@ -367,6 +367,7 @@ function AnnotationReviewContent({
   taskId: number;
 }) {
   const queryClient = useQueryClient();
+  const runsPath = Number.isNaN(projectId) ? "/runs" : `/projects/${projectId}/runs`;
 
   const [activeRange, setActiveRange] = useState<{ start: number; end: number } | null>(null);
 
@@ -458,7 +459,7 @@ function AnnotationReviewContent({
       <div className={styles.root}>
         <div className={styles.pageHeader}>
           <div>
-            <Link to={`/projects/${projectId}/runs`} className={styles.backLink}>
+            <Link to={runsPath} className={styles.backLink}>
               ← Run 一覧に戻る
             </Link>
             <h2 className={styles.pageTitle}>抽出</h2>
@@ -475,7 +476,7 @@ function AnnotationReviewContent({
       {/* ヘッダー */}
       <div className={styles.pageHeader}>
         <div>
-          <Link to={`/projects/${projectId}/runs`} className={styles.backLink}>
+          <Link to={runsPath} className={styles.backLink}>
             ← Run 一覧に戻る
           </Link>
           <h2 className={styles.pageTitle}>抽出</h2>

@@ -349,7 +349,7 @@ export function AnnotationTaskSettingsPage() {
         name: `アノテーション: ${taskName}`,
       });
 
-      if (savedVersion.project_id === projectId) {
+      if (Number.isNaN(projectId) || savedVersion.project_id === projectId) {
         return savedVersion;
       }
 
