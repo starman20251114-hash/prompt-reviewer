@@ -15,6 +15,7 @@ import {
   getAnnotationTasks,
   getProject,
   getPromptFamilies,
+  setPromptVersionProjects,
   updateAnnotationLabel,
   updateAnnotationTask,
 } from "../lib/api";
@@ -327,13 +328,19 @@ export function AnnotationTaskSettingsPage() {
   });
 
   const savePromptVersionMutation = useMutation({
-    mutationFn: (content: string) => {
+    mutationFn: async (content: string) => {
       const taskName = taskDetailQuery.data?.name ?? "アノテーション";
-      return createIndependentPromptVersion({
+      const savedVersion = await createIndependentPromptVersion({
         prompt_family_id: saveTargetFamilyId as number,
         content,
         name: `アノテーション: ${taskName}`,
       });
+
+      if (savedVersion.project_id === projectId) {
+        return savedVersion;
+      }
+
+      return setPromptVersionProjects(savedVersion.id, { project_id: projectId });
     },
     onSuccess: (saved) => {
       setPromptSaveMessage(`保存しました（v${saved.version}）`);
