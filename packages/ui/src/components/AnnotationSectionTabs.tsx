@@ -22,6 +22,7 @@ export function AnnotationSectionTabs() {
   const persistedReviewContext = id ? loadLastAnnotationReviewContext(id) : null;
   const reviewContext = reviewContextFromSearch ?? persistedReviewContext;
   const hasRunId = searchParams.get("runId") !== null;
+  const modeParam = searchParams.get("mode");
   const isReviewPath = location.pathname.endsWith(`/${annotationRoutes.review}`);
   const isSettingsPath = location.pathname.endsWith(`/${annotationRoutes.settings}`);
 
@@ -31,17 +32,23 @@ export function AnnotationSectionTabs() {
     }
   }, [id, reviewContextFromSearch]);
 
+  const reviewTabTo = id
+    ? reviewContext
+      ? buildAnnotationReviewPath(id, reviewContext)
+      : `/projects/${id}/${annotationRoutes.review}?mode=review`
+    : null;
+
   const tabs = id
     ? [
         {
-          to: buildAnnotationReviewPath(id, reviewContext),
+          to: reviewTabTo as string,
           label: "レビュー",
-          isActive: isReviewPath && hasRunId,
+          isActive: isReviewPath && (hasRunId || modeParam === "review"),
         },
         {
           to: `/projects/${id}/${annotationRoutes.review}`,
           label: "ゴールドアノテーション",
-          isActive: isReviewPath && !hasRunId,
+          isActive: isReviewPath && !hasRunId && modeParam !== "review",
         },
         {
           to: `/projects/${id}/${annotationRoutes.settings}`,
