@@ -4,12 +4,15 @@ import { useParams, useSearchParams } from "react-router";
 import { RunCompareView } from "../components/RunCompareView";
 import { ScoreSectionTabs } from "../components/ScoreSectionTabs";
 import {
+  type PromptFamily,
+  type PromptVersion,
   type Run,
   type Score,
   createScore,
   getProject,
-  getPromptVersions,
-  getRuns,
+  getPromptFamilies,
+  getPromptVersionsByFamily,
+  getRunsIndependent,
   getScore,
   updateScore,
 } from "../lib/api";
@@ -606,8 +609,8 @@ function BulkRunRow({
 
 // --------------- ScorePage ---------------
 export function ScorePage() {
-  const { id } = useParams<{ id: string }>();
-  const projectId = Number(id);
+  const { id } = useParams<{ id?: string }>();
+  const projectId = id !== undefined ? Number(id) : null;
   const queryClient = useQueryClient();
   const [searchParams] = useSearchParams();
   const focusedRunId = searchParams.get("runId") ? Number(searchParams.get("runId")) : null;
@@ -622,7 +625,7 @@ export function ScorePage() {
 
   function toggleCompare(runId: number) {
     setCompareIds((prev) => {
-      if (prev.includes(runId)) return prev.filter((id) => id !== runId);
+      if (prev.includes(runId)) return prev.filter((currentId) => currentId !== runId);
       if (prev.length >= 2) {
         const previousSecond = prev[1];
         return previousSecond === undefined ? [runId] : [previousSecond, runId];
@@ -633,23 +636,31 @@ export function ScorePage() {
 
   const { data: project } = useQuery({
     queryKey: ["projects", projectId],
-    queryFn: () => getProject(projectId),
-    enabled: !Number.isNaN(projectId),
+    queryFn: () => getProject(projectId as number),
+    enabled: projectId !== null && !Number.isNaN(projectId),
   });
 
-  const { data: promptVersions = [] } = useQuery({
-    queryKey: ["prompt-versions", projectId],
-    queryFn: () => getPromptVersions(projectId),
-    enabled: !Number.isNaN(projectId),
+  const { data: promptFamilies = [] } = useQuery({
+    queryKey: ["prompt-families"],
+    queryFn: () => getPromptFamilies(),
+  });
+
+  const { data: allVersions = [] } = useQuery({
+    queryKey: ["prompt-versions-all", promptFamilies.map((f: PromptFamily) => f.id)],
+    queryFn: () =>
+      Promise.all(promptFamilies.map((f: PromptFamily) => getPromptVersionsByFamily(f.id))).then(
+        (arrays) => arrays.flat(),
+      ),
+    enabled: promptFamilies.length > 0,
   });
 
   const { data: runs = [] } = useQuery({
-    queryKey: ["runs", projectId, { prompt_version_id: filterVersionId }],
+    queryKey: ["runs-independent", { prompt_version_id: filterVersionId, project_id: projectId }],
     queryFn: () =>
-      getRuns(projectId, {
+      getRunsIndependent({
         prompt_version_id: filterVersionId !== "" ? filterVersionId : undefined,
+        project_id: projectId ?? undefined,
       }),
-    enabled: !Number.isNaN(projectId),
   });
 
   // 全 Run のスコアを並列取得
@@ -741,9 +752,11 @@ export function ScorePage() {
   }
 
   function getVersionName(versionId: number): string {
-    const v = promptVersions.find((pv) => pv.id === versionId);
+    const v = allVersions.find((pv: PromptVersion) => pv.id === versionId);
     if (!v) return `v${versionId}`;
-    return `v${v.version}${v.name ? ` - ${v.name}` : ""}`;
+    const family = promptFamilies.find((f: PromptFamily) => f.id === v.prompt_family_id);
+    const familyName = family?.name ?? `Family ${v.prompt_family_id}`;
+    return `${familyName} v${v.version}${v.name ? ` - ${v.name}` : ""}`;
   }
 
   const dirtyCount = runs.filter((r) => bulkEdits.get(r.id)?.dirty).length;
@@ -793,12 +806,15 @@ export function ScorePage() {
           className={styles.filterSelect}
         >
           <option value="">すべて</option>
-          {promptVersions.map((v) => (
-            <option key={v.id} value={v.id}>
-              v{v.version}
-              {v.name ? ` - ${v.name}` : ""}
-            </option>
-          ))}
+          {allVersions.map((v: PromptVersion) => {
+            const family = promptFamilies.find((f: PromptFamily) => f.id === v.prompt_family_id);
+            return (
+              <option key={v.id} value={v.id}>
+                {family?.name ?? `Family ${v.prompt_family_id}`} v{v.version}
+                {v.name ? ` - ${v.name}` : ""}
+              </option>
+            );
+          })}
         </select>
 
         <div className={styles.scoreModeToggle}>

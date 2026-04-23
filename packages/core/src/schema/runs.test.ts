@@ -20,7 +20,7 @@ describe("runs スキーマ型定義", () => {
       type RequiredFields = {
         id: number;
         execution_profile_id: number | null;
-        project_id: number;
+        project_id: number | null;
         prompt_version_id: number;
         test_case_id: number;
         conversation: string;
@@ -72,8 +72,8 @@ describe("runs スキーマ型定義", () => {
       expectTypeOf<Run["is_best"]>().toEqualTypeOf<boolean>();
     });
 
-    it("Run の project_id は number 型", () => {
-      expectTypeOf<Run["project_id"]>().toEqualTypeOf<number>();
+    it("Run の project_id は number | null 型（スタンドアロン対応）", () => {
+      expectTypeOf<Run["project_id"]>().toEqualTypeOf<number | null>();
     });
 
     it("Run の prompt_version_id は number 型", () => {
@@ -145,8 +145,8 @@ describe("runs スキーマ型定義", () => {
       expectTypeOf(bestRun).toMatchTypeOf<NewRun>();
     });
 
-    it("NewRun の project_id は number 型（必須）", () => {
-      expectTypeOf<NewRun["project_id"]>().toEqualTypeOf<number>();
+    it("NewRun の project_id は number | null | undefined 型（スタンドアロン対応）", () => {
+      expectTypeOf<NewRun["project_id"]>().toEqualTypeOf<number | null | undefined>();
     });
   });
 

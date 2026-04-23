@@ -15,9 +15,7 @@ export const runs = sqliteTable("runs", {
   id: integer("id").primaryKey({ autoIncrement: true }),
   // 互換期間中は nullable で追加し、後続 Issue で必須化する。
   execution_profile_id: integer("execution_profile_id").references(() => execution_profiles.id),
-  project_id: integer("project_id")
-    .notNull()
-    .references(() => projects.id),
+  project_id: integer("project_id").references(() => projects.id),
   prompt_version_id: integer("prompt_version_id")
     .notNull()
     .references(() => prompt_versions.id),

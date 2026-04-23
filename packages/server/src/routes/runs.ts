@@ -776,7 +776,7 @@ export function createRunsRouter(db: DB, options: RunsRouterOptions = {}) {
     const result = await db
       .insert(runs)
       .values({
-        project_id: legacyProjectId ?? 0,
+        project_id: legacyProjectId ?? null,
         prompt_version_id: body.prompt_version_id,
         test_case_id: body.test_case_id,
         conversation: JSON.stringify(body.conversation),
@@ -1002,7 +1002,7 @@ export function createRunsRouter(db: DB, options: RunsRouterOptions = {}) {
             const [created] = await db
               .insert(runs)
               .values({
-                project_id: legacyProjectId ?? 0,
+                project_id: legacyProjectId ?? null,
                 prompt_version_id: body.prompt_version_id,
                 test_case_id: body.test_case_id,
                 conversation: JSON.stringify(conversation),

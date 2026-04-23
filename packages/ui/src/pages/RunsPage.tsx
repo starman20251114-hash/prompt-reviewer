@@ -6,20 +6,28 @@ import { useApiKey } from "../hooks/useApiKey";
 import {
   type AnnotationTask,
   type ConversationMessage,
+  type ExecutionProfile,
   type ExecutionTraceStep,
+  type PromptFamily,
   type PromptVersion,
   type Run,
   type TestCase,
   createRun,
+  createRunIndependent,
   discardRun,
+  discardRunIndependent,
   executeRunStream,
+  executeRunStreamIndependent,
   extractAnnotationCandidates,
   getAnnotationTasks,
+  getExecutionProfiles,
+  getIndependentTestCases,
   getProject,
-  getPromptVersions,
-  getRuns,
-  getTestCases,
+  getPromptFamilies,
+  getPromptVersionsByFamily,
+  getRunsIndependent,
   setBestRun,
+  setBestRunIndependent,
 } from "../lib/api";
 import styles from "./RunsPage.module.css";
 
@@ -179,7 +187,6 @@ function ExecutionTraceView({
   );
 }
 
-// アコーディオン形式の会話表示コンポーネント
 function RunConversation({ conversation }: { conversation: ConversationMessage[] }) {
   return (
     <div className={styles.chatList}>
@@ -203,7 +210,6 @@ function RunConversation({ conversation }: { conversation: ConversationMessage[]
   );
 }
 
-// Annotation抽出パネル
 function AnnotationExtractPanel({
   run,
   projectId,
@@ -229,7 +235,6 @@ function AnnotationExtractPanel({
       JSON.parse(text);
       return true;
     } catch {
-      // 最初の { から最後の } を抽出して試みる
       const first = text.indexOf("{");
       const last = text.lastIndexOf("}");
       if (first !== -1 && last > first) {
@@ -325,10 +330,10 @@ function AnnotationExtractPanel({
   );
 }
 
-// Run一覧カードコンポーネント
 function RunCard({
   run,
   projectId,
+  scorePath,
   versionLabel,
   versionNumber,
   testCaseLabel,
@@ -341,7 +346,8 @@ function RunCard({
   isDiscardPending,
 }: {
   run: Run;
-  projectId: number;
+  projectId: number | null;
+  scorePath: string;
   versionLabel: string;
   versionNumber: number;
   testCaseLabel: string;
@@ -393,20 +399,21 @@ function RunCard({
               {isCompareSelected ? "比較解除" : "比較"}
             </button>
           )}
-          <Link to={`/projects/${projectId}/score?runId=${run.id}`} className={styles.btnScore}>
+          <Link to={`${scorePath}?runId=${run.id}`} className={styles.btnScore}>
             採点
           </Link>
-          <button
-            type="button"
-            onClick={() => setShowAnnotation((prev) => !prev)}
-            className={styles.btnAnnotation}
-          >
-            {showAnnotation ? "Annotation を閉じる" : "Annotation候補を抽出"}
-          </button>
+          {projectId !== null && annotationTasks.length > 0 && (
+            <button
+              type="button"
+              onClick={() => setShowAnnotation((prev) => !prev)}
+              className={styles.btnAnnotation}
+            >
+              {showAnnotation ? "Annotation を閉じる" : "Annotation候補を抽出"}
+            </button>
+          )}
           <button
             type="button"
             onClick={() => {
-              // ベスト設定済みの場合は解除（unset=true）、未設定の場合は設定（unset=false）
               const unset = run.is_best;
               onSetBest(unset);
             }}
@@ -426,7 +433,7 @@ function RunCard({
         </div>
       </div>
 
-      {showAnnotation && (
+      {showAnnotation && projectId !== null && (
         <AnnotationExtractPanel run={run} projectId={projectId} annotationTasks={annotationTasks} />
       )}
 
@@ -500,84 +507,106 @@ function RunCompareBar({
 }
 
 export function RunsPage() {
-  const { id } = useParams<{ id: string }>();
-  const projectId = Number(id);
+  const { id } = useParams<{ id?: string }>();
+  const projectId = id !== undefined ? Number(id) : null;
   const queryClient = useQueryClient();
 
-  const { apiKey, hasApiKey } = useApiKey(projectId);
+  const apiKeyScope = projectId ?? "shared";
+  const { apiKey, hasApiKey } = useApiKey(apiKeyScope);
 
   const [activeTab, setActiveTab] = useState<PageTab>("create");
 
-  // 「Run 作成」タブの状態
   const [step, setStep] = useState<Step>("select");
+  const [selectedFamilyId, setSelectedFamilyId] = useState<number | "">("");
   const [selectedVersionId, setSelectedVersionId] = useState<number | "">("");
   const [selectedTestCaseId, setSelectedTestCaseId] = useState<number | "">("");
+  const [selectedProfileId, setSelectedProfileId] = useState<number | "">("");
   const [llmResponse, setLlmResponse] = useState("");
   const [executionTrace, setExecutionTrace] = useState<ExecutionTraceStep[]>([]);
   const [streamingStepId, setStreamingStepId] = useState<string | null>(null);
   const [savedRun, setSavedRun] = useState<Run | null>(null);
   const [executeError, setExecuteError] = useState<string | null>(null);
 
-  // 「Run 一覧」タブのフィルター状態
   const [filterVersionId, setFilterVersionId] = useState<number | "">("");
   const [filterTestCaseId, setFilterTestCaseId] = useState<number | "">("");
 
-  // 「Run 一覧」タブの比較状態
   const [compareRunA, setCompareRunA] = useState<Run | null>(null);
   const [compareRunB, setCompareRunB] = useState<Run | null>(null);
   const [isCompareOpen, setIsCompareOpen] = useState(false);
 
+  const scorePath = projectId !== null ? `/projects/${projectId}/score` : "/score";
+
   const { data: project } = useQuery({
     queryKey: ["projects", projectId],
-    queryFn: () => getProject(projectId),
-    enabled: !Number.isNaN(projectId),
+    queryFn: () => getProject(projectId as number),
+    enabled: projectId !== null && !Number.isNaN(projectId),
   });
 
-  const { data: promptVersions = [] } = useQuery({
-    queryKey: ["prompt-versions", projectId],
-    queryFn: () => getPromptVersions(projectId),
-    enabled: !Number.isNaN(projectId),
+  const { data: promptFamilies = [] } = useQuery({
+    queryKey: ["prompt-families"],
+    queryFn: () => getPromptFamilies(),
+  });
+
+  const { data: familyVersions = [] } = useQuery({
+    queryKey: ["prompt-versions-by-family", selectedFamilyId],
+    queryFn: () => getPromptVersionsByFamily(selectedFamilyId as number),
+    enabled: selectedFamilyId !== "",
+  });
+
+  const { data: allVersions = [] } = useQuery({
+    queryKey: ["prompt-versions-by-family", filterVersionId !== "" ? undefined : "all"],
+    queryFn: () => {
+      if (promptFamilies.length === 0) return Promise.resolve([]);
+      return Promise.all(
+        promptFamilies.map((f: PromptFamily) => getPromptVersionsByFamily(f.id)),
+      ).then((arrays) => arrays.flat());
+    },
+    enabled: promptFamilies.length > 0,
   });
 
   const { data: testCases = [] } = useQuery({
-    queryKey: ["test-cases", projectId],
-    queryFn: () => getTestCases(projectId),
-    enabled: !Number.isNaN(projectId),
+    queryKey: ["test-cases-independent", projectId],
+    queryFn: () =>
+      getIndependentTestCases(projectId !== null ? { project_id: projectId } : undefined),
+  });
+
+  const { data: executionProfiles = [] } = useQuery({
+    queryKey: ["execution-profiles"],
+    queryFn: () => getExecutionProfiles(),
   });
 
   const { data: annotationTasks = [] } = useQuery({
     queryKey: ["annotation-tasks"],
     queryFn: () => getAnnotationTasks(),
+    enabled: projectId !== null,
   });
 
-  // Run 作成タブ: savedステップ時に同一バージョン×ケースのRunを取得
   const { data: relatedRuns = [] } = useQuery({
     queryKey: [
-      "runs",
-      projectId,
+      "runs-independent",
       { prompt_version_id: selectedVersionId, test_case_id: selectedTestCaseId },
     ],
     queryFn: () =>
-      getRuns(projectId, {
+      getRunsIndependent({
         prompt_version_id: selectedVersionId !== "" ? selectedVersionId : undefined,
         test_case_id: selectedTestCaseId !== "" ? selectedTestCaseId : undefined,
+        project_id: projectId ?? undefined,
       }),
     enabled: step === "saved" && selectedVersionId !== "" && selectedTestCaseId !== "",
   });
 
-  // Run 一覧タブ: フィルター付きで全Runを取得
   const { data: allRuns = [], isLoading: isRunsLoading } = useQuery({
     queryKey: [
-      "runs",
-      projectId,
-      { prompt_version_id: filterVersionId, test_case_id: filterTestCaseId },
+      "runs-independent",
+      { prompt_version_id: filterVersionId, test_case_id: filterTestCaseId, project_id: projectId },
     ],
     queryFn: () =>
-      getRuns(projectId, {
+      getRunsIndependent({
         prompt_version_id: filterVersionId !== "" ? filterVersionId : undefined,
         test_case_id: filterTestCaseId !== "" ? filterTestCaseId : undefined,
+        project_id: projectId ?? undefined,
       }),
-    enabled: activeTab === "list" && !Number.isNaN(projectId),
+    enabled: activeTab === "list",
   });
 
   const createRunMutation = useMutation({
@@ -585,52 +614,64 @@ export function RunsPage() {
       prompt_version_id: number;
       test_case_id: number;
       conversation: ConversationMessage[];
-    }) =>
-      createRun(projectId, {
+    }) => {
+      const profileId = selectedProfileId !== "" ? selectedProfileId : executionProfiles[0]?.id;
+      if (!profileId) throw new Error("実行プロファイルを選択してください");
+      if (projectId !== null) {
+        return createRun(projectId, {
+          ...data,
+          execution_trace: executionTrace.length > 0 ? executionTrace : undefined,
+          execution_profile_id: profileId,
+        });
+      }
+      return createRunIndependent({
         ...data,
         execution_trace: executionTrace.length > 0 ? executionTrace : undefined,
-        model: "manual",
-        temperature: 0,
-        api_provider: "manual",
-      }),
+        execution_profile_id: profileId,
+      });
+    },
     onSuccess: (run) => {
       setSavedRun(run);
       setStep("saved");
-      void queryClient.invalidateQueries({ queryKey: ["runs", projectId] });
+      void queryClient.invalidateQueries({ queryKey: ["runs-independent"] });
     },
   });
 
   const executeRunMutation = useMutation({
-    mutationFn: (data: { prompt_version_id: number; test_case_id: number }) =>
-      executeRunStream(projectId, {
+    mutationFn: (data: { prompt_version_id: number; test_case_id: number }) => {
+      const profileId = selectedProfileId !== "" ? selectedProfileId : executionProfiles[0]?.id;
+      if (!profileId) throw new Error("実行プロファイルを選択してください");
+      const options = {
         ...data,
         api_key: apiKey,
-        onDelta: (text) => {
+        execution_profile_id: profileId,
+        onDelta: (text: string) => {
           setLlmResponse((prev) => `${prev}${text}`);
         },
-        onStepStart: (stepInfo) => {
+        onStepStart: (stepInfo: Omit<ExecutionTraceStep, "output">) => {
           setStreamingStepId(stepInfo.id);
           setExecutionTrace((prev) => [...prev, { ...stepInfo, output: "" }]);
           setLlmResponse("");
         },
-        onStepDelta: (stepDelta) => {
+        onStepDelta: (stepDelta: { id: string; title: string; text: string }) => {
           setExecutionTrace((prev) =>
-            prev.map((step) =>
-              step.id === stepDelta.id
-                ? { ...step, output: `${step.output}${stepDelta.text}` }
-                : step,
+            prev.map((s) =>
+              s.id === stepDelta.id ? { ...s, output: `${s.output}${stepDelta.text}` } : s,
             ),
           );
           setLlmResponse((prev) => `${prev}${stepDelta.text}`);
         },
-        onStepComplete: (stepInfo) => {
-          setExecutionTrace((prev) =>
-            prev.map((step) => (step.id === stepInfo.id ? stepInfo : step)),
-          );
+        onStepComplete: (stepInfo: ExecutionTraceStep) => {
+          setExecutionTrace((prev) => prev.map((s) => (s.id === stepInfo.id ? stepInfo : s)));
           setStreamingStepId(null);
           setLlmResponse(stepInfo.output);
         },
-      }),
+      };
+      if (projectId !== null) {
+        return executeRunStream(projectId, options);
+      }
+      return executeRunStreamIndependent(options);
+    },
     onMutate: () => {
       setExecuteError(null);
       setLlmResponse("");
@@ -642,7 +683,7 @@ export function RunsPage() {
       setExecutionTrace(run.execution_trace ?? []);
       setStreamingStepId(null);
       setStep("saved");
-      void queryClient.invalidateQueries({ queryKey: ["runs", projectId] });
+      void queryClient.invalidateQueries({ queryKey: ["runs-independent"] });
     },
     onError: (error) => {
       setExecuteError(error instanceof Error ? error.message : "LLM 実行に失敗しました。");
@@ -650,41 +691,66 @@ export function RunsPage() {
   });
 
   const setBestMutation = useMutation({
-    mutationFn: ({ id, unset }: { id: number; unset: boolean }) => setBestRun(projectId, id, unset),
+    mutationFn: ({ runId, unset }: { runId: number; unset: boolean }) => {
+      if (projectId !== null) {
+        return setBestRun(projectId, runId, unset);
+      }
+      return setBestRunIndependent(runId, unset);
+    },
     onSuccess: () => {
-      void queryClient.invalidateQueries({ queryKey: ["runs", projectId] });
+      void queryClient.invalidateQueries({ queryKey: ["runs-independent"] });
     },
   });
 
   const discardMutation = useMutation({
-    mutationFn: (id: number) => discardRun(projectId, id),
+    mutationFn: (runId: number) => {
+      if (projectId !== null) {
+        return discardRun(projectId, runId);
+      }
+      return discardRunIndependent(runId);
+    },
     onSuccess: () => {
-      void queryClient.invalidateQueries({ queryKey: ["runs", projectId] });
+      void queryClient.invalidateQueries({ queryKey: ["runs-independent"] });
     },
   });
 
   const selectedVersion =
-    selectedVersionId !== "" ? promptVersions.find((v) => v.id === selectedVersionId) : undefined;
+    selectedVersionId !== "" ? familyVersions.find((v) => v.id === selectedVersionId) : undefined;
   const selectedTestCase =
     selectedTestCaseId !== "" ? testCases.find((tc) => tc.id === selectedTestCaseId) : undefined;
 
   function getVersionLabel(versionId: number): string {
-    const v = promptVersions.find((pv) => pv.id === versionId);
+    const v = allVersions.find((pv: PromptVersion) => pv.id === versionId);
     if (!v) return "v?";
-    return `v${v.version}${v.name ? ` - ${v.name}` : ""}`;
+    const family = promptFamilies.find((f: PromptFamily) => f.id === v.prompt_family_id);
+    const familyName = family?.name ?? `Family ${v.prompt_family_id}`;
+    return `${familyName} v${v.version}${v.name ? ` - ${v.name}` : ""}`;
   }
 
   function getVersionNumber(versionId: number): number {
-    return promptVersions.find((pv) => pv.id === versionId)?.version ?? 0;
+    return allVersions.find((pv: PromptVersion) => pv.id === versionId)?.version ?? 0;
   }
 
   function getTestCaseLabel(testCaseId: number): string {
-    const tc = testCases.find((t) => t.id === testCaseId);
+    const tc = testCases.find((t: TestCase) => t.id === testCaseId);
     return tc?.title ?? "不明";
   }
 
+  const hasProfile = selectedProfileId !== "" || executionProfiles.length > 0;
+  const isStartDisabled =
+    selectedVersionId === "" || selectedTestCaseId === "" || !hasApiKey || !hasProfile;
+  const isSaveDisabled =
+    !llmResponse.trim() || createRunMutation.isPending || executeRunMutation.isPending;
+  const isExecuteDisabled =
+    selectedVersionId === "" ||
+    selectedTestCaseId === "" ||
+    !hasApiKey ||
+    !hasProfile ||
+    executeRunMutation.isPending ||
+    createRunMutation.isPending;
+
   function handleStartRun() {
-    if (selectedVersionId === "" || selectedTestCaseId === "") return;
+    if (isStartDisabled) return;
     setLlmResponse("");
     setExecutionTrace([]);
     setStreamingStepId(null);
@@ -722,11 +788,10 @@ export function RunsPage() {
   }
 
   function handleExecuteRun() {
-    if (selectedVersionId === "" || selectedTestCaseId === "" || !hasApiKey) return;
-
+    if (isExecuteDisabled) return;
     executeRunMutation.mutate({
-      prompt_version_id: selectedVersionId,
-      test_case_id: selectedTestCaseId,
+      prompt_version_id: selectedVersionId as number,
+      test_case_id: selectedTestCaseId as number,
     });
   }
 
@@ -745,7 +810,6 @@ export function RunsPage() {
     } else if (!compareRunB) {
       setCompareRunB(run);
     } else {
-      // 3つ目を選択した場合はAを置き換え
       setCompareRunA(compareRunB);
       setCompareRunB(run);
     }
@@ -759,20 +823,8 @@ export function RunsPage() {
     discardMutation.mutate(run.id);
   }
 
-  // アノテーションプロンプト生成パネルの状態（RunsPage 内）
-  const isStartDisabled = selectedVersionId === "" || selectedTestCaseId === "" || !hasApiKey;
-  const isSaveDisabled =
-    !llmResponse.trim() || createRunMutation.isPending || executeRunMutation.isPending;
-  const isExecuteDisabled =
-    selectedVersionId === "" ||
-    selectedTestCaseId === "" ||
-    !hasApiKey ||
-    executeRunMutation.isPending ||
-    createRunMutation.isPending;
-
   return (
     <div className={`${styles.root} ${styles.page}`}>
-      {/* ヘッダー */}
       <div className={styles.pageHeader}>
         <div>
           <h2 className={styles.pageTitle}>Run 実行・管理</h2>
@@ -780,7 +832,6 @@ export function RunsPage() {
         </div>
       </div>
 
-      {/* タブ */}
       <div className={styles.tabBar}>
         <button
           type="button"
@@ -802,11 +853,34 @@ export function RunsPage() {
         {/* ============ タブ: Run を作成 ============ */}
         {activeTab === "create" && (
           <div>
-            {/* Step 1: 選択フォーム */}
             {step === "select" && (
               <div className={styles.selectCard}>
                 <h3 className={styles.selectCardTitle}>Run を取得する</h3>
 
+                {/* プロンプトファミリー選択 */}
+                <div className={styles.fieldGroup}>
+                  <label htmlFor="select-family" className={styles.fieldLabel}>
+                    プロンプトファミリー
+                  </label>
+                  <select
+                    id="select-family"
+                    value={selectedFamilyId}
+                    onChange={(e) => {
+                      setSelectedFamilyId(e.target.value === "" ? "" : Number(e.target.value));
+                      setSelectedVersionId("");
+                    }}
+                    className={styles.fieldSelect}
+                  >
+                    <option value="">-- 選択してください --</option>
+                    {promptFamilies.map((f: PromptFamily) => (
+                      <option key={f.id} value={f.id}>
+                        {f.name ?? `Family #${f.id}`}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                {/* バージョン選択 */}
                 <div className={styles.fieldGroup}>
                   <label htmlFor="select-version" className={styles.fieldLabel}>
                     プロンプトバージョン
@@ -818,22 +892,23 @@ export function RunsPage() {
                       setSelectedVersionId(e.target.value === "" ? "" : Number(e.target.value))
                     }
                     className={styles.fieldSelect}
+                    disabled={selectedFamilyId === ""}
                   >
                     <option value="">-- 選択してください --</option>
-                    {promptVersions.map((v) => (
+                    {familyVersions.map((v: PromptVersion) => (
                       <option key={v.id} value={v.id}>
                         v{v.version}
                         {v.name ? ` - ${v.name}` : ""}
+                        {v.is_selected ? " ★" : ""}
                       </option>
                     ))}
                   </select>
-                  {promptVersions.length === 0 && (
-                    <p className={styles.fieldHint}>
-                      プロンプトバージョンがありません。先にバージョンを作成してください。
-                    </p>
+                  {selectedFamilyId === "" && (
+                    <p className={styles.fieldHint}>先にファミリーを選択してください。</p>
                   )}
                 </div>
 
+                {/* テストケース選択 */}
                 <div className={styles.fieldGroupLg}>
                   <label htmlFor="select-test-case" className={styles.fieldLabel}>
                     テストケース
@@ -847,7 +922,7 @@ export function RunsPage() {
                     className={styles.fieldSelect}
                   >
                     <option value="">-- 選択してください --</option>
-                    {testCases.map((tc) => (
+                    {testCases.map((tc: TestCase) => (
                       <option key={tc.id} value={tc.id}>
                         {tc.title}
                       </option>
@@ -860,12 +935,46 @@ export function RunsPage() {
                   )}
                 </div>
 
+                {/* 実行プロファイル選択 */}
+                <div className={styles.fieldGroup}>
+                  <label htmlFor="select-profile" className={styles.fieldLabel}>
+                    実行プロファイル
+                  </label>
+                  <select
+                    id="select-profile"
+                    value={selectedProfileId}
+                    onChange={(e) =>
+                      setSelectedProfileId(e.target.value === "" ? "" : Number(e.target.value))
+                    }
+                    className={styles.fieldSelect}
+                  >
+                    <option value="">
+                      {executionProfiles.length > 0
+                        ? "-- 選択してください（未選択時は先頭を使用）--"
+                        : "-- 実行プロファイルがありません --"}
+                    </option>
+                    {executionProfiles.map((p: ExecutionProfile) => (
+                      <option key={p.id} value={p.id}>
+                        {p.name} ({p.model})
+                      </option>
+                    ))}
+                  </select>
+                  {executionProfiles.length === 0 && (
+                    <p className={styles.fieldHint}>
+                      <Link to="/execution-profiles" className={styles.settingsLink}>
+                        実行設定
+                      </Link>
+                      でプロファイルを作成してください。
+                    </p>
+                  )}
+                </div>
+
                 <button
                   type="button"
                   onClick={handleStartRun}
                   disabled={isStartDisabled}
                   title={
-                    !hasApiKey ? "APIキーが未設定です（設定画面で入力してください）" : undefined
+                    !hasApiKey ? "APIキーが未設定です（実行設定画面で入力してください）" : undefined
                   }
                   className={`${styles.btnStart} ${isStartDisabled ? styles.btnStartDisabled : ""}`}
                 >
@@ -883,7 +992,6 @@ export function RunsPage() {
               </div>
             )}
 
-            {/* Step 2: Run 実行UI */}
             {step === "input" && selectedVersion && selectedTestCase && (
               <div>
                 <div className={styles.stepHeader}>
@@ -904,11 +1012,9 @@ export function RunsPage() {
                 <CopyPromptPanel version={selectedVersion} testCase={selectedTestCase} />
 
                 <div className={styles.twoColumns}>
-                  {/* 左カラム: テストケース表示 */}
                   <div className={styles.panel}>
                     <h3 className={styles.panelTitle}>テストケース: {selectedTestCase.title}</h3>
 
-                    {/* 会話ターン表示 */}
                     <div className={styles.chatList}>
                       {selectedTestCase.turns.map((turn, index) => (
                         <div
@@ -937,7 +1043,6 @@ export function RunsPage() {
                       </div>
                     )}
 
-                    {/* 期待される説明 */}
                     {selectedTestCase.expected_description && (
                       <div className={styles.expectedBox}>
                         <p className={styles.expectedLabel}>期待される応答の説明</p>
@@ -948,7 +1053,6 @@ export function RunsPage() {
                     )}
                   </div>
 
-                  {/* 右カラム: LLM実行・手動入力エリア */}
                   <div className={`${styles.panel} ${styles.panelFlex}`}>
                     <h3 className={styles.panelSubtitle}>LLM 応答</h3>
                     <p className={styles.inputDescription}>
@@ -1007,7 +1111,6 @@ export function RunsPage() {
               </div>
             )}
 
-            {/* Step 3: 保存後の表示 */}
             {step === "saved" && savedRun && selectedVersion && selectedTestCase && (
               <div>
                 <div className={styles.successBanner}>Run を保存しました（ID: {savedRun.id}）</div>
@@ -1018,7 +1121,6 @@ export function RunsPage() {
                   </button>
                 </div>
 
-                {/* 保存したRunの内容 */}
                 <div className={styles.savedPanel}>
                   <h3 className={styles.panelTitle}>保存した Run の内容</h3>
                   <p className={styles.savedMeta}>
@@ -1054,7 +1156,6 @@ export function RunsPage() {
                   ) : null}
                 </div>
 
-                {/* 同一バージョン×ケースの過去Run一覧 */}
                 <div className={styles.savedPanel}>
                   <h3 className={styles.panelTitle}>過去の Run 一覧</h3>
                   {relatedRuns.length === 0 ? (
@@ -1066,11 +1167,12 @@ export function RunsPage() {
                           key={run.id}
                           run={run}
                           projectId={projectId}
+                          scorePath={scorePath}
                           versionLabel={getVersionLabel(run.prompt_version_id)}
                           versionNumber={getVersionNumber(run.prompt_version_id)}
                           testCaseLabel={getTestCaseLabel(run.test_case_id)}
                           annotationTasks={annotationTasks}
-                          onSetBest={(unset) => setBestMutation.mutate({ id: run.id, unset })}
+                          onSetBest={(unset) => setBestMutation.mutate({ runId: run.id, unset })}
                           isBestPending={setBestMutation.isPending}
                           onDiscard={() => handleDiscardRun(run)}
                           isDiscardPending={discardMutation.isPending}
@@ -1099,7 +1201,6 @@ export function RunsPage() {
               }}
             />
 
-            {/* フィルターバー */}
             <div className={styles.filterBar}>
               <div className={styles.filterField}>
                 <label htmlFor="filter-version" className={styles.filterLabel}>
@@ -1114,12 +1215,17 @@ export function RunsPage() {
                   className={styles.filterSelect}
                 >
                   <option value="">すべて</option>
-                  {promptVersions.map((v) => (
-                    <option key={v.id} value={v.id}>
-                      v{v.version}
-                      {v.name ? ` - ${v.name}` : ""}
-                    </option>
-                  ))}
+                  {allVersions.map((v: PromptVersion) => {
+                    const family = promptFamilies.find(
+                      (f: PromptFamily) => f.id === v.prompt_family_id,
+                    );
+                    return (
+                      <option key={v.id} value={v.id}>
+                        {family?.name ?? `Family ${v.prompt_family_id}`} v{v.version}
+                        {v.name ? ` - ${v.name}` : ""}
+                      </option>
+                    );
+                  })}
                 </select>
               </div>
 
@@ -1136,7 +1242,7 @@ export function RunsPage() {
                   className={styles.filterSelect}
                 >
                   <option value="">すべて</option>
-                  {testCases.map((tc) => (
+                  {testCases.map((tc: TestCase) => (
                     <option key={tc.id} value={tc.id}>
                       {tc.title}
                     </option>
@@ -1156,7 +1262,6 @@ export function RunsPage() {
               </button>
             </div>
 
-            {/* Run 一覧 */}
             {isRunsLoading ? (
               <p className={styles.loadingMsg}>読み込み中...</p>
             ) : allRuns.length === 0 ? (
@@ -1172,11 +1277,12 @@ export function RunsPage() {
                     key={run.id}
                     run={run}
                     projectId={projectId}
+                    scorePath={scorePath}
                     versionLabel={getVersionLabel(run.prompt_version_id)}
                     versionNumber={getVersionNumber(run.prompt_version_id)}
                     testCaseLabel={getTestCaseLabel(run.test_case_id)}
                     annotationTasks={annotationTasks}
-                    onSetBest={(unset) => setBestMutation.mutate({ id: run.id, unset })}
+                    onSetBest={(unset) => setBestMutation.mutate({ runId: run.id, unset })}
                     isBestPending={setBestMutation.isPending}
                     onDiscard={() => handleDiscardRun(run)}
                     isDiscardPending={discardMutation.isPending}
@@ -1203,7 +1309,6 @@ export function RunsPage() {
         )}
       </div>
 
-      {/* 比較ビュー */}
       {isCompareOpen && compareRunA && compareRunB && (
         <RunCompareView
           runA={compareRunA}

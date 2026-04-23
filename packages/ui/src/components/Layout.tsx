@@ -84,6 +84,8 @@ function SidebarNav() {
     { to: "/test-cases", label: "テストケース", end: false },
     { to: "/prompts", label: "プロンプト", end: false },
     { to: "/context-assets", label: "コンテキスト素材", end: false },
+    { to: "/runs", label: "Run", end: false },
+    { to: "/score", label: "採点", end: false },
     { to: "/execution-profiles", label: "実行設定", end: false },
     { to: "/health", label: "ヘルスチェック", end: false },
   ];
