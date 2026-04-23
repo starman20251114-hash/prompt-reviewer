@@ -19,6 +19,7 @@ import {
   executeRunStream,
   executeRunStreamIndependent,
   extractAnnotationCandidates,
+  extractAnnotationCandidatesIndependent,
   getAnnotationTasks,
   getExecutionProfiles,
   getIndependentTestCases,
@@ -216,7 +217,7 @@ function AnnotationExtractPanel({
   annotationTasks,
 }: {
   run: Run;
-  projectId: number;
+  projectId: number | null;
   annotationTasks: AnnotationTask[];
 }) {
   const [selectedTaskId, setSelectedTaskId] = useState<number | "">("");
@@ -253,10 +254,13 @@ function AnnotationExtractPanel({
   const extractMutation = useMutation({
     mutationFn: () => {
       if (selectedTaskId === "") throw new Error("タスクを選択してください");
-      return extractAnnotationCandidates(projectId, run.id, {
+      const params = {
         annotation_task_id: selectedTaskId,
         source_type: hasStructuredOutput ? "structured_json" : "final_answer",
-      });
+      } as const;
+      return projectId !== null
+        ? extractAnnotationCandidates(projectId, run.id, params)
+        : extractAnnotationCandidatesIndependent(run.id, params);
     },
     onSuccess: (result) => {
       setExtractResult(result);
@@ -309,7 +313,7 @@ function AnnotationExtractPanel({
         <div className={styles.annotationSuccess}>
           <span>{extractResult.candidates_created} 件の候補を抽出しました。</span>
           <Link
-            to={`/projects/${projectId}/annotation-review?runId=${run.id}&taskId=${extractResult.annotation_task_id}`}
+            to={`${projectId !== null ? `/projects/${projectId}/annotation-review` : "/annotation-review"}?runId=${run.id}&taskId=${extractResult.annotation_task_id}`}
             className={styles.annotationReviewLink}
           >
             レビューページへ
@@ -319,7 +323,7 @@ function AnnotationExtractPanel({
       {!extractResult && selectedTaskId !== "" && (
         <div className={styles.annotationReviewLinkRow}>
           <Link
-            to={`/projects/${projectId}/annotation-review?runId=${run.id}&taskId=${selectedTaskId}`}
+            to={`${projectId !== null ? `/projects/${projectId}/annotation-review` : "/annotation-review"}?runId=${run.id}&taskId=${selectedTaskId}`}
             className={styles.annotationReviewLinkSmall}
           >
             既存の候補をレビュー
@@ -404,7 +408,7 @@ function RunCard({
           <Link to={`${scorePath}?runId=${run.id}`} className={styles.btnScore}>
             採点
           </Link>
-          {projectId !== null && annotationTasks.length > 0 && !isQuickRun && (
+          {annotationTasks.length > 0 && !isQuickRun && (
             <button
               type="button"
               onClick={() => setShowAnnotation((prev) => !prev)}
@@ -439,7 +443,7 @@ function RunCard({
         </div>
       </div>
 
-      {showAnnotation && projectId !== null && (
+      {showAnnotation && (
         <AnnotationExtractPanel run={run} projectId={projectId} annotationTasks={annotationTasks} />
       )}
 
@@ -578,7 +582,6 @@ export function RunsPage() {
   const { data: annotationTasks = [] } = useQuery({
     queryKey: ["annotation-tasks"],
     queryFn: () => getAnnotationTasks(),
-    enabled: projectId !== null,
   });
 
   const { data: relatedRuns = [] } = useQuery({

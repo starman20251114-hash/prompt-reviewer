@@ -259,3 +259,21 @@ type TestCaseFilters = {
 - `#123` は Context Assets を使う
 - `#124` は Independent Test Cases を使う
 - `#125` は Runs / Score / Progression の新 API と必要な不足分を詰める
+- `#184` は `#125` の続きとして、`AnnotationReviewPage` / `AnnotationTaskSettingsPage` 側の状態管理・導線・API 利用を `RunsPage` の score 新フィルタ対応と整合させる
+
+## 追記: Issue #184 の観点
+
+`#125` の修正対象は `RunsPage` が中心だが、同じデータ導線を使うアノテーション関連ページにも追随対応が必要になる可能性が高い。
+
+特に確認したいポイント:
+
+- `AnnotationReviewPage` が `RunsPage` 側で追加した filter / 遷移条件と矛盾しないこと
+- `AnnotationTaskSettingsPage` からの導線や task 選択状態が、`#125` の変更後も破綻しないこと
+- `api.ts` に `#125` で追加した関数・型が annotation 系ページでも不足なく再利用できること
+
+実装順の目安:
+
+1. `#125` で入った `api.ts` と `RunsPage` の変更差分を基準として確認する
+2. `AnnotationReviewPage` の検索条件・URL パラメータ・遷移先を見直す
+3. `AnnotationTaskSettingsPage` の関連導線と依存 API を見直す
+4. 必要なら UI テストや型チェックを追加して回帰を防ぐ

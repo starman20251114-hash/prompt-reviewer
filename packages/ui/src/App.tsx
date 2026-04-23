@@ -47,6 +47,8 @@ export function App() {
             <Route path="projects/:id/score" element={<ScorePage />} />
             <Route path="score-progression" element={<ScoreProgressionPage />} />
             <Route path="projects/:id/score-progression" element={<ScoreProgressionPage />} />
+            <Route path="annotation-review" element={<AnnotationReviewPage />} />
+            <Route path="annotation-tasks" element={<AnnotationTaskSettingsPage />} />
             <Route path="projects/:id/annotation-tasks" element={<AnnotationTaskSettingsPage />} />
             <Route path="projects/:id/annotation-review" element={<AnnotationReviewPage />} />
             <Route path="projects/:id/settings" element={<ProjectSettingsPage />} />

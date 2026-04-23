@@ -764,6 +764,10 @@ export function discardRun(projectId: number, id: number): Promise<Run> {
   return api.patch<Run>(`/projects/${projectId}/runs/${id}/discard`, {});
 }
 
+export function getRunIndependent(id: number): Promise<Run> {
+  return api.get<Run>(`/runs/${id}`);
+}
+
 export function getRunsIndependent(filters?: RunFilters): Promise<Run[]> {
   const params = new URLSearchParams();
   if (filters?.prompt_version_id !== undefined) {
@@ -1253,6 +1257,20 @@ export function extractAnnotationCandidates(
 ): Promise<{ candidates_created: number; annotation_task_id: number }> {
   return api.post<{ candidates_created: number; annotation_task_id: number }>(
     `/projects/${projectId}/runs/${runId}/candidates/extract`,
+    data,
+  );
+}
+
+export function extractAnnotationCandidatesIndependent(
+  runId: number,
+  data: {
+    annotation_task_id: number;
+    source_type?: "structured_json" | "final_answer" | "trace_step";
+    source_step_id?: string;
+  },
+): Promise<{ candidates_created: number; annotation_task_id: number }> {
+  return api.post<{ candidates_created: number; annotation_task_id: number }>(
+    `/runs/${runId}/candidates/extract`,
     data,
   );
 }
