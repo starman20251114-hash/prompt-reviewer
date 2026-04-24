@@ -7,6 +7,7 @@ import {
   getProjects,
   updateProject,
 } from "../lib/api";
+import { useActiveLabel } from "../lib/useActiveLabel";
 import styles from "./ProjectsPage.module.css";
 
 function formatDate(timestamp: number): string {
@@ -145,14 +146,25 @@ function DeleteDialog({ project, onClose, onConfirm, isLoading }: DeleteDialogPr
 
 type LabelRowProps = {
   project: Project;
+  isActive: boolean;
+  onSelect: (project: Project) => void;
   onEdit: (project: Project) => void;
   onDelete: (project: Project) => void;
 };
 
-function LabelRow({ project, onEdit, onDelete }: LabelRowProps) {
+function LabelRow({ project, isActive, onSelect, onEdit, onDelete }: LabelRowProps) {
   return (
-    <div className={styles.labelRow}>
-      <span className={styles.labelTag}>{project.name}</span>
+    <div
+      className={`${styles.labelRow} ${isActive ? styles.labelRowActive : ""}`}
+      onClick={() => onSelect(project)}
+      onKeyDown={(e) => e.key === "Enter" && onSelect(project)}
+      role="button"
+      tabIndex={0}
+    >
+      <span className={`${styles.labelTag} ${isActive ? styles.labelTagActive : ""}`}>
+        {project.name}
+      </span>
+      {isActive && <span className={styles.activeBadge}>絞り込み中</span>}
       {project.description && (
         <span className={styles.labelDescription}>{project.description}</span>
       )}
@@ -160,14 +172,14 @@ function LabelRow({ project, onEdit, onDelete }: LabelRowProps) {
       <div className={styles.actions}>
         <button
           type="button"
-          onClick={() => onEdit(project)}
+          onClick={(e) => { e.stopPropagation(); onEdit(project); }}
           className={styles.editButton}
         >
           編集
         </button>
         <button
           type="button"
-          onClick={() => onDelete(project)}
+          onClick={(e) => { e.stopPropagation(); onDelete(project); }}
           className={styles.deleteButton}
         >
           削除
@@ -179,9 +191,14 @@ function LabelRow({ project, onEdit, onDelete }: LabelRowProps) {
 
 export function ProjectsPage() {
   const queryClient = useQueryClient();
+  const { activeLabelId, setActiveLabelId } = useActiveLabel();
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [editTarget, setEditTarget] = useState<Project | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<Project | null>(null);
+
+  function handleSelectLabel(project: Project) {
+    setActiveLabelId(activeLabelId === project.id ? null : project.id);
+  }
 
   const {
     data: projects,
@@ -246,12 +263,20 @@ export function ProjectsPage() {
         </div>
       )}
 
+      {activeLabelId !== null && (
+        <p className={styles.activeHint}>
+          ラベルを選択中です。テストケース・プロンプト・コンテキスト素材のページでこのラベルで絞り込まれます。
+        </p>
+      )}
+
       {!isLoading && !isError && projects && projects.length > 0 && (
         <div className={styles.labelList}>
           {projects.map((project) => (
             <LabelRow
               key={project.id}
               project={project}
+              isActive={activeLabelId === project.id}
+              onSelect={handleSelectLabel}
               onEdit={setEditTarget}
               onDelete={setDeleteTarget}
             />

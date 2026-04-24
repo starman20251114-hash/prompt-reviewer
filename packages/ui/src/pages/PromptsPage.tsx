@@ -1,6 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useState } from "react";
 import { useParams, useSearchParams } from "react-router";
+import { getStoredActiveLabelId } from "../lib/useActiveLabel";
 import {
   type Project,
   type PromptExecutionStepDefinition,
@@ -840,6 +841,17 @@ export function PromptsPage() {
       ? requestedFamilyId
       : (families[0]?.id ?? null);
   const selectedFamily = families.find((family) => family.id === selectedFamilyId) ?? null;
+
+  useEffect(() => {
+    if (searchParams.get("project_id") !== null || routeProjectId !== null) return;
+    const activeId = getStoredActiveLabelId();
+    if (activeId === null) return;
+    const next = new URLSearchParams(searchParams);
+    next.set("project_id", String(activeId));
+    setSearchParams(next, { replace: true });
+  // 初回マウント時のみ実行
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   useEffect(() => {
     const nextParams = new URLSearchParams(searchParams);
