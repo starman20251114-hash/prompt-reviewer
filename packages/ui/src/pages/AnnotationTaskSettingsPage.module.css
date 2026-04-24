@@ -220,16 +220,9 @@
 }
 
 .requiredMark {
-  display: inline-flex;
-  align-items: center;
-  margin-left: 8px;
-  padding: 2px 6px;
-  border-radius: 999px;
-  background: rgba(250, 179, 135, 0.16);
-  color: var(--c-accent-strong);
-  font-size: 10px;
-  letter-spacing: 0.04em;
-  vertical-align: middle;
+  margin-left: 4px;
+  color: var(--c-danger);
+  font-size: 14px;
 }
 
 .fieldInput,
