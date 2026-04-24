@@ -165,6 +165,19 @@
   composes: fieldLabel from '../styles/shared.module.css';
 }
 
+.fieldLabelRow {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin-bottom: 6px;
+}
+
+.fieldLabelHint {
+  font-size: 12px;
+  color: var(--c-muted);
+}
+
 .requiredMark {
   composes: requiredMark from '../styles/shared.module.css';
 }
@@ -230,6 +243,14 @@
   line-height: 1.5;
 }
 
+.contextImportHint {
+  margin: 0;
+  font-size: 12px;
+  color: var(--c-muted);
+  line-height: 1.5;
+  text-align: right;
+}
+
 .tagGroup {
   display: flex;
   gap: 8px;
@@ -256,8 +277,8 @@
 .assetSection {
   display: flex;
   flex-direction: column;
-  gap: 12px;
-  padding: 14px;
+  gap: 4px;
+  padding: 14px 14px 2px;
   border: 1px solid var(--c-border);
   border-radius: 12px;
   background: color-mix(in srgb, var(--c-bg) 55%, transparent);

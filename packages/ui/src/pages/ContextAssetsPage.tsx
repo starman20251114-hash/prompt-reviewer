@@ -104,6 +104,7 @@ export function ContextAssetsPage() {
   });
   const [searchInput, setSearchInput] = useState("");
   const [selectedProjectIds, setSelectedProjectIds] = useState<number[]>([]);
+  const [showProperties, setShowProperties] = useState(false);
 
   const projectsQuery = useQuery({
     queryKey: ["projects"],
@@ -283,7 +284,7 @@ export function ContextAssetsPage() {
       <div className={styles.pageHeader}>
         <div>
           <h2 className={styles.pageTitle}>コンテキスト素材</h2>
-          <p className={styles.pageDescription}>グローバルなコンテキスト素材を管理します。</p>
+          <p className={styles.pageDescription}>テストケースで利用するコンテキスト素材を管理します。</p>
         </div>
         <div className={styles.headerActions}>
           <input
@@ -298,7 +299,11 @@ export function ContextAssetsPage() {
           />
           <button
             type="button"
-            onClick={() => fileInputRef.current?.click()}
+            onClick={() => {
+              setShowCreateForm(false);
+              setStatusMessage(null);
+              fileInputRef.current?.click();
+            }}
             className={styles.btnPrimary}
             disabled={uploadMutation.isPending}
           >
@@ -454,110 +459,127 @@ export function ContextAssetsPage() {
 
           {selectedId && selectedDetail && (
             <>
-              <div className={styles.panelHeader}>
-                <div className={styles.detailMeta}>
-                  <div className={styles.detailMetaRow}>
-                    <label htmlFor="detail-name" className={styles.metaLabel}>
-                      名前
-                    </label>
-                    <input
-                      id="detail-name"
-                      type="text"
-                      className={styles.textInput}
-                      value={draftName}
-                      onChange={(e) => setDraftName(e.target.value)}
-                    />
-                  </div>
-                  <div className={styles.detailMetaRow}>
-                    <label htmlFor="detail-path" className={styles.metaLabel}>
-                      パス
-                    </label>
-                    <input
-                      id="detail-path"
-                      type="text"
-                      className={styles.textInput}
-                      value={draftPath}
-                      onChange={(e) => setDraftPath(e.target.value)}
-                    />
-                  </div>
-                  <div className={styles.detailMetaRow}>
-                    <label htmlFor="detail-mime" className={styles.metaLabel}>
-                      MIMEタイプ
-                    </label>
-                    <input
-                      id="detail-mime"
-                      type="text"
-                      className={styles.textInput}
-                      value={draftMimeType}
-                      onChange={(e) => setDraftMimeType(e.target.value)}
-                    />
-                  </div>
-                  {selectedSummary && (
-                    <p className={styles.panelSubtitle}>
-                      {formatBytes(getContentSize(selectedDetail.content))} / 更新:{" "}
-                      {formatDate(selectedSummary.updated_at)}
-                    </p>
-                  )}
-                </div>
-                <div className={styles.panelActions}>
-                  <button
-                    type="button"
-                    onClick={() => saveMutation.mutate()}
-                    disabled={!isDetailDirty || saveMutation.isPending}
-                    className={`${styles.btnSave} ${!isDetailDirty || saveMutation.isPending ? styles.btnDisabled : ""}`}
-                  >
-                    {saveMutation.isPending ? "保存中..." : "保存"}
-                  </button>
-                  {deleteConfirmId === selectedId ? (
-                    <div className={styles.deleteConfirm}>
-                      <span className={styles.deleteConfirmText}>本当に削除しますか？</span>
-                      <button
-                        type="button"
-                        onClick={() => deleteMutation.mutate(selectedId)}
-                        disabled={deleteMutation.isPending}
-                        className={styles.btnDanger}
-                      >
-                        {deleteMutation.isPending ? "削除中..." : "削除"}
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => setDeleteConfirmId(null)}
-                        className={styles.btnCancel}
-                      >
-                        キャンセル
-                      </button>
+              {/* プロパティ開閉セクション */}
+              <div className={styles.propertiesSection}>
+                <button
+                  type="button"
+                  onClick={() => setShowProperties((v) => !v)}
+                  className={styles.propertiesToggle}
+                >
+                  プロパティ
+                  <span className={styles.propertiesToggleIcon}>
+                    {showProperties ? "▾" : "▸"}
+                  </span>
+                </button>
+                {showProperties && (
+                  <div className={styles.propertiesBody}>
+                    <div className={styles.detailMetaRow}>
+                      <label htmlFor="detail-name" className={styles.metaLabel}>
+                        名前
+                      </label>
+                      <input
+                        id="detail-name"
+                        type="text"
+                        className={styles.textInput}
+                        value={draftName}
+                        onChange={(e) => setDraftName(e.target.value)}
+                      />
                     </div>
-                  ) : (
+                    <div className={styles.detailMetaRow}>
+                      <label htmlFor="detail-path" className={styles.metaLabel}>
+                        パス
+                      </label>
+                      <input
+                        id="detail-path"
+                        type="text"
+                        className={styles.textInput}
+                        value={draftPath}
+                        onChange={(e) => setDraftPath(e.target.value)}
+                      />
+                    </div>
+                    <div className={styles.detailMetaRow}>
+                      <label htmlFor="detail-mime" className={styles.metaLabel}>
+                        MIMEタイプ
+                      </label>
+                      <input
+                        id="detail-mime"
+                        type="text"
+                        className={styles.textInput}
+                        value={draftMimeType}
+                        onChange={(e) => setDraftMimeType(e.target.value)}
+                      />
+                    </div>
+
+                    <div>
+                      <p className={styles.projectAssignTitle}>プロジェクト割り当て</p>
+                      <div className={styles.projectAssignList}>
+                        {projects.length === 0 && (
+                          <span className={styles.noProjects}>プロジェクトがありません</span>
+                        )}
+                        {projects.map((p) => (
+                          <button
+                            key={p.id}
+                            type="button"
+                            onClick={() => handleProjectAssignToggle(p.id)}
+                            className={`${styles.projectBadge} ${selectedProjectIds.includes(p.id) ? styles.projectBadgeActive : ""}`}
+                          >
+                            {p.name}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+
+                    {selectedSummary && (
+                      <p className={styles.panelSubtitle}>
+                        {formatBytes(getContentSize(selectedDetail.content))} / 更新:{" "}
+                        {formatDate(selectedSummary.updated_at)}
+                      </p>
+                    )}
+                  </div>
+                )}
+              </div>
+
+              {/* 保存・削除ツールバー（エディタの外に独立） */}
+              <div className={styles.editorToolbar}>
+                <button
+                  type="button"
+                  onClick={() => saveMutation.mutate()}
+                  disabled={!isDetailDirty || saveMutation.isPending}
+                  className={`${styles.btnSave} ${!isDetailDirty || saveMutation.isPending ? styles.btnDisabled : ""}`}
+                >
+                  {saveMutation.isPending ? "保存中..." : "保存"}
+                </button>
+                {deleteConfirmId === selectedId ? (
+                  <div className={styles.deleteConfirm}>
+                    <span className={styles.deleteConfirmText}>本当に削除しますか？</span>
                     <button
                       type="button"
-                      onClick={() => setDeleteConfirmId(selectedId)}
+                      onClick={() => deleteMutation.mutate(selectedId)}
+                      disabled={deleteMutation.isPending}
                       className={styles.btnDanger}
                     >
-                      削除
+                      {deleteMutation.isPending ? "削除中..." : "削除"}
                     </button>
-                  )}
-                </div>
-              </div>
-
-              <div className={styles.projectAssignSection}>
-                <p className={styles.projectAssignTitle}>プロジェクト割り当て</p>
-                <div className={styles.projectAssignList}>
-                  {projects.length === 0 && (
-                    <span className={styles.noProjects}>プロジェクトがありません</span>
-                  )}
-                  {projects.map((p) => (
                     <button
-                      key={p.id}
                       type="button"
-                      onClick={() => handleProjectAssignToggle(p.id)}
-                      className={`${styles.projectBadge} ${selectedProjectIds.includes(p.id) ? styles.projectBadgeActive : ""}`}
+                      onClick={() => setDeleteConfirmId(null)}
+                      className={styles.btnCancel}
                     >
-                      {p.name}
+                      キャンセル
                     </button>
-                  ))}
-                </div>
+                  </div>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={() => setDeleteConfirmId(selectedId)}
+                    className={styles.btnDanger}
+                  >
+                    削除
+                  </button>
+                )}
               </div>
 
+              {/* CodeMirrorエディタ */}
               <div className={styles.editorArea}>
                 <CodeMirror
                   value={draftContent}

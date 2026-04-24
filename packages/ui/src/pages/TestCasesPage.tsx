@@ -134,8 +134,8 @@ function TurnEditor({ turns, onChange }: TurnEditorProps) {
               }
               className={`${styles.turnSelect} ${turn.role === "user" ? styles.turnSelectUser : styles.turnSelectAssistant}`}
             >
-              <option value="user">user</option>
-              <option value="assistant">assistant</option>
+              <option value="user">ユーザー</option>
+              <option value="assistant">アシスタント</option>
             </select>
             <div className={styles.turnControls}>
               <button
@@ -217,38 +217,20 @@ function ProjectTagEditor({ projects, selectedProjectIds, onChange }: ProjectTag
 }
 
 type ContextAssetPickerProps = {
-  selectedIds: number[];
   availableAssets: ContextAssetSummary[];
-  linkedAssets: ContextAssetSummary[];
   selectedImportId: number | null;
   isImporting: boolean;
   onImportSelectionChange: (id: number | null) => void;
   onImport: () => void;
-  onToggleLink: (assetId: number) => void;
 };
 
 function ContextAssetPicker({
-  selectedIds,
   availableAssets,
-  linkedAssets,
   selectedImportId,
   isImporting,
   onImportSelectionChange,
   onImport,
-  onToggleLink,
 }: ContextAssetPickerProps) {
-  const assetMap = new Map<number, ContextAssetSummary>();
-  for (const asset of linkedAssets) {
-    assetMap.set(asset.id, asset);
-  }
-  for (const asset of availableAssets) {
-    assetMap.set(asset.id, asset);
-  }
-
-  const selectedAssets = selectedIds
-    .map((assetId) => assetMap.get(assetId))
-    .filter((asset): asset is ContextAssetSummary => Boolean(asset));
-
   return (
     <div className={styles.assetSection}>
       <div className={styles.contextImportControls}>
@@ -282,49 +264,9 @@ function ContextAssetPicker({
           {isImporting ? "取込中..." : "内容を取り込む"}
         </button>
       </div>
-
-      <p className={styles.modeHint}>
-        `context_assets` の内容をスナップショットとして `context_content`
-        に取り込みます。関連付けだけ残したい場合は下のタグを切り替えてください。
+      <p className={styles.contextImportHint}>
+        選択した素材の内容をスナップショットとしてコンテキスト欄に取り込みます。
       </p>
-
-      {selectedAssets.length > 0 ? (
-        <div className={styles.selectedAssets}>
-          <p className={styles.selectedAssetsLabel}>関連付け中の素材</p>
-          <div className={styles.assetTagList}>
-            {selectedAssets.map((asset) => (
-              <button
-                key={asset.id}
-                type="button"
-                onClick={() => onToggleLink(asset.id)}
-                className={`${styles.assetTag} ${styles.assetTagSelected}`}
-              >
-                {asset.name}
-              </button>
-            ))}
-          </div>
-        </div>
-      ) : (
-        <p className={styles.modeHint}>関連付け中の素材はありません。</p>
-      )}
-
-      {availableAssets.length > 0 && (
-        <div className={styles.availableAssets}>
-          <p className={styles.selectedAssetsLabel}>候補から関連付けを切り替える</p>
-          <div className={styles.assetTagList}>
-            {availableAssets.map((asset) => (
-              <button
-                key={asset.id}
-                type="button"
-                onClick={() => onToggleLink(asset.id)}
-                className={`${styles.assetTag} ${selectedIds.includes(asset.id) ? styles.assetTagSelected : ""}`}
-              >
-                {asset.name}
-              </button>
-            ))}
-          </div>
-        </div>
-      )}
     </div>
   );
 }
@@ -418,15 +360,6 @@ function TestCaseModal({
     });
   }
 
-  function handleToggleAsset(assetId: number) {
-    setImportNotice(null);
-    setFormData((prev) => ({
-      ...prev,
-      context_asset_ids: prev.context_asset_ids.includes(assetId)
-        ? prev.context_asset_ids.filter((id) => id !== assetId)
-        : [...prev.context_asset_ids, assetId],
-    }));
-  }
 
   const isSubmittable = formData.title.trim() !== "";
 
@@ -446,10 +379,13 @@ function TestCaseModal({
         </h3>
         <form onSubmit={handleSubmit}>
           <div className={styles.fieldGroup}>
-            <label htmlFor="test-case-title" className={styles.fieldLabel}>
-              タイトル
-              <span className={styles.requiredMark}>*</span>
-            </label>
+            <div className={styles.fieldLabelRow}>
+              <label htmlFor="test-case-title" className={styles.fieldLabel}>
+                タイトル
+                <span className={styles.requiredMark}>*</span>
+              </label>
+              <span className={styles.fieldLabelHint}>プロンプトのみで何も参照しない場合はタイトルだけ入力して作成してください。</span>
+            </div>
             <input
               id="test-case-title"
               type="text"
@@ -461,27 +397,11 @@ function TestCaseModal({
           </div>
 
           <div className={styles.fieldGroup}>
-            <p className={styles.fieldLabel}>プロジェクトラベル</p>
-            <p className={styles.modeHint}>
-              project 親子ではなく独立資産として管理しつつ、必要な project にタグ付けできます。
-            </p>
-            <ProjectTagEditor
-              projects={projects}
-              selectedProjectIds={formData.project_ids}
-              onChange={(projectIds) =>
-                setFormData((prev) => ({ ...prev, project_ids: projectIds }))
-              }
-            />
-          </div>
-
-          <div className={styles.fieldGroup}>
             <label htmlFor="test-case-context" className={styles.fieldLabel}>
               コンテキスト（任意）
             </label>
             <ContextAssetPicker
-              selectedIds={formData.context_asset_ids}
               availableAssets={availableAssets}
-              linkedAssets={linkedAssets}
               selectedImportId={selectedImportId}
               isImporting={importContextMutation.isPending}
               onImportSelectionChange={setSelectedImportId}
@@ -489,7 +409,6 @@ function TestCaseModal({
                 if (!selectedImportId) return;
                 importContextMutation.mutate(selectedImportId);
               }}
-              onToggleLink={handleToggleAsset}
             />
             {importContextMutation.isError && (
               <p className={styles.contextImportError}>
@@ -509,16 +428,6 @@ function TestCaseModal({
             />
           </div>
 
-          <div className={styles.fieldGroup}>
-            <p className={styles.fieldLabel}>会話ターン（任意）</p>
-            <p className={styles.modeHint}>
-              実行時の補足情報は上のコンテキスト欄へ、会話として固定したい内容はターンで入力します。
-            </p>
-            <TurnEditor
-              turns={formData.turns}
-              onChange={(turns) => setFormData((prev) => ({ ...prev, turns }))}
-            />
-          </div>
 
           <div className={styles.fieldGroupLg}>
             <label htmlFor="test-case-expected" className={styles.fieldLabel}>
@@ -533,6 +442,20 @@ function TestCaseModal({
               placeholder="期待するアシスタントの振る舞いを記述..."
               rows={3}
               className={styles.fieldTextarea}
+            />
+          </div>
+
+          <div className={styles.fieldGroup}>
+            <p className={styles.fieldLabel}>プロジェクトラベル</p>
+            <p className={styles.modeHint}>
+              必要なプロジェクトにタグ付けできます。
+            </p>
+            <ProjectTagEditor
+              projects={projects}
+              selectedProjectIds={formData.project_ids}
+              onChange={(projectIds) =>
+                setFormData((prev) => ({ ...prev, project_ids: projectIds }))
+              }
             />
           </div>
 
@@ -938,8 +861,7 @@ export function TestCasesPage() {
         <div>
           <h2 className={styles.pageTitle}>テストケース管理</h2>
           <p className={styles.pageDescription}>
-            独立資産としてテストケースを管理し、必要な project や context assets
-            をあとから関連付けます。
+            テストケースを管理します。必要なコンテキスト素材やプロジェクトをあとから関連付けられます。
           </p>
         </div>
         <button type="button" onClick={() => setIsCreateOpen(true)} className={styles.btnPrimary}>
