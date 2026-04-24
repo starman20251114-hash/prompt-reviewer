@@ -709,7 +709,7 @@ export function TestCasesPage() {
       ? Number(searchParams.get("project_id"))
       : legacyProjectId !== null && !Number.isNaN(legacyProjectId)
         ? legacyProjectId
-        : null;
+        : getStoredActiveLabelId();
   const selectedUnclassified = searchParams.get("unclassified") === "true";
   const searchQuery = searchParams.get("q")?.trim() ?? "";
 
@@ -730,17 +730,6 @@ export function TestCasesPage() {
     next.set("project_id", String(legacyProjectId));
     setSearchParams(next, { replace: true });
   }, [legacyProjectId, searchParams, setSearchParams]);
-
-  useEffect(() => {
-    if (searchParams.get("project_id") !== null || legacyProjectId !== null) return;
-    const activeId = getStoredActiveLabelId();
-    if (activeId === null) return;
-    const next = new URLSearchParams(searchParams);
-    next.set("project_id", String(activeId));
-    setSearchParams(next, { replace: true });
-  // 初回マウント時のみ実行
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
 
   const filters: TestCaseFilters = {
     q: searchQuery || undefined,

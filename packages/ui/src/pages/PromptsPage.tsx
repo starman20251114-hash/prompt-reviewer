@@ -811,7 +811,8 @@ export function PromptsPage() {
   const projectFilterParam = searchParams.get("project_id");
   const familyFilterParam = searchParams.get("family_id");
   const selectedProjectId =
-    routeProjectId ?? (projectFilterParam ? Number(projectFilterParam) : null);
+    routeProjectId ??
+    (projectFilterParam ? Number(projectFilterParam) : getStoredActiveLabelId());
   const isProjectScopedView = routeProjectId !== null;
 
   const [selectedVersion, setSelectedVersion] = useState<PromptVersion | null>(null);
@@ -841,17 +842,6 @@ export function PromptsPage() {
       ? requestedFamilyId
       : (families[0]?.id ?? null);
   const selectedFamily = families.find((family) => family.id === selectedFamilyId) ?? null;
-
-  useEffect(() => {
-    if (searchParams.get("project_id") !== null || routeProjectId !== null) return;
-    const activeId = getStoredActiveLabelId();
-    if (activeId === null) return;
-    const next = new URLSearchParams(searchParams);
-    next.set("project_id", String(activeId));
-    setSearchParams(next, { replace: true });
-  // 初回マウント時のみ実行
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
 
   useEffect(() => {
     const nextParams = new URLSearchParams(searchParams);
