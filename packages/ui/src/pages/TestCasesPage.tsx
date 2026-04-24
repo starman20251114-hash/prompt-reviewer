@@ -17,6 +17,7 @@ import {
   setTestCaseProjects,
   updateIndependentTestCase,
 } from "../lib/api";
+import { useI18n } from "../i18n/I18nProvider";
 import { getStoredActiveLabelId } from "../lib/useActiveLabel";
 import styles from "./TestCasesPage.module.css";
 
@@ -73,6 +74,8 @@ type TurnEditorProps = {
 };
 
 function TurnEditor({ turns, onChange }: TurnEditorProps) {
+  const { t } = useI18n();
+
   function handleRoleChange(index: number, role: "user" | "assistant") {
     onChange(
       turns.map((turn, currentIndex) => (currentIndex === index ? { ...turn, role } : turn)),
@@ -134,8 +137,8 @@ function TurnEditor({ turns, onChange }: TurnEditorProps) {
               }
               className={`${styles.turnSelect} ${turn.role === "user" ? styles.turnSelectUser : styles.turnSelectAssistant}`}
             >
-              <option value="user">ユーザー</option>
-              <option value="assistant">アシスタント</option>
+              <option value="user">{t("testCases.turnUser")}</option>
+              <option value="assistant">{t("testCases.turnAssistant")}</option>
             </select>
             <div className={styles.turnControls}>
               <button
@@ -231,6 +234,8 @@ function ContextAssetPicker({
   onImportSelectionChange,
   onImport,
 }: ContextAssetPickerProps) {
+  const { t } = useI18n();
+
   return (
     <div className={styles.assetSection}>
       <div className={styles.contextImportControls}>
@@ -265,7 +270,7 @@ function ContextAssetPicker({
         </button>
       </div>
       <p className={styles.contextImportHint}>
-        選択した素材の内容をスナップショットとしてコンテキスト欄に取り込みます。
+        {t("testCases.contextImportHint")}
       </p>
     </div>
   );
@@ -294,6 +299,7 @@ function TestCaseModal({
   onSubmit,
   isLoading,
 }: TestCaseModalProps) {
+  const { t } = useI18n();
   const [formData, setFormData] = useState<TestCaseFormData>(() =>
     getInitialFormData(
       testCase,
@@ -384,7 +390,7 @@ function TestCaseModal({
                 タイトル
                 <span className={styles.requiredMark}>*</span>
               </label>
-              <span className={styles.fieldLabelHint}>プロンプトのみで何も参照しない場合はタイトルだけ入力して作成してください。</span>
+              <span className={styles.fieldLabelHint}>{t("testCases.titleHint")}</span>
             </div>
             <input
               id="test-case-title"
@@ -447,9 +453,7 @@ function TestCaseModal({
 
           <div className={styles.fieldGroup}>
             <p className={styles.fieldLabel}>プロジェクトラベル</p>
-            <p className={styles.modeHint}>
-              必要なプロジェクトにタグ付けできます。
-            </p>
+            <p className={styles.modeHint}>{t("testCases.projectLabelHint")}</p>
             <ProjectTagEditor
               projects={projects}
               selectedProjectIds={formData.project_ids}
@@ -618,6 +622,7 @@ type ProjectMembershipMap = Record<number, number[]>;
 type LinkedAssetMap = Record<number, ContextAssetSummary[]>;
 
 export function TestCasesPage() {
+  const { t } = useI18n();
   const queryClient = useQueryClient();
   const { id } = useParams<{ id?: string }>();
   const [searchParams, setSearchParams] = useSearchParams();
@@ -859,10 +864,8 @@ export function TestCasesPage() {
     <div className={styles.root}>
       <div className={styles.pageHeader}>
         <div>
-          <h2 className={styles.pageTitle}>テストケース管理</h2>
-          <p className={styles.pageDescription}>
-            テストケースを管理します。必要なコンテキスト素材やプロジェクトをあとから関連付けられます。
-          </p>
+          <h2 className={styles.pageTitle}>{t("testCases.title")}</h2>
+          <p className={styles.pageDescription}>{t("testCases.description")}</p>
         </div>
         <button type="button" onClick={() => setIsCreateOpen(true)} className={styles.btnPrimary}>
           + 新規作成

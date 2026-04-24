@@ -22,6 +22,7 @@ import {
   setContextAssetProjects,
   updateContextAsset,
 } from "../lib/api";
+import { useI18n } from "../i18n/I18nProvider";
 import { getStoredActiveLabelId } from "../lib/useActiveLabel";
 import styles from "./ContextAssetsPage.module.css";
 
@@ -88,6 +89,7 @@ const EMPTY_CREATE_FORM: CreateFormState = {
 export function ContextAssetsPage() {
   const queryClient = useQueryClient();
   const fileInputRef = useRef<HTMLInputElement | null>(null);
+  const { t } = useI18n();
 
   const [selectedId, setSelectedId] = useState<number | null>(null);
   const [draftContent, setDraftContent] = useState("");
@@ -284,7 +286,7 @@ export function ContextAssetsPage() {
       <div className={styles.pageHeader}>
         <div>
           <h2 className={styles.pageTitle}>コンテキスト素材</h2>
-          <p className={styles.pageDescription}>テストケースで利用するコンテキスト素材を管理します。</p>
+          <p className={styles.pageDescription}>{t("contextAssets.description")}</p>
         </div>
         <div className={styles.headerActions}>
           <input
@@ -466,7 +468,7 @@ export function ContextAssetsPage() {
                   onClick={() => setShowProperties((v) => !v)}
                   className={styles.propertiesToggle}
                 >
-                  プロパティ
+                  {t("contextAssets.properties")}
                   <span className={styles.propertiesToggleIcon}>
                     {showProperties ? "▾" : "▸"}
                   </span>
@@ -475,7 +477,7 @@ export function ContextAssetsPage() {
                   <div className={styles.propertiesBody}>
                     <div className={styles.detailMetaRow}>
                       <label htmlFor="detail-name" className={styles.metaLabel}>
-                        名前
+                        {t("contextAssets.name")}
                       </label>
                       <input
                         id="detail-name"
@@ -487,7 +489,7 @@ export function ContextAssetsPage() {
                     </div>
                     <div className={styles.detailMetaRow}>
                       <label htmlFor="detail-path" className={styles.metaLabel}>
-                        パス
+                        {t("contextAssets.path")}
                       </label>
                       <input
                         id="detail-path"
@@ -499,7 +501,7 @@ export function ContextAssetsPage() {
                     </div>
                     <div className={styles.detailMetaRow}>
                       <label htmlFor="detail-mime" className={styles.metaLabel}>
-                        MIMEタイプ
+                        {t("contextAssets.mimeType")}
                       </label>
                       <input
                         id="detail-mime"
@@ -511,7 +513,9 @@ export function ContextAssetsPage() {
                     </div>
 
                     <div>
-                      <p className={styles.projectAssignTitle}>プロジェクト割り当て</p>
+                      <p className={styles.projectAssignTitle}>
+                        {t("contextAssets.projectAssignment")}
+                      </p>
                       <div className={styles.projectAssignList}>
                         {projects.length === 0 && (
                           <span className={styles.noProjects}>プロジェクトがありません</span>
@@ -547,25 +551,29 @@ export function ContextAssetsPage() {
                   disabled={!isDetailDirty || saveMutation.isPending}
                   className={`${styles.btnSave} ${!isDetailDirty || saveMutation.isPending ? styles.btnDisabled : ""}`}
                 >
-                  {saveMutation.isPending ? "保存中..." : "保存"}
+                  {saveMutation.isPending ? t("contextAssets.saving") : t("contextAssets.save")}
                 </button>
                 {deleteConfirmId === selectedId ? (
                   <div className={styles.deleteConfirm}>
-                    <span className={styles.deleteConfirmText}>本当に削除しますか？</span>
+                    <span className={styles.deleteConfirmText}>
+                      {t("contextAssets.confirmDelete")}
+                    </span>
                     <button
                       type="button"
                       onClick={() => deleteMutation.mutate(selectedId)}
                       disabled={deleteMutation.isPending}
                       className={styles.btnDanger}
                     >
-                      {deleteMutation.isPending ? "削除中..." : "削除"}
+                      {deleteMutation.isPending
+                        ? t("contextAssets.deleting")
+                        : t("contextAssets.delete")}
                     </button>
                     <button
                       type="button"
                       onClick={() => setDeleteConfirmId(null)}
                       className={styles.btnCancel}
                     >
-                      キャンセル
+                      {t("contextAssets.cancel")}
                     </button>
                   </div>
                 ) : (
@@ -574,7 +582,7 @@ export function ContextAssetsPage() {
                     onClick={() => setDeleteConfirmId(selectedId)}
                     className={styles.btnDanger}
                   >
-                    削除
+                    {t("contextAssets.delete")}
                   </button>
                 )}
               </div>

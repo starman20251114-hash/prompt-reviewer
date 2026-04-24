@@ -1072,7 +1072,7 @@ export function PromptsPage() {
             onClick={() => setEditingFamily(null)}
             className={styles.btnAccentOutline}
           >
-            + ファミリー作成
+            {t("prompts.createFamily")}
           </button>
           <button
             type="button"
