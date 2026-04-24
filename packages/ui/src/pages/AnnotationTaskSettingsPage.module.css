@@ -40,7 +40,8 @@
 .pageDescription {
   margin: 0;
   max-width: 720px;
-  color: var(--c-subtext);
+  font-size: 13px;
+  color: var(--c-muted);
   line-height: 1.6;
 }
 
