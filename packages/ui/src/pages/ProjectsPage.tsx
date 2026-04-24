@@ -1,20 +1,14 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { useState } from "react";
-import { useNavigate } from "react-router";
-import { type Project, createProject, deleteProject, getProjects } from "../lib/api";
-
-const colors = {
-  bg: "#1e1e2e",
-  card: "#313244",
-  border: "#45475a",
-  text: "#cdd6f4",
-  subtext: "#a6adc8",
-  accent: "#cba6f7",
-  danger: "#f38ba8",
-  overlay: "#181825",
-  surface: "#45475a",
-  muted: "#6c7086",
-};
+import { useEffect, useState } from "react";
+import {
+  type Project,
+  createProject,
+  deleteProject,
+  getProjects,
+  updateProject,
+} from "../lib/api";
+import { clearStoredActiveLabelId, useActiveLabel } from "../lib/useActiveLabel";
+import styles from "./ProjectsPage.module.css";
 
 function formatDate(timestamp: number): string {
   return new Date(timestamp).toLocaleDateString("ja-JP", {
@@ -24,36 +18,35 @@ function formatDate(timestamp: number): string {
   });
 }
 
-type CreateModalProps = {
+type LabelFormModalProps = {
+  initial?: { name: string; description: string };
+  title: string;
+  submitLabel: string;
   onClose: () => void;
   onSubmit: (data: { name: string; description?: string }) => void;
   isLoading: boolean;
 };
 
-function CreateModal({ onClose, onSubmit, isLoading }: CreateModalProps) {
-  const [name, setName] = useState("");
-  const [description, setDescription] = useState("");
+function LabelFormModal({
+  initial,
+  title,
+  submitLabel,
+  onClose,
+  onSubmit,
+  isLoading,
+}: LabelFormModalProps) {
+  const [name, setName] = useState(initial?.name ?? "");
+  const [description, setDescription] = useState(initial?.description ?? "");
 
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     if (!name.trim()) return;
-    onSubmit({
-      name: name.trim(),
-      description: description.trim() || undefined,
-    });
+    onSubmit({ name: name.trim(), description: description.trim() || undefined });
   }
 
   return (
     <div
-      style={{
-        position: "fixed",
-        inset: 0,
-        background: "rgba(0,0,0,0.6)",
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "center",
-        zIndex: 100,
-      }}
+      className={styles.modalOverlay}
       onClick={(e) => {
         if (e.target === e.currentTarget) onClose();
       }}
@@ -61,123 +54,45 @@ function CreateModal({ onClose, onSubmit, isLoading }: CreateModalProps) {
         if (e.key === "Escape") onClose();
       }}
     >
-      <div
-        style={{
-          background: colors.overlay,
-          border: `1px solid ${colors.border}`,
-          borderRadius: "12px",
-          padding: "28px",
-          width: "480px",
-          maxWidth: "90vw",
-        }}
-      >
-        <h3
-          style={{
-            margin: "0 0 20px",
-            fontSize: "18px",
-            color: colors.text,
-          }}
-        >
-          新規プロジェクト作成
-        </h3>
+      <div className={styles.modalBox}>
+        <h3 className={styles.modalTitle}>{title}</h3>
         <form onSubmit={handleSubmit}>
-          <div style={{ marginBottom: "16px" }}>
-            <label
-              htmlFor="create-project-name"
-              style={{
-                display: "block",
-                marginBottom: "6px",
-                fontSize: "14px",
-                color: colors.subtext,
-              }}
-            >
-              プロジェクト名
-              <span style={{ color: colors.danger, marginLeft: "4px" }}>*</span>
+          <div className={styles.formField}>
+            <label htmlFor="label-name" className={styles.label}>
+              ラベル名<span className={styles.required}>*</span>
             </label>
             <input
-              id="create-project-name"
+              id="label-name"
               type="text"
               value={name}
               onChange={(e) => setName(e.target.value)}
               placeholder="例: 顧客サポートBot"
-              style={{
-                width: "100%",
-                padding: "10px 12px",
-                background: colors.card,
-                border: `1px solid ${colors.border}`,
-                borderRadius: "8px",
-                color: colors.text,
-                fontSize: "14px",
-                outline: "none",
-                boxSizing: "border-box",
-              }}
+              className={styles.input}
             />
           </div>
-          <div style={{ marginBottom: "24px" }}>
-            <label
-              htmlFor="create-project-description"
-              style={{
-                display: "block",
-                marginBottom: "6px",
-                fontSize: "14px",
-                color: colors.subtext,
-              }}
-            >
+          <div className={styles.formFieldLast}>
+            <label htmlFor="label-description" className={styles.label}>
               説明（任意）
             </label>
             <textarea
-              id="create-project-description"
+              id="label-description"
               value={description}
               onChange={(e) => setDescription(e.target.value)}
-              placeholder="プロジェクトの目的や概要を記入..."
+              placeholder="ラベルの用途や目的を記入..."
               rows={3}
-              style={{
-                width: "100%",
-                padding: "10px 12px",
-                background: colors.card,
-                border: `1px solid ${colors.border}`,
-                borderRadius: "8px",
-                color: colors.text,
-                fontSize: "14px",
-                outline: "none",
-                resize: "vertical",
-                boxSizing: "border-box",
-                fontFamily: "inherit",
-              }}
+              className={styles.textarea}
             />
           </div>
-          <div style={{ display: "flex", gap: "12px", justifyContent: "flex-end" }}>
-            <button
-              type="button"
-              onClick={onClose}
-              style={{
-                padding: "8px 20px",
-                background: "transparent",
-                border: `1px solid ${colors.border}`,
-                borderRadius: "8px",
-                color: colors.subtext,
-                fontSize: "14px",
-                cursor: "pointer",
-              }}
-            >
+          <div className={styles.modalFooter}>
+            <button type="button" onClick={onClose} className={styles.cancelButton}>
               キャンセル
             </button>
             <button
               type="submit"
               disabled={!name.trim() || isLoading}
-              style={{
-                padding: "8px 20px",
-                background: colors.accent,
-                border: "none",
-                borderRadius: "8px",
-                color: colors.overlay,
-                fontSize: "14px",
-                fontWeight: 600,
-                cursor: !name.trim() || isLoading ? "not-allowed" : "pointer",
-                opacity: !name.trim() || isLoading ? 0.6 : 1,
-              }}
+              className={styles.submitButton}
             >
-              {isLoading ? "作成中..." : "作成"}
+              {isLoading ? "保存中..." : submitLabel}
             </button>
           </div>
         </form>
@@ -196,15 +111,7 @@ type DeleteDialogProps = {
 function DeleteDialog({ project, onClose, onConfirm, isLoading }: DeleteDialogProps) {
   return (
     <div
-      style={{
-        position: "fixed",
-        inset: 0,
-        background: "rgba(0,0,0,0.6)",
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "center",
-        zIndex: 100,
-      }}
+      className={styles.modalOverlay}
       onClick={(e) => {
         if (e.target === e.currentTarget) onClose();
       }}
@@ -212,75 +119,22 @@ function DeleteDialog({ project, onClose, onConfirm, isLoading }: DeleteDialogPr
         if (e.key === "Escape") onClose();
       }}
     >
-      <div
-        style={{
-          background: colors.overlay,
-          border: `1px solid ${colors.border}`,
-          borderRadius: "12px",
-          padding: "28px",
-          width: "420px",
-          maxWidth: "90vw",
-        }}
-      >
-        <h3
-          style={{
-            margin: "0 0 12px",
-            fontSize: "18px",
-            color: colors.text,
-          }}
-        >
-          プロジェクトを削除
-        </h3>
-        <p style={{ margin: "0 0 8px", color: colors.subtext, fontSize: "14px" }}>
-          以下のプロジェクトを削除してもよいですか？
+      <div className={styles.modalBox}>
+        <h3 className={styles.modalTitle}>ラベルを削除</h3>
+        <p className={styles.deleteWarning}>以下のラベルを削除してもよいですか？</p>
+        <p className={styles.deleteTarget}>{project.name}</p>
+        <p className={styles.deleteNote}>
+          この操作は取り消せません。関連するテストケースやプロンプトとの紐付けも解除されます。
         </p>
-        <p
-          style={{
-            margin: "0 0 20px",
-            color: colors.text,
-            fontWeight: 600,
-            fontSize: "15px",
-            padding: "8px 12px",
-            background: colors.card,
-            borderRadius: "6px",
-          }}
-        >
-          {project.name}
-        </p>
-        <p style={{ margin: "0 0 24px", color: colors.danger, fontSize: "13px" }}>
-          この操作は取り消せません。関連するテストケースやプロンプトもすべて削除されます。
-        </p>
-        <div style={{ display: "flex", gap: "12px", justifyContent: "flex-end" }}>
-          <button
-            type="button"
-            onClick={onClose}
-            style={{
-              padding: "8px 20px",
-              background: "transparent",
-              border: `1px solid ${colors.border}`,
-              borderRadius: "8px",
-              color: colors.subtext,
-              fontSize: "14px",
-              cursor: "pointer",
-            }}
-          >
+        <div className={styles.modalFooter}>
+          <button type="button" onClick={onClose} className={styles.cancelButton}>
             キャンセル
           </button>
           <button
             type="button"
             onClick={onConfirm}
             disabled={isLoading}
-            style={{
-              padding: "8px 20px",
-              background: colors.danger,
-              border: "none",
-              borderRadius: "8px",
-              color: colors.overlay,
-              fontSize: "14px",
-              fontWeight: 600,
-              cursor: isLoading ? "not-allowed" : "pointer",
-              opacity: isLoading ? 0.6 : 1,
-            }}
+            className={styles.dangerButton}
           >
             {isLoading ? "削除中..." : "削除する"}
           </button>
@@ -290,116 +144,61 @@ function DeleteDialog({ project, onClose, onConfirm, isLoading }: DeleteDialogPr
   );
 }
 
-type ProjectCardProps = {
+type LabelRowProps = {
   project: Project;
+  isActive: boolean;
+  onSelect: (project: Project) => void;
+  onEdit: (project: Project) => void;
   onDelete: (project: Project) => void;
 };
 
-function ProjectCard({ project, onDelete }: ProjectCardProps) {
-  const navigate = useNavigate();
-
+function LabelRow({ project, isActive, onSelect, onEdit, onDelete }: LabelRowProps) {
   return (
-    <button
-      type="button"
-      style={{
-        background: colors.card,
-        border: `1px solid ${colors.border}`,
-        borderRadius: "12px",
-        padding: "20px",
-        cursor: "pointer",
-        transition: "border-color 0.15s",
-        display: "flex",
-        flexDirection: "column",
-        gap: "8px",
-        textAlign: "left",
-        width: "100%",
-        fontFamily: "inherit",
-      }}
-      onClick={() => navigate(`/projects/${project.id}`)}
-      onMouseEnter={(e) => {
-        (e.currentTarget as HTMLButtonElement).style.borderColor = colors.accent;
-      }}
-      onMouseLeave={(e) => {
-        (e.currentTarget as HTMLButtonElement).style.borderColor = colors.border;
-      }}
+    <div
+      className={`${styles.labelRow} ${isActive ? styles.labelRowActive : ""}`}
+      onClick={() => onSelect(project)}
+      onKeyDown={(e) => e.key === "Enter" && onSelect(project)}
+      role="button"
+      tabIndex={0}
     >
-      <div
-        style={{
-          display: "flex",
-          justifyContent: "space-between",
-          alignItems: "flex-start",
-          gap: "12px",
-        }}
-      >
-        <h3
-          style={{
-            margin: 0,
-            fontSize: "16px",
-            fontWeight: 600,
-            color: colors.text,
-            wordBreak: "break-word",
-          }}
-        >
-          {project.name}
-        </h3>
+      <span className={`${styles.labelTag} ${isActive ? styles.labelTagActive : ""}`}>
+        {project.name}
+      </span>
+      {isActive && <span className={styles.activeBadge}>絞り込み中</span>}
+      {project.description && (
+        <span className={styles.labelDescription}>{project.description}</span>
+      )}
+      <span className={styles.labelDate}>{formatDate(project.created_at)}</span>
+      <div className={styles.actions}>
         <button
           type="button"
-          onClick={(e) => {
-            e.stopPropagation();
-            onDelete(project);
-          }}
-          style={{
-            flexShrink: 0,
-            padding: "4px 10px",
-            background: "transparent",
-            border: `1px solid ${colors.border}`,
-            borderRadius: "6px",
-            color: colors.danger,
-            fontSize: "12px",
-            cursor: "pointer",
-            transition: "background 0.15s",
-          }}
-          onMouseEnter={(e) => {
-            (e.currentTarget as HTMLButtonElement).style.background = "rgba(243,139,168,0.1)";
-          }}
-          onMouseLeave={(e) => {
-            (e.currentTarget as HTMLButtonElement).style.background = "transparent";
-          }}
+          onClick={(e) => { e.stopPropagation(); onEdit(project); }}
+          className={styles.editButton}
+        >
+          編集
+        </button>
+        <button
+          type="button"
+          onClick={(e) => { e.stopPropagation(); onDelete(project); }}
+          className={styles.deleteButton}
         >
           削除
         </button>
       </div>
-      {project.description && (
-        <p
-          style={{
-            margin: 0,
-            fontSize: "14px",
-            color: colors.subtext,
-            lineHeight: 1.5,
-            wordBreak: "break-word",
-          }}
-        >
-          {project.description}
-        </p>
-      )}
-      <p
-        style={{
-          margin: 0,
-          fontSize: "12px",
-          color: colors.muted,
-          marginTop: "4px",
-        }}
-      >
-        作成日: {formatDate(project.created_at)}
-      </p>
-    </button>
+    </div>
   );
 }
 
 export function ProjectsPage() {
   const queryClient = useQueryClient();
+  const { activeLabelId, setActiveLabelId } = useActiveLabel();
   const [isCreateOpen, setIsCreateOpen] = useState(false);
+  const [editTarget, setEditTarget] = useState<Project | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<Project | null>(null);
+
+  function handleSelectLabel(project: Project) {
+    setActiveLabelId(activeLabelId === project.id ? null : project.id);
+  }
 
   const {
     data: projects,
@@ -419,91 +218,103 @@ export function ProjectsPage() {
     },
   });
 
+  const updateMutation = useMutation({
+    mutationFn: ({ id, data }: { id: number; data: { name?: string; description?: string } }) =>
+      updateProject(id, data),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: ["projects"] });
+      setEditTarget(null);
+    },
+  });
+
   const deleteMutation = useMutation({
     mutationFn: (id: number) => deleteProject(id),
-    onSuccess: () => {
+    onSuccess: (_, deletedId) => {
+      if (activeLabelId === deletedId) {
+        setActiveLabelId(null);
+      }
       void queryClient.invalidateQueries({ queryKey: ["projects"] });
       setDeleteTarget(null);
     },
   });
 
+  useEffect(() => {
+    if (!projects || activeLabelId === null) {
+      return;
+    }
+    if (!projects.some((project) => project.id === activeLabelId)) {
+      clearStoredActiveLabelId();
+      setActiveLabelId(null);
+    }
+  }, [activeLabelId, projects, setActiveLabelId]);
+
   return (
-    <div>
-      <div
-        style={{
-          display: "flex",
-          justifyContent: "space-between",
-          alignItems: "center",
-          marginBottom: "16px",
-        }}
-      >
-        <h2 style={{ margin: 0, fontSize: "20px", color: colors.text }}>プロジェクト一覧</h2>
-        <button
-          type="button"
-          onClick={() => setIsCreateOpen(true)}
-          style={{
-            padding: "8px 18px",
-            background: colors.accent,
-            border: "none",
-            borderRadius: "8px",
-            color: colors.overlay,
-            fontSize: "14px",
-            fontWeight: 600,
-            cursor: "pointer",
-          }}
-        >
-          + 新規作成
+    <div className={styles.root}>
+      <div className={styles.header}>
+        <h2 className={styles.title}>ラベル管理</h2>
+        <button type="button" onClick={() => setIsCreateOpen(true)} className={styles.createButton}>
+          + 新規ラベル作成
         </button>
       </div>
 
-      <p style={{ color: colors.subtext, marginBottom: "24px", margin: "0 0 24px" }}>
-        システムプロンプトを管理するプロジェクトを選択してください。
+      <p className={styles.description}>
+        プロジェクトラベルを管理します。ラベルをクリックして選択すると、テストケース・プロンプト・コンテキスト素材のページでそのラベルで絞り込まれます。再クリックで解除できます。
       </p>
 
-      {isLoading && (
-        <p style={{ color: colors.muted, textAlign: "center", padding: "40px 0" }}>読み込み中...</p>
-      )}
+      {isLoading && <p className={styles.loadingText}>読み込み中...</p>}
 
       {isError && (
-        <p style={{ color: colors.danger, textAlign: "center", padding: "40px 0" }}>
+        <p className={styles.errorText}>
           エラーが発生しました: {error instanceof Error ? error.message : "不明なエラー"}
         </p>
       )}
 
       {!isLoading && !isError && projects && projects.length === 0 && (
-        <div
-          style={{
-            textAlign: "center",
-            padding: "60px 0",
-            color: colors.muted,
-          }}
-        >
-          <p style={{ margin: "0 0 8px", fontSize: "16px" }}>プロジェクトがまだありません</p>
-          <p style={{ margin: 0, fontSize: "14px" }}>
-            「新規作成」ボタンから最初のプロジェクトを作成してください。
-          </p>
+        <div className={styles.emptyState}>
+          <p style={{ fontSize: "16px" }}>ラベルがまだありません</p>
+          <p style={{ fontSize: "14px" }}>「新規ラベル作成」ボタンから最初のラベルを作成してください。</p>
         </div>
       )}
 
+      {activeLabelId !== null && (
+        <p className={styles.activeHint}>
+          ラベルを選択中です。テストケース・プロンプト・コンテキスト素材のページでこのラベルで絞り込まれます。同じラベルを再クリックすると解除できます。
+        </p>
+      )}
+
       {!isLoading && !isError && projects && projects.length > 0 && (
-        <div
-          style={{
-            display: "grid",
-            gridTemplateColumns: "repeat(auto-fill, minmax(300px, 1fr))",
-            gap: "16px",
-          }}
-        >
+        <div className={styles.labelList}>
           {projects.map((project) => (
-            <ProjectCard key={project.id} project={project} onDelete={setDeleteTarget} />
+            <LabelRow
+              key={project.id}
+              project={project}
+              isActive={activeLabelId === project.id}
+              onSelect={handleSelectLabel}
+              onEdit={setEditTarget}
+              onDelete={setDeleteTarget}
+            />
           ))}
         </div>
       )}
 
       {isCreateOpen && (
-        <CreateModal
+        <LabelFormModal
+          title="新規ラベル作成"
+          submitLabel="作成"
           onClose={() => setIsCreateOpen(false)}
           onSubmit={(data) => createMutation.mutate(data)}
           isLoading={createMutation.isPending}
+        />
+      )}
+
+      {editTarget && (
+        <LabelFormModal
+          title="ラベルを編集"
+          submitLabel="保存"
+          initial={{ name: editTarget.name, description: editTarget.description ?? "" }}
+          onClose={() => setEditTarget(null)}
+          onSubmit={(data) => updateMutation.mutate({ id: editTarget.id, data })}
+          isLoading={updateMutation.isPending}
         />
       )}
 

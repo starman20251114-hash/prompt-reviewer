@@ -1,6 +1,7 @@
 import { useMutation, useQueries, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useState } from "react";
 import { useParams, useSearchParams } from "react-router";
+import { getStoredActiveLabelId } from "../lib/useActiveLabel";
 import {
   type ContextAssetSummary,
   type Project,
@@ -729,6 +730,24 @@ export function TestCasesPage() {
     next.set("project_id", String(legacyProjectId));
     setSearchParams(next, { replace: true });
   }, [legacyProjectId, searchParams, setSearchParams]);
+
+  // アクティブラベルをマウント時に URL へ反映（初回のみ、他のフィルタ優先）
+  useEffect(() => {
+    if (
+      searchParams.get("project_id") !== null ||
+      searchParams.get("unclassified") === "true" ||
+      legacyProjectId !== null
+    ) {
+      return;
+    }
+    const activeId = getStoredActiveLabelId();
+    if (activeId === null) return;
+    const next = new URLSearchParams(searchParams);
+    next.set("project_id", String(activeId));
+    setSearchParams(next, { replace: true });
+  // biome-ignore lint/react-hooks/exhaustive-deps: 初回マウント時のみ実行
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const filters: TestCaseFilters = {
     q: searchQuery || undefined,

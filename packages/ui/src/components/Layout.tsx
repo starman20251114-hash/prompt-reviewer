@@ -1,9 +1,4 @@
-import { NavLink, Outlet, useLocation, useParams } from "react-router";
-import {
-  buildAnnotationReviewPath,
-  getAnnotationReviewContextFromSearch,
-  loadLastAnnotationReviewContext,
-} from "../lib/annotationReviewNavigation";
+import { NavLink, Outlet } from "react-router";
 import { ErrorBoundary } from "./ErrorBoundary";
 
 const navLinkStyle = ({ isActive }: { isActive: boolean }) => ({
@@ -17,70 +12,9 @@ const navLinkStyle = ({ isActive }: { isActive: boolean }) => ({
   fontSize: "14px",
 });
 
-function ProjectSubNav({ projectId }: { projectId: string }) {
-  const location = useLocation();
-  const reviewContext =
-    getAnnotationReviewContextFromSearch(location.search) ??
-    loadLastAnnotationReviewContext(projectId);
-  const annotationReviewPath = buildAnnotationReviewPath(projectId, reviewContext);
-
-  const subNavItems = [
-    { to: `/projects/${projectId}`, label: "ホーム", end: true },
-    { to: `/projects/${projectId}/context-files`, label: "コンテキスト" },
-    { to: `/test-cases?project_id=${projectId}`, label: "テストケース" },
-    { to: `/projects/${projectId}/prompts`, label: "プロンプト" },
-    { to: `/projects/${projectId}/runs`, label: "Run" },
-    { to: `/projects/${projectId}/score`, label: "採点" },
-    {
-      to: annotationReviewPath,
-      label: "抽出",
-      matchPaths: [
-        `/projects/${projectId}/annotation-review`,
-        `/projects/${projectId}/annotation-tasks`,
-      ],
-    },
-    { to: "/execution-profiles", label: "実行設定" },
-  ];
-
-  return (
-    <div style={{ marginTop: "8px" }}>
-      <div
-        style={{
-          padding: "4px 16px",
-          fontSize: "11px",
-          color: "#6c7086",
-          textTransform: "uppercase",
-          letterSpacing: "0.08em",
-          marginBottom: "4px",
-        }}
-      >
-        プロジェクト
-      </div>
-      {subNavItems.map(({ to, label, end, matchPaths }) => (
-        <NavLink
-          key={to}
-          to={to}
-          end={end}
-          style={
-            matchPaths
-              ? navLinkStyle({
-                  isActive: matchPaths.some((path) => location.pathname.startsWith(path)),
-                })
-              : navLinkStyle
-          }
-        >
-          {label}
-        </NavLink>
-      ))}
-    </div>
-  );
-}
-
 function SidebarNav() {
-  const { id } = useParams<{ id?: string }>();
-
   const topNavItems = [
-    { to: "/", label: "プロジェクト一覧", end: true },
+    { to: "/", label: "ラベル管理", end: true },
     { to: "/test-cases", label: "テストケース", end: false },
     { to: "/prompts", label: "プロンプト", end: false },
     { to: "/context-assets", label: "コンテキスト素材", end: false },
@@ -98,7 +32,6 @@ function SidebarNav() {
           {label}
         </NavLink>
       ))}
-      {id && <ProjectSubNav projectId={id} />}
     </nav>
   );
 }

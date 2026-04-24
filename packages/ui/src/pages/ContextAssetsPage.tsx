@@ -9,6 +9,7 @@ import { EditorView } from "@codemirror/view";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import CodeMirror from "@uiw/react-codemirror";
 import { useEffect, useRef, useState } from "react";
+import { getStoredActiveLabelId } from "../lib/useActiveLabel";
 import {
   type ContextAssetDetail,
   type ContextAssetFilters,
@@ -97,7 +98,10 @@ export function ContextAssetsPage() {
   const [showCreateForm, setShowCreateForm] = useState(false);
   const [createForm, setCreateForm] = useState<CreateFormState>(EMPTY_CREATE_FORM);
   const [deleteConfirmId, setDeleteConfirmId] = useState<number | null>(null);
-  const [filters, setFilters] = useState<ContextAssetFilters>({});
+  const [filters, setFilters] = useState<ContextAssetFilters>(() => {
+    const activeId = getStoredActiveLabelId();
+    return activeId !== null ? { project_id: activeId } : {};
+  });
   const [searchInput, setSearchInput] = useState("");
   const [selectedProjectIds, setSelectedProjectIds] = useState<number[]>([]);
 
@@ -235,6 +239,7 @@ export function ContextAssetsPage() {
   function handleProjectFilterChange(projectId: number) {
     setFilters((prev) => ({
       ...prev,
+      unclassified: undefined,
       project_id: prev.project_id === projectId ? undefined : projectId,
     }));
   }
@@ -242,6 +247,7 @@ export function ContextAssetsPage() {
   function handleUnclassifiedToggle() {
     setFilters((prev) => ({
       ...prev,
+      project_id: undefined,
       unclassified: prev.unclassified ? undefined : true,
     }));
   }

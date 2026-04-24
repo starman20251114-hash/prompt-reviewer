@@ -32,28 +32,30 @@ export function App() {
       <BrowserRouter>
         <Routes>
           <Route element={<Layout />}>
-            {/* トップ: プロジェクト一覧 */}
+            {/* ラベル管理 */}
             <Route index element={<ProjectsPage />} />
-            {/* プロジェクト詳細 */}
+            {/* 後方互換: /projects/:id はトップにリダイレクト */}
             <Route path="projects/:id" element={<ProjectDetailPage />} />
-            <Route path="projects/:id/context-files" element={<ContextFilesPage />} />
+            {/* 資産管理（ラベルフィルタはクエリパラメータで対応） */}
             <Route path="test-cases" element={<TestCasesPage />} />
-            <Route path="projects/:id/test-cases" element={<TestCasesPage />} />
             <Route path="prompts" element={<PromptsPage />} />
-            <Route path="projects/:id/prompts" element={<PromptsPage />} />
             <Route path="runs" element={<RunsPage />} />
-            <Route path="projects/:id/runs" element={<RunsPage />} />
             <Route path="score" element={<ScorePage />} />
-            <Route path="projects/:id/score" element={<ScorePage />} />
             <Route path="score-progression" element={<ScoreProgressionPage />} />
-            <Route path="projects/:id/score-progression" element={<ScoreProgressionPage />} />
             <Route path="annotation-review" element={<AnnotationReviewPage />} />
             <Route path="annotation-tasks" element={<AnnotationTaskSettingsPage />} />
-            <Route path="projects/:id/annotation-tasks" element={<AnnotationTaskSettingsPage />} />
-            <Route path="projects/:id/annotation-review" element={<AnnotationReviewPage />} />
-            <Route path="projects/:id/settings" element={<ProjectSettingsPage />} />
             <Route path="execution-profiles" element={<ExecutionProfilesPage />} />
             <Route path="context-assets" element={<ContextAssetsPage />} />
+            {/* 後方互換: 旧 project 配下ルート */}
+            <Route path="projects/:id/context-files" element={<ContextFilesPage />} />
+            <Route path="projects/:id/test-cases" element={<TestCasesPage />} />
+            <Route path="projects/:id/prompts" element={<PromptsPage />} />
+            <Route path="projects/:id/runs" element={<RunsPage />} />
+            <Route path="projects/:id/score" element={<ScorePage />} />
+            <Route path="projects/:id/score-progression" element={<ScoreProgressionPage />} />
+            <Route path="projects/:id/annotation-review" element={<AnnotationReviewPage />} />
+            <Route path="projects/:id/annotation-tasks" element={<AnnotationTaskSettingsPage />} />
+            <Route path="projects/:id/settings" element={<ProjectSettingsPage />} />
             {/* ユーティリティ */}
             <Route path="health" element={<HealthPage />} />
             {/* 404 */}

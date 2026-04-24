@@ -573,7 +573,7 @@ function AnnotationReviewContent({
 }
 
 export function AnnotationReviewPage() {
-  const { id } = useParams<{ id: string }>();
+  const { id } = useParams<{ id?: string }>();
   const [searchParams] = useSearchParams();
   const projectId = Number(id);
   const runIdParam = searchParams.get("runId");
