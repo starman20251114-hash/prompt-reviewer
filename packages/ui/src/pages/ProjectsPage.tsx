@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import {
   type Project,
   createProject,
@@ -7,7 +7,7 @@ import {
   getProjects,
   updateProject,
 } from "../lib/api";
-import { useActiveLabel } from "../lib/useActiveLabel";
+import { clearStoredActiveLabelId, useActiveLabel } from "../lib/useActiveLabel";
 import styles from "./ProjectsPage.module.css";
 
 function formatDate(timestamp: number): string {
@@ -229,11 +229,24 @@ export function ProjectsPage() {
 
   const deleteMutation = useMutation({
     mutationFn: (id: number) => deleteProject(id),
-    onSuccess: () => {
+    onSuccess: (_, deletedId) => {
+      if (activeLabelId === deletedId) {
+        setActiveLabelId(null);
+      }
       void queryClient.invalidateQueries({ queryKey: ["projects"] });
       setDeleteTarget(null);
     },
   });
+
+  useEffect(() => {
+    if (!projects || activeLabelId === null) {
+      return;
+    }
+    if (!projects.some((project) => project.id === activeLabelId)) {
+      clearStoredActiveLabelId();
+      setActiveLabelId(null);
+    }
+  }, [activeLabelId, projects, setActiveLabelId]);
 
   return (
     <div className={styles.root}>

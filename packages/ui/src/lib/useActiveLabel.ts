@@ -2,6 +2,14 @@ import { useState } from "react";
 
 const STORAGE_KEY = "prompt_reviewer_active_label_id";
 
+export function clearStoredActiveLabelId() {
+  try {
+    localStorage.removeItem(STORAGE_KEY);
+  } catch {
+    // localStorage unavailable
+  }
+}
+
 export function getStoredActiveLabelId(): number | null {
   try {
     const stored = localStorage.getItem(STORAGE_KEY);
@@ -17,14 +25,14 @@ export function useActiveLabel() {
   const [activeLabelId, setActiveLabelIdState] = useState<number | null>(getStoredActiveLabelId);
 
   function setActiveLabelId(id: number | null) {
-    try {
-      if (id === null) {
-        localStorage.removeItem(STORAGE_KEY);
-      } else {
+    if (id === null) {
+      clearStoredActiveLabelId();
+    } else {
+      try {
         localStorage.setItem(STORAGE_KEY, String(id));
+      } catch {
+        // localStorage unavailable
       }
-    } catch {
-      // localStorage unavailable
     }
     setActiveLabelIdState(id);
   }
