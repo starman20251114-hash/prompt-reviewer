@@ -1,71 +1,96 @@
 import { NavLink, Outlet } from "react-router";
+import { useI18n } from "../i18n/I18nProvider";
 import { ErrorBoundary } from "./ErrorBoundary";
+import styles from "./Layout.module.css";
 
-const navLinkStyle = ({ isActive }: { isActive: boolean }) => ({
-  display: "block",
-  padding: "8px 16px",
-  textDecoration: "none",
-  color: isActive ? "#cba6f7" : "#cdd6f4",
-  backgroundColor: isActive ? "#313244" : "transparent",
-  borderRadius: "4px",
-  margin: "2px 8px",
-  fontSize: "14px",
-});
+type NavItem = {
+  to: string;
+  labelKey: string;
+  end?: boolean;
+  children?: { to: string; labelKey: string }[];
+};
+
+const navItems: NavItem[] = [
+  {
+    to: "/prompts",
+    labelKey: "layout.prompts",
+    children: [{ to: "/annotation-tasks", labelKey: "layout.extraction" }],
+  },
+  {
+    to: "/test-cases",
+    labelKey: "layout.testCases",
+    children: [{ to: "/context-assets", labelKey: "layout.contextAssets" }],
+  },
+  { to: "/", labelKey: "layout.labels", end: true },
+  { to: "/runs", labelKey: "layout.runs" },
+  { to: "/score", labelKey: "layout.scoring" },
+  { to: "/execution-profiles", labelKey: "layout.executionProfiles" },
+  { to: "/health", labelKey: "layout.health" },
+];
+
+function getNavLinkClassName(isActive: boolean) {
+  return [styles.navLink, isActive ? styles.navLinkActive : ""].filter(Boolean).join(" ");
+}
+
+function getSubNavLinkClassName(isActive: boolean) {
+  return [styles.subNavLink, isActive ? styles.subNavLinkActive : ""].filter(Boolean).join(" ");
+}
 
 function SidebarNav() {
-  const topNavItems = [
-    { to: "/", label: "ラベル管理", end: true },
-    { to: "/test-cases", label: "テストケース", end: false },
-    { to: "/prompts", label: "プロンプト", end: false },
-    { to: "/context-assets", label: "コンテキスト素材", end: false },
-    { to: "/runs", label: "Run", end: false },
-    { to: "/score", label: "採点", end: false },
-    { to: "/annotation-review", label: "抽出", end: false },
-    { to: "/execution-profiles", label: "実行設定", end: false },
-    { to: "/health", label: "ヘルスチェック", end: false },
-  ];
+  const { t } = useI18n();
 
   return (
-    <nav style={{ marginTop: "8px" }}>
-      {topNavItems.map(({ to, label, end }) => (
-        <NavLink key={to} to={to} end={end} style={navLinkStyle}>
-          {label}
-        </NavLink>
+    <nav className={styles.nav}>
+      {navItems.map(({ to, labelKey, end, children }) => (
+        <div
+          key={to}
+          className={[styles.navGroup, children?.length ? styles.navGroupExpanded : ""]
+            .filter(Boolean)
+            .join(" ")}
+        >
+          <NavLink
+            to={to}
+            end={end}
+            className={({ isActive }) => getNavLinkClassName(isActive)}
+          >
+            <span className={styles.navLinkParent}>
+              <span>{t(labelKey)}</span>
+              {children?.length ? (
+                <span className={styles.navHint}>{t("layout.navHintHasChildren")}</span>
+              ) : null}
+            </span>
+          </NavLink>
+          {children?.length ? (
+            <div className={styles.subNavList}>
+              {children.map((child) => (
+                <NavLink
+                  key={child.to}
+                  to={child.to}
+                  className={({ isActive }) => getSubNavLinkClassName(isActive)}
+                >
+                  {t(child.labelKey)}
+                </NavLink>
+              ))}
+            </div>
+          ) : null}
+        </div>
       ))}
     </nav>
   );
 }
 
 export function Layout() {
+  const { t } = useI18n();
+
   return (
-    <div style={{ display: "flex", height: "100vh", fontFamily: "sans-serif" }}>
-      <aside
-        style={{
-          width: "240px",
-          backgroundColor: "#181825",
-          color: "#cdd6f4",
-          padding: "16px 0",
-          flexShrink: 0,
-          borderRight: "1px solid #313244",
-          overflowY: "auto",
-        }}
-      >
-        <div style={{ padding: "0 16px 16px", borderBottom: "1px solid #313244" }}>
-          <h1 style={{ fontSize: "16px", fontWeight: "bold", margin: 0, color: "#cba6f7" }}>
-            Prompt Reviewer
-          </h1>
+    <div className={styles.root}>
+      <aside className={styles.sidebar}>
+        <div className={styles.brand}>
+          <h1 className={styles.brandTitle}>{t("common.appName")}</h1>
         </div>
         <SidebarNav />
       </aside>
-      <main
-        style={{
-          flex: 1,
-          backgroundColor: "#1e1e2e",
-          color: "#cdd6f4",
-          padding: "24px",
-          overflow: "auto",
-        }}
-      >
+      <main className={styles.main}>
         <ErrorBoundary>
           <Outlet />
         </ErrorBoundary>

@@ -18,6 +18,7 @@ import {
   updateIndependentPromptVersion,
   updatePromptFamily,
 } from "../lib/api";
+import { useI18n } from "../i18n/I18nProvider";
 import { getStoredActiveLabelId } from "../lib/useActiveLabel";
 import styles from "./PromptsPage.module.css";
 
@@ -154,8 +155,13 @@ function FamilyModal({ family, onClose, onSubmit, isPending, isError }: FamilyMo
   const [name, setName] = useState(family?.name ?? "");
   const [description, setDescription] = useState(family?.description ?? "");
 
+  const isNew = family === null;
+  const isNameRequired = isNew;
+  const isSubmitDisabled = isPending || (isNameRequired && !name.trim());
+
   function handleSubmit(event: React.FormEvent) {
     event.preventDefault();
+    if (isSubmitDisabled) return;
     onSubmit({
       name: name.trim() || null,
       description: description.trim() || null,
@@ -180,6 +186,7 @@ function FamilyModal({ family, onClose, onSubmit, isPending, isError }: FamilyMo
           <div>
             <label htmlFor="family-name" className={styles.fieldLabel}>
               名前
+              {isNameRequired && <span className={styles.requiredMark}>*</span>}
             </label>
             <input
               id="family-name"
@@ -188,6 +195,7 @@ function FamilyModal({ family, onClose, onSubmit, isPending, isError }: FamilyMo
               onChange={(event) => setName(event.target.value)}
               placeholder="例: FAQ 応答改善"
               className={styles.fieldInput}
+              required={isNameRequired}
             />
           </div>
           <div>
@@ -209,8 +217,8 @@ function FamilyModal({ family, onClose, onSubmit, isPending, isError }: FamilyMo
             </button>
             <button
               type="submit"
-              disabled={isPending}
-              className={`${styles.btnSave} ${isPending ? styles.btnDisabled : ""}`}
+              disabled={isSubmitDisabled}
+              className={`${styles.btnSave} ${isSubmitDisabled ? styles.btnDisabled : ""}`}
             >
               {isPending ? "保存中..." : family ? "更新" : "作成"}
             </button>
@@ -304,8 +312,12 @@ function VersionTreeItem({
   );
 }
 
+const NEW_FAMILY_VALUE = "__new__";
+
 type PromptEditorProps = {
-  familyId: number;
+  familyId?: number;
+  families: PromptFamily[];
+  initialFamilyId: number | null;
   projects: Project[];
   version: PromptVersion | null;
   defaultProjectId: number | null;
@@ -316,6 +328,8 @@ type PromptEditorProps = {
 
 function PromptEditor({
   familyId,
+  families,
+  initialFamilyId,
   projects,
   version,
   defaultProjectId,
@@ -337,14 +351,28 @@ function PromptEditor({
   const [workflowSteps, setWorkflowSteps] = useState<PromptExecutionStepDefinition[]>(
     version?.workflow_definition?.steps ?? [],
   );
+  const [familySelectValue, setFamilySelectValue] = useState(
+    isNew ? (initialFamilyId !== null ? String(initialFamilyId) : NEW_FAMILY_VALUE) : "",
+  );
+  const [newFamilyName, setNewFamilyName] = useState("");
+
+  const isCreatingNewFamily = isNew && familySelectValue === NEW_FAMILY_VALUE;
 
   const saveMutation = useMutation({
     mutationFn: async () => {
       const workflowDefinition = buildWorkflowDefinition(workflowSteps);
 
+      let actualFamilyId: number;
+      if (isCreatingNewFamily) {
+        const newFamily = await createPromptFamily({ name: newFamilyName.trim() });
+        actualFamilyId = newFamily.id;
+      } else {
+        actualFamilyId = isNew ? Number(familySelectValue) : (familyId ?? 0);
+      }
+
       const savedVersion = isNew
         ? await createIndependentPromptVersion({
-            prompt_family_id: familyId,
+            prompt_family_id: actualFamilyId,
             content: content.trim(),
             name: name.trim() || undefined,
             memo: memo.trim() || undefined,
@@ -366,14 +394,21 @@ function PromptEditor({
     },
     onSuccess: (savedVersion) => {
       void queryClient.invalidateQueries({ queryKey: ["promptFamilies"] });
-      void queryClient.invalidateQueries({ queryKey: ["promptVersionsByFamily", familyId] });
+      void queryClient.invalidateQueries({
+        queryKey: ["promptVersionsByFamily", savedVersion.prompt_family_id],
+      });
       onSave(savedVersion);
     },
   });
 
   const workflowValidationMessage = getWorkflowValidationMessage(workflowSteps);
+  const isFamilyValid =
+    !isNew || (isCreatingNewFamily ? newFamilyName.trim().length > 0 : familySelectValue !== "");
   const isDisabled =
-    !content.trim() || saveMutation.isPending || workflowValidationMessage !== null;
+    !content.trim() ||
+    saveMutation.isPending ||
+    workflowValidationMessage !== null ||
+    !isFamilyValid;
 
   function handleSubmit(event: React.FormEvent) {
     event.preventDefault();
@@ -385,6 +420,36 @@ function PromptEditor({
 
   return (
     <form onSubmit={handleSubmit} className={styles.editorForm}>
+      {isNew && (
+        <div>
+          <label htmlFor="editor-family" className={styles.fieldLabel}>
+            プロンプトファミリー<span className={styles.requiredMark}>*</span>
+          </label>
+          <select
+            id="editor-family"
+            value={familySelectValue}
+            onChange={(event) => setFamilySelectValue(event.target.value)}
+            className={styles.fieldInput}
+          >
+            {families.map((family) => (
+              <option key={family.id} value={String(family.id)}>
+                {family.name ?? `ファミリー ${family.id}`}
+              </option>
+            ))}
+            <option value={NEW_FAMILY_VALUE}>＋ 新しいファミリーを作成...</option>
+          </select>
+          {isCreatingNewFamily && (
+            <input
+              type="text"
+              value={newFamilyName}
+              onChange={(event) => setNewFamilyName(event.target.value)}
+              placeholder="新しいファミリー名を入力"
+              className={styles.fieldInput}
+              style={{ marginTop: "8px" }}
+            />
+          )}
+        </div>
+      )}
       <div>
         <label htmlFor="editor-name" className={styles.fieldLabel}>
           {isNew || version?.parent_version_id === null
@@ -803,6 +868,7 @@ type PanelMode =
   | null;
 
 export function PromptsPage() {
+  const { t } = useI18n();
   const { id } = useParams<{ id?: string }>();
   const [searchParams, setSearchParams] = useSearchParams();
   const queryClient = useQueryClient();
@@ -992,10 +1058,8 @@ export function PromptsPage() {
     <div className={`${styles.root} ${styles.page}`}>
       <div className={styles.pageHeader}>
         <div>
-          <h2 className={styles.pageTitle}>プロンプト管理</h2>
-          <p className={styles.pageDescription}>
-            Prompt Family 単位で履歴を管理し、必要に応じてプロジェクトラベルで絞り込みます。
-          </p>
+          <h2 className={styles.pageTitle}>{t("prompts.title")}</h2>
+          <p className={styles.pageDescription}>{t("prompts.description")}</p>
         </div>
         <div className={styles.pageActions}>
           {selectedVersion && compareVersion && (
@@ -1013,8 +1077,8 @@ export function PromptsPage() {
           <button
             type="button"
             onClick={() => setPanelMode({ type: "new" })}
-            disabled={!selectedFamily}
-            className={`${styles.btnPrimary} ${selectedFamily ? "" : styles.btnDisabled}`}
+            disabled={families.length === 0}
+            className={`${styles.btnPrimary} ${families.length === 0 ? styles.btnDisabled : ""}`}
           >
             + 新規バージョン
           </button>
@@ -1024,7 +1088,7 @@ export function PromptsPage() {
       <div className={styles.filterBar}>
         <div className={styles.filterGroup}>
           <label htmlFor="project-filter" className={styles.filterLabel}>
-            プロジェクトフィルタ
+            {t("prompts.projectFilterLabel")}
           </label>
           <select
             id="project-filter"
@@ -1088,7 +1152,7 @@ export function PromptsPage() {
         <div className={styles.sidebarColumn}>
           <section className={styles.familyPanel}>
             <div className={styles.familyPanelHeader}>
-              <div className={styles.treePanelLabel}>Prompt Families</div>
+              <div className={styles.treePanelLabel}>{t("prompts.familyPanelLabel")}</div>
               <div className={styles.familyActions}>
                 <button
                   type="button"
@@ -1191,19 +1255,21 @@ export function PromptsPage() {
             </div>
           )}
 
-          {panelMode?.type === "new" && selectedFamily && (
+          {panelMode?.type === "new" && (
             <>
-              <div className={styles.panelHeaderTitle}>
-                {selectedFamily.name ?? `ファミリー ${selectedFamily.id}`} に新規追加
-              </div>
+              <div className={styles.panelHeaderTitle}>新規バージョンを作成</div>
               <div className={styles.panelEditorBody}>
                 <PromptEditor
-                  familyId={selectedFamily.id}
+                  families={families}
+                  initialFamilyId={selectedFamilyId}
                   projects={projects}
                   version={null}
                   defaultProjectId={selectedProjectId}
                   isNew={true}
                   onSave={(version) => {
+                    const nextParams = new URLSearchParams(searchParams);
+                    nextParams.set("family_id", String(version.prompt_family_id));
+                    setSearchParams(nextParams, { replace: true });
                     setSelectedVersion(version);
                     setPanelMode({ type: "view", version });
                   }}
@@ -1246,7 +1312,7 @@ export function PromptsPage() {
               <div className={styles.panelBody}>
                 {selectedFamily && (
                   <div className={styles.familySummaryCard}>
-                    <span className={styles.familySummaryLabel}>Family</span>
+                    <span className={styles.familySummaryLabel}>{t("prompts.familySummaryLabel")}</span>
                     <strong className={styles.familySummaryName}>
                       {selectedFamily.name ?? `ファミリー ${selectedFamily.id}`}
                     </strong>
@@ -1314,6 +1380,8 @@ export function PromptsPage() {
               <div className={styles.panelEditorBody}>
                 <PromptEditor
                   familyId={selectedFamily.id}
+                  families={families}
+                  initialFamilyId={selectedFamily.id}
                   projects={projects}
                   version={panelMode.version}
                   defaultProjectId={selectedProjectId}

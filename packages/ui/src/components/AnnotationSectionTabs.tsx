@@ -1,5 +1,6 @@
 import { useEffect } from "react";
 import { NavLink, useLocation } from "react-router";
+import { useI18n } from "../i18n/I18nProvider";
 import {
   buildAnnotationReviewPath,
   getAnnotationReviewContextFromSearch,
@@ -14,6 +15,7 @@ const annotationRoutes = {
 } as const;
 
 export function AnnotationSectionTabs() {
+  const { t } = useI18n();
   const location = useLocation();
 
   const searchParams = new URLSearchParams(location.search);
@@ -37,24 +39,24 @@ export function AnnotationSectionTabs() {
 
   const tabs = [
     {
+      to: `/${annotationRoutes.settings}`,
+      label: t("annotation.tabs.settings"),
+      isActive: isSettingsPath,
+    },
+    {
       to: reviewTabTo,
-      label: "レビュー",
+      label: t("annotation.tabs.review"),
       isActive: isReviewPath && (hasRunId || modeParam === "review"),
     },
     {
       to: `/${annotationRoutes.review}`,
-      label: "ゴールドアノテーション",
+      label: t("annotation.tabs.goldAnnotations"),
       isActive: isReviewPath && !hasRunId && modeParam !== "review",
-    },
-    {
-      to: `/${annotationRoutes.settings}`,
-      label: "設定",
-      isActive: isSettingsPath,
     },
   ];
 
   return (
-    <div className={styles.tabList} aria-label="抽出ページ切り替え">
+    <div className={styles.tabList} aria-label={t("annotation.tabs.ariaLabel")}>
       {tabs.map(({ to, label, isActive }) => (
         <NavLink key={to} to={to} className={`${styles.tab} ${isActive ? styles.tabActive : ""}`}>
           {label}

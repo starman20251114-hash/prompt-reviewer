@@ -79,6 +79,8 @@
   color: var(--c-muted);
   text-transform: uppercase;
   letter-spacing: 0.08em;
+  white-space: nowrap;
+  flex-shrink: 0;
 }
 
 .filterSelect {
@@ -754,12 +756,15 @@
 
 .btnWorkflowAdd {
   padding: 6px 12px;
+  min-width: 120px;
   background: transparent;
   border: 1px solid var(--c-blue);
   border-radius: 6px;
   color: var(--c-blue);
   font-size: 12px;
   cursor: pointer;
+  white-space: nowrap;
+  flex-shrink: 0;
 }
 
 .workflowEmpty {
