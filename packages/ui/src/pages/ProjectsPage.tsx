@@ -245,7 +245,7 @@ export function ProjectsPage() {
       </div>
 
       <p className={styles.description}>
-        プロジェクトラベルを管理します。ラベルはテストケース・プロンプト・Run などの資産を分類するために使用します。
+        プロジェクトラベルを管理します。ラベルをクリックして選択すると、テストケース・プロンプト・コンテキスト素材のページでそのラベルで絞り込まれます。再クリックで解除できます。
       </p>
 
       {isLoading && <p className={styles.loadingText}>読み込み中...</p>}
@@ -265,7 +265,7 @@ export function ProjectsPage() {
 
       {activeLabelId !== null && (
         <p className={styles.activeHint}>
-          ラベルを選択中です。テストケース・プロンプト・コンテキスト素材のページでこのラベルで絞り込まれます。
+          ラベルを選択中です。テストケース・プロンプト・コンテキスト素材のページでこのラベルで絞り込まれます。同じラベルを再クリックすると解除できます。
         </p>
       )}
 
