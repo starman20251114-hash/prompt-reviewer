@@ -1,7 +1,4 @@
 .root {
-  --c-accent: #89b4fa;
-  --c-accent-strong: #74c7ec;
-
   color: var(--c-text);
 }
 
@@ -10,11 +7,11 @@
   align-items: flex-start;
   justify-content: space-between;
   gap: 16px;
-  margin-bottom: 24px;
+  margin-bottom: 28px;
 }
 
 .eyebrow {
-  margin: 0 0 8px;
+  margin: 0 0 6px;
   color: var(--c-accent);
   font-size: 11px;
   font-weight: 700;
@@ -23,55 +20,57 @@
 }
 
 .pageTitle {
-  margin: 0 0 8px;
-  font-size: 26px;
+  margin: 0 0 4px;
+  font-size: 20px;
+  color: var(--c-text);
 }
 
 .layout {
   display: grid;
-  grid-template-columns: minmax(240px, 320px) minmax(0, 1fr);
-  gap: 24px;
+  grid-template-columns: minmax(240px, 300px) minmax(0, 1fr);
+  gap: 20px;
   align-items: start;
 }
 
 .sidebar {
   display: flex;
   flex-direction: column;
-  gap: 16px;
-  padding: 14px;
-  background: var(--c-card);
+  gap: 12px;
+  background: var(--c-overlay);
   border: 1px solid var(--c-border);
-  border-radius: 10px;
+  border-radius: 12px;
+  padding: 20px;
 }
 
 .sidebarHeader {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid var(--c-border);
 }
 
 .sidebarTitle {
-  margin: 0;
-  font-size: 16px;
+  margin: 0 0 4px;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--c-text);
 }
 
 .sidebarHint {
   margin: 0;
   color: var(--c-muted);
-  font-size: 13px;
+  font-size: 12px;
   line-height: 1.5;
 }
 
 .profileList {
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: 6px;
 }
 
 .profileCard {
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  gap: 4px;
   width: 100%;
   padding: 10px 12px;
   background: transparent;
@@ -91,10 +90,11 @@
 
 .profileCardActive {
   border-color: var(--c-accent);
-  background: color-mix(in srgb, var(--c-accent) 10%, var(--c-card));
+  background: color-mix(in srgb, var(--c-accent) 12%, var(--c-overlay));
 }
 
 .profileName {
+  font-size: 14px;
   font-weight: 600;
 }
 
@@ -105,36 +105,36 @@
 }
 
 .emptyCard {
-  padding: 18px;
-  background: var(--c-card);
+  padding: 16px;
+  background: transparent;
   border: 1px dashed var(--c-border);
-  border-radius: 14px;
+  border-radius: 8px;
 }
 
 .emptyTitle {
-  margin: 0 0 8px;
-  font-size: 14px;
+  margin: 0 0 6px;
+  font-size: 13px;
   font-weight: 600;
 }
 
 .emptyText {
   margin: 0;
   color: var(--c-muted);
-  font-size: 13px;
+  font-size: 12px;
   line-height: 1.5;
 }
 
 .content {
   display: flex;
   flex-direction: column;
-  gap: 20px;
+  gap: 16px;
 }
 
 .section {
-  padding: 16px;
-  background: var(--c-card);
+  background: var(--c-overlay);
   border: 1px solid var(--c-border);
-  border-radius: 10px;
+  border-radius: 12px;
+  padding: 24px;
 }
 
 .sectionHeader {
@@ -142,40 +142,44 @@
   justify-content: space-between;
   gap: 16px;
   align-items: flex-start;
-  margin-bottom: 16px;
+  padding-bottom: 16px;
+  margin-bottom: 20px;
+  border-bottom: 1px solid var(--c-border);
 }
 
 .sectionTitle {
   margin: 0 0 4px;
   font-size: 15px;
   font-weight: 600;
+  color: var(--c-text);
 }
 
 .sectionDescription {
   margin: 0;
   color: var(--c-muted);
-  font-size: 13px;
+  font-size: 12px;
   line-height: 1.5;
 }
 
 .formGrid {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
 }
 
 .fieldGroup {
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  gap: 8px;
 }
 
 .fieldGroupWide {
-  grid-column: 1 / -1;
+  /* no-op: single column layout */
 }
 
 .fieldLabel {
-  font-size: 14px;
+  font-size: 13px;
+  font-weight: 500;
   color: var(--c-subtext);
 }
 
@@ -184,8 +188,8 @@
 .fieldTextarea,
 .apiKeyInput {
   width: 100%;
-  padding: 10px 12px;
-  background: var(--c-overlay);
+  padding: 9px 12px;
+  background: var(--c-card);
   border: 1px solid var(--c-border);
   border-radius: 8px;
   color: var(--c-text);
@@ -203,7 +207,7 @@
 .fieldSelect:focus,
 .fieldTextarea:focus,
 .apiKeyInput:focus {
-  border-color: var(--c-accent-strong);
+  border-color: var(--c-accent);
   outline: none;
 }
 
@@ -232,80 +236,94 @@
 
 .slider {
   flex: 1;
-  accent-color: var(--c-accent-strong);
+  accent-color: var(--c-accent);
+  cursor: pointer;
 }
 
 .sliderValue {
   min-width: 32px;
   color: var(--c-accent);
   font-weight: 700;
+  font-size: 14px;
   text-align: right;
 }
 
 .formFooter {
   display: flex;
   align-items: center;
-  gap: 12px;
-  margin-top: 16px;
-}
-
-.primaryButton,
-.secondaryButton,
-.dangerButton {
-  border-radius: 999px;
-  padding: 10px 16px;
-  font-size: 13px;
-  font-weight: 600;
-  cursor: pointer;
-  transition:
-    opacity 0.15s ease,
-    transform 0.15s ease;
+  gap: 16px;
+  margin-top: 24px;
+  padding-top: 20px;
+  border-top: 1px solid var(--c-border);
 }
 
 .primaryButton {
-  background: linear-gradient(135deg, var(--c-accent), var(--c-accent-strong));
+  padding: 10px 24px;
+  background: var(--c-accent);
   border: none;
+  border-radius: 8px;
   color: #1e1e2e;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: opacity 0.15s;
+}
+
+.primaryButton:hover:not(:disabled) {
+  opacity: 0.9;
+}
+
+.primaryButton:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
 }
 
 .secondaryButton {
-  background: var(--c-surface);
+  padding: 9px 16px;
+  background: var(--c-card);
   border: 1px solid var(--c-border);
+  border-radius: 8px;
+  color: var(--c-subtext);
+  font-size: 13px;
+  cursor: pointer;
+  transition:
+    border-color 0.15s,
+    color 0.15s;
+}
+
+.secondaryButton:hover {
+  border-color: var(--c-accent);
   color: var(--c-text);
 }
 
 .dangerButton {
-  background: rgba(243, 139, 168, 0.12);
-  border: 1px solid rgba(243, 139, 168, 0.35);
+  padding: 9px 16px;
+  background: transparent;
+  border: 1px solid rgba(243, 139, 168, 0.45);
+  border-radius: 8px;
   color: var(--c-danger);
+  font-size: 13px;
+  cursor: pointer;
 }
 
-.primaryButton:hover:not(:disabled),
-.secondaryButton:hover:not(:disabled),
-.dangerButton:hover:not(:disabled) {
-  transform: translateY(-1px);
-}
-
-.primaryButton:disabled,
-.secondaryButton:disabled,
 .dangerButton:disabled {
-  opacity: 0.55;
+  opacity: 0.56;
   cursor: not-allowed;
 }
 
 .feedbackSuccess {
-  color: var(--c-green);
   font-size: 13px;
+  color: var(--c-green);
 }
 
 .feedbackError {
-  color: var(--c-danger);
   font-size: 13px;
+  color: var(--c-danger);
 }
 
 .apiKeyInputRow {
   display: flex;
-  gap: 10px;
+  gap: 8px;
 }
 
 .apiKeyStatus {
@@ -318,7 +336,7 @@
 }
 
 .apiKeyStatusUnset {
-  color: var(--c-danger);
+  color: var(--c-muted);
 }
 
 .loadingMsg,
@@ -352,6 +370,6 @@
   }
 
   .pageTitle {
-    font-size: 22px;
+    font-size: 18px;
   }
 }
