@@ -235,6 +235,7 @@ export function ContextAssetsPage() {
   function handleProjectFilterChange(projectId: number) {
     setFilters((prev) => ({
       ...prev,
+      unclassified: undefined,
       project_id: prev.project_id === projectId ? undefined : projectId,
     }));
   }
@@ -242,6 +243,7 @@ export function ContextAssetsPage() {
   function handleUnclassifiedToggle() {
     setFilters((prev) => ({
       ...prev,
+      project_id: undefined,
       unclassified: prev.unclassified ? undefined : true,
     }));
   }
