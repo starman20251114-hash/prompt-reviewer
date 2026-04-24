@@ -19,6 +19,7 @@
   color: var(--c-overlay);
   font-weight: 600;
   cursor: pointer;
+  white-space: nowrap;
 }
 
 .btnSecondary {
@@ -27,6 +28,7 @@
   border-radius: 6px;
   color: var(--c-subtext);
   cursor: pointer;
+  white-space: nowrap;
 }
 
 .btnDisabled {

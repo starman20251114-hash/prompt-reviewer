@@ -18,6 +18,7 @@ import {
   updateIndependentPromptVersion,
   updatePromptFamily,
 } from "../lib/api";
+import { useI18n } from "../i18n/I18nProvider";
 import { getStoredActiveLabelId } from "../lib/useActiveLabel";
 import styles from "./PromptsPage.module.css";
 
@@ -867,6 +868,7 @@ type PanelMode =
   | null;
 
 export function PromptsPage() {
+  const { t } = useI18n();
   const { id } = useParams<{ id?: string }>();
   const [searchParams, setSearchParams] = useSearchParams();
   const queryClient = useQueryClient();
@@ -1056,10 +1058,8 @@ export function PromptsPage() {
     <div className={`${styles.root} ${styles.page}`}>
       <div className={styles.pageHeader}>
         <div>
-          <h2 className={styles.pageTitle}>プロンプト管理</h2>
-          <p className={styles.pageDescription}>
-            Prompt Family 単位で履歴を管理し、必要に応じてプロジェクトラベルで絞り込みます。
-          </p>
+          <h2 className={styles.pageTitle}>{t("prompts.title")}</h2>
+          <p className={styles.pageDescription}>{t("prompts.description")}</p>
         </div>
         <div className={styles.pageActions}>
           {selectedVersion && compareVersion && (
@@ -1088,7 +1088,7 @@ export function PromptsPage() {
       <div className={styles.filterBar}>
         <div className={styles.filterGroup}>
           <label htmlFor="project-filter" className={styles.filterLabel}>
-            プロジェクトフィルタ
+            {t("prompts.projectFilterLabel")}
           </label>
           <select
             id="project-filter"
@@ -1152,7 +1152,7 @@ export function PromptsPage() {
         <div className={styles.sidebarColumn}>
           <section className={styles.familyPanel}>
             <div className={styles.familyPanelHeader}>
-              <div className={styles.treePanelLabel}>Prompt Families</div>
+              <div className={styles.treePanelLabel}>{t("prompts.familyPanelLabel")}</div>
               <div className={styles.familyActions}>
                 <button
                   type="button"
@@ -1312,7 +1312,7 @@ export function PromptsPage() {
               <div className={styles.panelBody}>
                 {selectedFamily && (
                   <div className={styles.familySummaryCard}>
-                    <span className={styles.familySummaryLabel}>Family</span>
+                    <span className={styles.familySummaryLabel}>{t("prompts.familySummaryLabel")}</span>
                     <strong className={styles.familySummaryName}>
                       {selectedFamily.name ?? `ファミリー ${selectedFamily.id}`}
                     </strong>
