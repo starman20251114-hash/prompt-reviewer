@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useParams, useSearchParams } from "react-router";
 import { getStoredActiveLabelId } from "../lib/useActiveLabel";
 import {
@@ -811,9 +811,15 @@ export function PromptsPage() {
   const projectFilterParam = searchParams.get("project_id");
   const familyFilterParam = searchParams.get("family_id");
   const selectedProjectId =
-    routeProjectId ??
-    (projectFilterParam ? Number(projectFilterParam) : getStoredActiveLabelId());
+    routeProjectId ?? (projectFilterParam ? Number(projectFilterParam) : null);
   const isProjectScopedView = routeProjectId !== null;
+
+  // アクティブラベルをマウント時に一度だけ適用（family_idエフェクトと競合しないよう useRef で管理）
+  const activeLabelToApply = useRef<number | null>(
+    projectFilterParam === null && routeProjectId === null
+      ? getStoredActiveLabelId()
+      : null,
+  );
 
   const [selectedVersion, setSelectedVersion] = useState<PromptVersion | null>(null);
   const [compareVersion, setCompareVersion] = useState<PromptVersion | null>(null);
@@ -845,20 +851,28 @@ export function PromptsPage() {
 
   useEffect(() => {
     const nextParams = new URLSearchParams(searchParams);
-    if (selectedFamilyId === null) {
-      if (!nextParams.has("family_id")) {
-        return;
-      }
-      nextParams.delete("family_id");
-      setSearchParams(nextParams, { replace: true });
-      return;
+    let changed = false;
+
+    // アクティブラベルを一度だけ適用（family_id同期と同一エフェクトで競合回避）
+    if (activeLabelToApply.current !== null && !nextParams.has("project_id")) {
+      nextParams.set("project_id", String(activeLabelToApply.current));
+      activeLabelToApply.current = null;
+      changed = true;
     }
 
-    if (searchParams.get("family_id") === String(selectedFamilyId)) {
-      return;
+    if (selectedFamilyId === null) {
+      if (nextParams.has("family_id")) {
+        nextParams.delete("family_id");
+        changed = true;
+      }
+    } else if (nextParams.get("family_id") !== String(selectedFamilyId)) {
+      nextParams.set("family_id", String(selectedFamilyId));
+      changed = true;
     }
-    nextParams.set("family_id", String(selectedFamilyId));
-    setSearchParams(nextParams, { replace: true });
+
+    if (changed) {
+      setSearchParams(nextParams, { replace: true });
+    }
   }, [searchParams, selectedFamilyId, setSearchParams]);
 
   const {
