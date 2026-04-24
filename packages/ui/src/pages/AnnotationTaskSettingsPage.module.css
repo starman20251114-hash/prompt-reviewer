@@ -130,6 +130,7 @@
   margin: 0;
   font-size: 15px;
   font-weight: 600;
+  color: var(--c-accent);
 }
 
 .sectionHint {
@@ -140,25 +141,34 @@
 }
 
 .panel,
-.emptyState,
-.labelCard {
+.emptyState {
   background: var(--c-card);
   border: 1px solid var(--c-border);
   border-radius: 10px;
   padding: 16px;
 }
 
+.labelCard {
+  background: var(--c-card);
+  border: 1px solid var(--c-border);
+  border-radius: 10px;
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
 .taskCard,
 .taskCardActive {
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  gap: 4px;
   width: 100%;
   text-align: left;
   padding: 10px 12px;
   border-radius: 8px;
   border: 1px solid var(--c-border);
-  background: transparent;
+  background: var(--c-bg);
   color: var(--c-text);
   cursor: pointer;
   transition:
@@ -166,14 +176,13 @@
     background-color 0.15s ease;
 }
 
-.taskCard:hover,
-.taskCardActive:hover {
-  background: color-mix(in srgb, var(--c-accent) 8%, transparent);
+.taskCard:hover {
+  border-color: var(--c-accent);
 }
 
 .taskCardActive {
   border-color: var(--c-accent);
-  background: color-mix(in srgb, var(--c-accent) 10%, var(--c-card));
+  background: color-mix(in srgb, var(--c-accent) 10%, var(--c-bg));
 }
 
 .taskCardTitle {
@@ -227,22 +236,28 @@
   box-sizing: border-box;
   border: 1px solid var(--c-border);
   border-radius: 8px;
-  background: var(--c-overlay);
+  background: var(--c-surface);
   color: var(--c-text);
-  padding: 10px 12px;
+  padding: 9px 12px;
   font-size: 14px;
   font-family: inherit;
+}
+
+.fieldInput::placeholder,
+.fieldTextarea::placeholder {
+  color: var(--c-subtext);
+  opacity: 0.6;
 }
 
 .fieldInput:focus,
 .fieldTextarea:focus {
   outline: none;
-  border-color: var(--c-accent-strong);
+  border-color: var(--c-accent);
 }
 
 .fieldInput:disabled,
 .fieldTextarea:disabled {
-  opacity: 0.75;
+  opacity: 0.6;
   cursor: not-allowed;
 }
 
@@ -347,12 +362,6 @@
   transform: none;
 }
 
-.labelCard {
-  display: flex;
-  flex-direction: column;
-  gap: 14px;
-}
-
 .labelCardHeader {
   display: flex;
   justify-content: space-between;
@@ -362,7 +371,9 @@
 
 .labelTitle {
   margin: 0;
-  font-size: 16px;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--c-accent);
 }
 
 .labelMeta {
@@ -462,9 +473,9 @@
   box-sizing: border-box;
   border: 1px solid var(--c-border);
   border-radius: 8px;
-  background: var(--c-overlay);
+  background: var(--c-surface);
   color: var(--c-text);
-  padding: 10px 12px;
+  padding: 9px 12px;
   font-size: 13px;
   font-family: monospace;
   resize: vertical;
