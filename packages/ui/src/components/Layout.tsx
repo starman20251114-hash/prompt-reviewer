@@ -41,9 +41,9 @@ const navItems: NavItem[] = [
     label: "テストケース",
     children: [{ to: "/context-assets", label: "コンテキスト素材" }],
   },
-  { to: "/", label: "ラベル管理", end: true },
   { to: "/runs", label: "Run" },
   { to: "/score", label: "採点" },
+  { to: "/", label: "ラベル管理", end: true },
   { to: "/execution-profiles", label: "実行設定" },
   { to: "/health", label: "ヘルスチェック" },
 ];
