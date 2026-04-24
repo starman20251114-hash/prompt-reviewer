@@ -12,25 +12,56 @@ const navLinkStyle = ({ isActive }: { isActive: boolean }) => ({
   fontSize: "14px",
 });
 
-function SidebarNav() {
-  const topNavItems = [
-    { to: "/", label: "ラベル管理", end: true },
-    { to: "/test-cases", label: "テストケース", end: false },
-    { to: "/prompts", label: "プロンプト", end: false },
-    { to: "/context-assets", label: "コンテキスト素材", end: false },
-    { to: "/runs", label: "Run", end: false },
-    { to: "/score", label: "採点", end: false },
-    { to: "/annotation-review", label: "抽出", end: false },
-    { to: "/execution-profiles", label: "実行設定", end: false },
-    { to: "/health", label: "ヘルスチェック", end: false },
-  ];
+const subNavLinkStyle = ({ isActive }: { isActive: boolean }) => ({
+  display: "block",
+  padding: "6px 16px 6px 32px",
+  textDecoration: "none",
+  color: isActive ? "#cba6f7" : "#a6adc8",
+  backgroundColor: isActive ? "#313244" : "transparent",
+  borderRadius: "4px",
+  margin: "2px 8px",
+  fontSize: "13px",
+});
 
+type NavItem = {
+  to: string;
+  label: string;
+  end?: boolean;
+  children?: { to: string; label: string }[];
+};
+
+const navItems: NavItem[] = [
+  {
+    to: "/prompts",
+    label: "プロンプト",
+    children: [{ to: "/annotation-review", label: "抽出" }],
+  },
+  {
+    to: "/test-cases",
+    label: "テストケース",
+    children: [{ to: "/context-assets", label: "コンテキスト素材" }],
+  },
+  { to: "/", label: "ラベル管理", end: true },
+  { to: "/runs", label: "Run" },
+  { to: "/score", label: "採点" },
+  { to: "/execution-profiles", label: "実行設定" },
+  { to: "/health", label: "ヘルスチェック" },
+];
+
+function SidebarNav() {
   return (
     <nav style={{ marginTop: "8px" }}>
-      {topNavItems.map(({ to, label, end }) => (
-        <NavLink key={to} to={to} end={end} style={navLinkStyle}>
-          {label}
-        </NavLink>
+      {navItems.map(({ to, label, end, children }) => (
+        <div key={to}>
+          <NavLink to={to} end={end} style={navLinkStyle}>
+            {label}
+          </NavLink>
+          {children?.map((child) => (
+            <NavLink key={child.to} to={child.to} style={subNavLinkStyle}>
+              {child.label}
+            </NavLink>
+          ))}
+        </div>
       ))}
     </nav>
   );
