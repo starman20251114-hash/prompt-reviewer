@@ -154,8 +154,13 @@ function FamilyModal({ family, onClose, onSubmit, isPending, isError }: FamilyMo
   const [name, setName] = useState(family?.name ?? "");
   const [description, setDescription] = useState(family?.description ?? "");
 
+  const isNew = family === null;
+  const isNameRequired = isNew;
+  const isSubmitDisabled = isPending || (isNameRequired && !name.trim());
+
   function handleSubmit(event: React.FormEvent) {
     event.preventDefault();
+    if (isSubmitDisabled) return;
     onSubmit({
       name: name.trim() || null,
       description: description.trim() || null,
@@ -180,6 +185,7 @@ function FamilyModal({ family, onClose, onSubmit, isPending, isError }: FamilyMo
           <div>
             <label htmlFor="family-name" className={styles.fieldLabel}>
               名前
+              {isNameRequired && <span className={styles.requiredMark}>*</span>}
             </label>
             <input
               id="family-name"
@@ -188,6 +194,7 @@ function FamilyModal({ family, onClose, onSubmit, isPending, isError }: FamilyMo
               onChange={(event) => setName(event.target.value)}
               placeholder="例: FAQ 応答改善"
               className={styles.fieldInput}
+              required={isNameRequired}
             />
           </div>
           <div>
@@ -209,8 +216,8 @@ function FamilyModal({ family, onClose, onSubmit, isPending, isError }: FamilyMo
             </button>
             <button
               type="submit"
-              disabled={isPending}
-              className={`${styles.btnSave} ${isPending ? styles.btnDisabled : ""}`}
+              disabled={isSubmitDisabled}
+              className={`${styles.btnSave} ${isSubmitDisabled ? styles.btnDisabled : ""}`}
             >
               {isPending ? "保存中..." : family ? "更新" : "作成"}
             </button>
