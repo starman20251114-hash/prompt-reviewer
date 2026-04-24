@@ -29,5 +29,32 @@ export const jaMessages = {
     familyPanelLabel: "プロンプトファミリー",
     familySummaryLabel: "ファミリー",
     projectFilterLabel: "プロジェクトフィルタ",
+    createFamily: "+ ファミリー作成",
+  },
+  contextAssets: {
+    description: "テストケースで利用するコンテキスト素材を管理します。",
+    properties: "プロパティ",
+    name: "名前",
+    path: "パス",
+    mimeType: "MIMEタイプ",
+    projectAssignment: "プロジェクト割り当て",
+    save: "保存",
+    saving: "保存中...",
+    confirmDelete: "本当に削除しますか？",
+    deleting: "削除中...",
+    delete: "削除",
+    cancel: "キャンセル",
+  },
+  testCases: {
+    title: "テストケース管理",
+    description:
+      "テストケースを管理します。必要なコンテキスト素材やプロジェクトをあとから関連付けられます。",
+    turnUser: "ユーザー",
+    turnAssistant: "アシスタント",
+    contextImportHint:
+      "選択した素材の内容をスナップショットとしてコンテキスト欄に取り込みます。",
+    titleHint:
+      "プロンプトのみで何も参照しない場合はタイトルだけ入力して作成してください。",
+    projectLabelHint: "必要なプロジェクトにタグ付けできます。",
   },
 } as const;

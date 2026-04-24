@@ -21,9 +21,9 @@ const navItems: NavItem[] = [
     labelKey: "layout.testCases",
     children: [{ to: "/context-assets", labelKey: "layout.contextAssets" }],
   },
-  { to: "/", labelKey: "layout.labels", end: true },
   { to: "/runs", labelKey: "layout.runs" },
   { to: "/score", labelKey: "layout.scoring" },
+  { to: "/", labelKey: "layout.labels", end: true },
   { to: "/execution-profiles", labelKey: "layout.executionProfiles" },
   { to: "/health", labelKey: "layout.health" },
 ];

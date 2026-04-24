@@ -12,11 +12,11 @@
 
 .pageTitle {
   composes: pageTitle from '../styles/shared.module.css';
-  margin: 0 0 4px;
+  margin: 0;
 }
 
 .pageDescription {
-  margin: 0;
+  margin: 6px 0 0;
   color: var(--c-subtext);
   font-size: 14px;
 }
@@ -392,6 +392,47 @@
 .noProjects {
   font-size: 12px;
   color: var(--c-muted);
+}
+
+.propertiesSection {
+  border-bottom: 1px solid var(--c-border);
+  flex-shrink: 0;
+}
+
+.propertiesToggle {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 16px;
+  background: transparent;
+  border: none;
+  color: var(--c-subtext);
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  text-align: left;
+}
+
+.propertiesToggleIcon {
+  color: var(--c-subtext);
+  font-size: 16px;
+}
+
+.propertiesBody {
+  padding: 12px 16px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.editorToolbar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 16px;
+  border-bottom: 1px solid var(--c-border);
+  flex-shrink: 0;
 }
 
 .editorArea {
