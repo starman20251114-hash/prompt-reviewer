@@ -473,7 +473,7 @@ export function AnnotationTaskSettingsPage() {
                     onClick={() => deleteTaskMutation.mutate()}
                     disabled={deleteTaskMutation.isPending}
                   >
-                    {deleteTaskMutation.isPending ? "削除中..." : "タスクを削除"}
+                    {deleteTaskMutation.isPending ? "削除中..." : "削除"}
                   </button>
                 </div>
 
