@@ -1,22 +1,24 @@
 import { useQuery } from "@tanstack/react-query";
-import { useNavigate, useParams } from "react-router";
+import { Navigate, useParams } from "react-router";
 import { getProject } from "../lib/api";
 
 export function ProjectDetailPage() {
   const { id } = useParams<{ id: string }>();
-  const navigate = useNavigate();
   const projectId = Number(id);
 
-  const { data: project, isLoading } = useQuery({
+  const { isLoading } = useQuery({
     queryKey: ["project", projectId],
     queryFn: () => getProject(projectId),
     enabled: !Number.isNaN(projectId),
   });
 
-  // ラベル管理画面にリダイレクト（後方互換のためルートは残す）
-  if (!isLoading && project) {
-    void navigate("/", { replace: true });
-    return null;
+  if (Number.isNaN(projectId)) {
+    return <Navigate to="/" replace />;
+  }
+
+  // 既存 ID でも無効 ID でも、読み込み完了後はトップへ戻す。
+  if (!isLoading) {
+    return <Navigate to="/" replace />;
   }
 
   return null;

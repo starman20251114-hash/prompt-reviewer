@@ -114,7 +114,7 @@ function buildLabelForm(label?: AnnotationLabel): LabelFormState {
 }
 
 export function AnnotationTaskSettingsPage() {
-  const { id } = useParams<{ id: string }>();
+  const { id } = useParams<{ id?: string }>();
   const projectId = Number(id);
   const queryClient = useQueryClient();
 
@@ -403,7 +403,7 @@ export function AnnotationTaskSettingsPage() {
           <p className={styles.eyebrow}>Annotation Task Settings</p>
           <h2 className={styles.pageTitle}>抽出</h2>
           <p className={styles.pageDescription}>
-            {project?.name ?? "プロジェクト"} で使う annotation task と label を準備します。
+            {project?.name ?? "全体"} で使う annotation task と label を準備します。
             現在の初期実装では output mode は <code>span_label</code> 固定です。
           </p>
           <AnnotationSectionTabs />
