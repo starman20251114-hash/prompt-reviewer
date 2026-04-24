@@ -13,16 +13,13 @@ import {
   createAnnotationTasksRouter,
 } from "./routes/annotation-tasks.js";
 import { createContextAssetsRouter } from "./routes/context-assets.js";
-import { createContextFilesRouter } from "./routes/context-files.js";
 import { createExecutionProfilesRouter } from "./routes/execution-profiles.js";
-import { createProjectSettingsRouter } from "./routes/project-settings.js";
-import { createProjectTestCasesRouter } from "./routes/project-test-cases.js";
 import { createProjectsRouter } from "./routes/projects.js";
 import { createPromptFamiliesRouter } from "./routes/prompt-families.js";
 import { createPromptVersionsRouter } from "./routes/prompt-versions.js";
 import { createRunsRouter } from "./routes/runs.js";
 import { createScoreProgressionRouter } from "./routes/score-progression.js";
-import { createScoresRouter, createVersionSummaryRouter } from "./routes/scores.js";
+import { createScoresRouter } from "./routes/scores.js";
 import { createTestCasesRouter } from "./routes/test-cases.js";
 
 const dbPath = process.env.DB_PATH ?? "../../dev.db";
@@ -89,18 +86,11 @@ app.route("/api/context-assets", createContextAssetsRouter(db));
 app.route("/api/projects", createProjectsRouter(db));
 app.route("/api/execution-profiles", createExecutionProfilesRouter(db));
 app.route("/api/prompt-families", createPromptFamiliesRouter(db));
-app.route("/api/projects/:projectId/context-files", createContextFilesRouter(db));
 app.route("/api/test-cases", createTestCasesRouter(db));
-app.route("/api/projects/:projectId/test-cases", createProjectTestCasesRouter(db));
 app.route("/api/prompt-versions", createPromptVersionsRouter(db));
-app.route("/api/projects/:projectId/prompt-versions", createPromptVersionsRouter(db));
-app.route("/api/projects/:projectId/prompt-versions", createVersionSummaryRouter(db));
 app.route("/api/runs", createRunsRouter(db, { enableCandidateExtractRoute: true }));
-app.route("/api/projects/:projectId/runs", createRunsRouter(db));
 app.route("/api/runs", createScoresRouter(db));
 app.route("/api/score-progression", createScoreProgressionRouter(db));
-app.route("/api/projects/:projectId/score-progression", createScoreProgressionRouter(db));
-app.route("/api/projects/:projectId/settings", createProjectSettingsRouter(db));
 app.get("*", async (c) => {
   if (!uiDistDir) {
     return c.notFound();

@@ -173,43 +173,6 @@ export function deleteAnnotationLabel(id: number): Promise<void> {
   return api.delete<void>(`/annotation-labels/${id}`);
 }
 
-export type ContextFileSummary = {
-  name: string;
-  path: string;
-  mime_type: string;
-  size: number;
-  updated_at: number;
-};
-
-export type ContextFileDetail = ContextFileSummary & {
-  content: string;
-};
-
-export function getContextFiles(projectId: number): Promise<ContextFileSummary[]> {
-  return api.get<ContextFileSummary[]>(`/projects/${projectId}/context-files`);
-}
-
-export function getContextFile(projectId: number, filePath: string): Promise<ContextFileDetail> {
-  const params = new URLSearchParams({ path: filePath });
-  return api.get<ContextFileDetail>(`/projects/${projectId}/context-files/content?${params}`);
-}
-
-export function uploadContextFile(
-  projectId: number,
-  data: { file_name: string; content: string; mime_type?: string },
-): Promise<ContextFileSummary> {
-  return api.post<ContextFileSummary>(`/projects/${projectId}/context-files`, data);
-}
-
-export function updateContextFile(
-  projectId: number,
-  filePath: string,
-  data: { content: string },
-): Promise<ContextFileDetail> {
-  const params = new URLSearchParams({ path: filePath });
-  return api.put<ContextFileDetail>(`/projects/${projectId}/context-files/content?${params}`, data);
-}
-
 export function createProject(data: {
   name: string;
   description?: string;
@@ -260,47 +223,6 @@ export type PromptFamily = {
   created_at: number;
   updated_at: number;
 };
-
-export function getPromptVersions(projectId: number): Promise<PromptVersion[]> {
-  return api.get<PromptVersion[]>(`/projects/${projectId}/prompt-versions`);
-}
-
-export function getPromptVersion(projectId: number, id: number): Promise<PromptVersion> {
-  return api.get<PromptVersion>(`/projects/${projectId}/prompt-versions/${id}`);
-}
-
-export function createPromptVersion(
-  projectId: number,
-  data: {
-    content: string;
-    name?: string;
-    memo?: string;
-    workflow_definition?: PromptWorkflowDefinition;
-  },
-): Promise<PromptVersion> {
-  return api.post<PromptVersion>(`/projects/${projectId}/prompt-versions`, data);
-}
-
-export function updatePromptVersion(
-  projectId: number,
-  id: number,
-  data: {
-    content?: string;
-    name?: string | null;
-    memo?: string | null;
-    workflow_definition?: PromptWorkflowDefinition | null;
-  },
-): Promise<PromptVersion> {
-  return api.patch<PromptVersion>(`/projects/${projectId}/prompt-versions/${id}`, data);
-}
-
-export function branchPromptVersion(
-  projectId: number,
-  id: number,
-  data: { name?: string; memo?: string },
-): Promise<PromptVersion> {
-  return api.post<PromptVersion>(`/projects/${projectId}/prompt-versions/${id}/branch`, data);
-}
 
 export function getPromptFamilies(): Promise<PromptFamily[]> {
   return api.get<PromptFamily[]>("/prompt-families");
@@ -914,10 +836,6 @@ export function discardRunIndependent(id: number): Promise<Run> {
   return api.patch<Run>(`/runs/${id}/discard`, {});
 }
 
-export function setSelectedVersion(projectId: number, id: number): Promise<PromptVersion> {
-  return api.patch<PromptVersion>(`/projects/${projectId}/prompt-versions/${id}/selected`, {});
-}
-
 // Score API
 
 export type Score = {
@@ -974,17 +892,6 @@ export function upsertScore(
 
 // ProjectSettings API
 
-export type ProjectSettings = {
-  id: number;
-  project_id: number;
-  model: string;
-  temperature: number;
-  api_provider: "anthropic" | "openai";
-  max_tokens: number | null;
-  created_at: number;
-  updated_at: number;
-};
-
 export type ApiProvider = "anthropic" | "openai";
 
 export type LLMModelOption = {
@@ -1026,29 +933,6 @@ export type ContextAssetFilters = {
   unclassified?: boolean;
   linked_to?: `test_case:${number}` | `prompt_family:${number}`;
 };
-
-export function getProjectSettings(projectId: number): Promise<ProjectSettings> {
-  return api.get<ProjectSettings>(`/projects/${projectId}/settings`);
-}
-
-export function upsertProjectSettings(
-  projectId: number,
-  data: {
-    model: string;
-    temperature: number;
-    api_provider: ApiProvider;
-    max_tokens: number | null;
-  },
-): Promise<ProjectSettings> {
-  return api.put<ProjectSettings>(`/projects/${projectId}/settings`, data);
-}
-
-export function listProjectSettingsModels(
-  projectId: number,
-  data: { api_provider: ApiProvider; api_key: string },
-): Promise<{ models: LLMModelOption[] }> {
-  return api.post<{ models: LLMModelOption[] }>(`/projects/${projectId}/settings/models`, data);
-}
 
 export function getExecutionProfiles(): Promise<ExecutionProfile[]> {
   return api.get<ExecutionProfile[]>("/execution-profiles");

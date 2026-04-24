@@ -1,6 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useState } from "react";
-import { Link, useParams } from "react-router";
+import { Link } from "react-router";
 import { RunCompareView } from "../components/RunCompareView";
 import { useApiKey } from "../hooks/useApiKey";
 import {
@@ -8,17 +8,14 @@ import {
   type ConversationMessage,
   type ExecutionProfile,
   type ExecutionTraceStep,
+  type Project,
   type PromptFamily,
   type PromptVersion,
   type Run,
   type TestCase,
-  createRun,
   createRunIndependent,
-  discardRun,
   discardRunIndependent,
-  executeRunStream,
   executeRunStreamIndependent,
-  extractAnnotationCandidates,
   extractAnnotationCandidatesIndependent,
   getAnnotationTasks,
   getExecutionProfiles,
@@ -27,9 +24,9 @@ import {
   getPromptFamilies,
   getPromptVersionsByFamily,
   getRunsIndependent,
-  setBestRun,
   setBestRunIndependent,
 } from "../lib/api";
+import { getStoredActiveLabelId } from "../lib/useActiveLabel";
 import styles from "./RunsPage.module.css";
 
 function buildFullPrompt(version: PromptVersion, testCase?: TestCase | null): string {
@@ -213,11 +210,9 @@ function RunConversation({ conversation }: { conversation: ConversationMessage[]
 
 function AnnotationExtractPanel({
   run,
-  projectId,
   annotationTasks,
 }: {
   run: Run;
-  projectId: number | null;
   annotationTasks: AnnotationTask[];
 }) {
   const [selectedTaskId, setSelectedTaskId] = useState<number | "">("");
@@ -258,9 +253,7 @@ function AnnotationExtractPanel({
         annotation_task_id: selectedTaskId,
         source_type: hasStructuredOutput ? "structured_json" : "final_answer",
       } as const;
-      return projectId !== null
-        ? extractAnnotationCandidates(projectId, run.id, params)
-        : extractAnnotationCandidatesIndependent(run.id, params);
+      return extractAnnotationCandidatesIndependent(run.id, params);
     },
     onSuccess: (result) => {
       setExtractResult(result);
@@ -313,7 +306,7 @@ function AnnotationExtractPanel({
         <div className={styles.annotationSuccess}>
           <span>{extractResult.candidates_created} 件の候補を抽出しました。</span>
           <Link
-            to={`${projectId !== null ? `/projects/${projectId}/annotation-review` : "/annotation-review"}?runId=${run.id}&taskId=${extractResult.annotation_task_id}`}
+            to={`/annotation-review?runId=${run.id}&taskId=${extractResult.annotation_task_id}`}
             className={styles.annotationReviewLink}
           >
             レビューページへ
@@ -323,7 +316,7 @@ function AnnotationExtractPanel({
       {!extractResult && selectedTaskId !== "" && (
         <div className={styles.annotationReviewLinkRow}>
           <Link
-            to={`${projectId !== null ? `/projects/${projectId}/annotation-review` : "/annotation-review"}?runId=${run.id}&taskId=${selectedTaskId}`}
+            to={`/annotation-review?runId=${run.id}&taskId=${selectedTaskId}`}
             className={styles.annotationReviewLinkSmall}
           >
             既存の候補をレビュー
@@ -336,7 +329,6 @@ function AnnotationExtractPanel({
 
 function RunCard({
   run,
-  projectId,
   scorePath,
   versionLabel,
   versionNumber,
@@ -350,7 +342,6 @@ function RunCard({
   isDiscardPending,
 }: {
   run: Run;
-  projectId: number | null;
   scorePath: string;
   versionLabel: string;
   versionNumber: number;
@@ -450,9 +441,7 @@ function RunCard({
         </div>
       </div>
 
-      {showAnnotation && (
-        <AnnotationExtractPanel run={run} projectId={projectId} annotationTasks={annotationTasks} />
-      )}
+      {showAnnotation && <AnnotationExtractPanel run={run} annotationTasks={annotationTasks} />}
 
       {expanded && (
         <div className={styles.runConversation}>
@@ -524,12 +513,10 @@ function RunCompareBar({
 }
 
 export function RunsPage() {
-  const { id } = useParams<{ id?: string }>();
-  const projectId = id !== undefined ? Number(id) : null;
+  const projectId = getStoredActiveLabelId();
   const queryClient = useQueryClient();
 
-  const apiKeyScope = projectId ?? "shared";
-  const { apiKey, hasApiKey } = useApiKey(apiKeyScope);
+  const { apiKey, hasApiKey } = useApiKey("shared");
 
   const [activeTab, setActiveTab] = useState<PageTab>("create");
 
@@ -551,9 +538,9 @@ export function RunsPage() {
   const [compareRunB, setCompareRunB] = useState<Run | null>(null);
   const [isCompareOpen, setIsCompareOpen] = useState(false);
 
-  const scorePath = projectId !== null ? `/projects/${projectId}/score` : "/score";
+  const scorePath = "/score";
 
-  const { data: project } = useQuery({
+  const { data: project } = useQuery<Project | undefined>({
     queryKey: ["projects", projectId],
     queryFn: () => getProject(projectId as number),
     enabled: projectId !== null && !Number.isNaN(projectId),
@@ -644,13 +631,6 @@ export function RunsPage() {
     }) => {
       const profileId = selectedProfileId !== "" ? selectedProfileId : executionProfiles[0]?.id;
       if (!profileId) throw new Error("実行プロファイルを選択してください");
-      if (projectId !== null) {
-        return createRun(projectId, {
-          ...data,
-          execution_trace: executionTrace.length > 0 ? executionTrace : undefined,
-          execution_profile_id: profileId,
-        });
-      }
       return createRunIndependent({
         ...data,
         execution_trace: executionTrace.length > 0 ? executionTrace : undefined,
@@ -698,9 +678,6 @@ export function RunsPage() {
           setLlmResponse(stepInfo.output);
         },
       };
-      if (projectId !== null) {
-        return executeRunStream(projectId, options);
-      }
       return executeRunStreamIndependent(options);
     },
     onMutate: () => {
@@ -723,9 +700,6 @@ export function RunsPage() {
 
   const setBestMutation = useMutation({
     mutationFn: ({ runId, unset }: { runId: number; unset: boolean }) => {
-      if (projectId !== null) {
-        return setBestRun(projectId, runId, unset);
-      }
       return setBestRunIndependent(runId, unset);
     },
     onSuccess: () => {
@@ -735,9 +709,6 @@ export function RunsPage() {
 
   const discardMutation = useMutation({
     mutationFn: (runId: number) => {
-      if (projectId !== null) {
-        return discardRun(projectId, runId);
-      }
       return discardRunIndependent(runId);
     },
     onSuccess: () => {
@@ -1221,7 +1192,6 @@ export function RunsPage() {
                         <RunCard
                           key={run.id}
                           run={run}
-                          projectId={projectId}
                           scorePath={scorePath}
                           versionLabel={getVersionLabel(run.prompt_version_id)}
                           versionNumber={getVersionNumber(run.prompt_version_id)}
@@ -1331,7 +1301,6 @@ export function RunsPage() {
                   <RunCard
                     key={run.id}
                     run={run}
-                    projectId={projectId}
                     scorePath={scorePath}
                     versionLabel={getVersionLabel(run.prompt_version_id)}
                     versionNumber={getVersionNumber(run.prompt_version_id)}

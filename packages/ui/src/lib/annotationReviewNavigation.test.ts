@@ -29,14 +29,14 @@ describe("annotationReviewNavigation", () => {
         runId: "12",
         taskId: "34",
       }),
-    ).toBe("/projects/7/annotation-review?mode=review&runId=12&taskId=34");
+    ).toBe("/annotation-review?mode=review&runId=12&taskId=34");
   });
 
   it("レビュー文脈がないときは抽出トップ URL を返す", () => {
-    expect(buildAnnotationReviewPath(7, null)).toBe("/projects/7/annotation-review");
+    expect(buildAnnotationReviewPath(7, null)).toBe("/annotation-review");
   });
 
-  it("保存したレビュー文脈を project ごとに復元できる", () => {
+  it("保存したレビュー文脈をキーごとに復元できる", () => {
     const storage = new Map<string, string>();
     vi.stubGlobal("window", {
       localStorage: {

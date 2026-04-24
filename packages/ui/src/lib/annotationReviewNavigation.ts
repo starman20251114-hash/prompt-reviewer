@@ -65,7 +65,8 @@ export function buildAnnotationReviewPath(
   projectId: string | number,
   context?: AnnotationReviewContext | null,
 ): string {
-  const basePath = `/projects/${projectId}/annotation-review`;
+  void projectId;
+  const basePath = "/annotation-review";
 
   if (!context) {
     return basePath;

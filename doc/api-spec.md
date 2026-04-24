@@ -851,17 +851,9 @@ Run に対する評価スコアを管理する API。
 
 annotation 関連エンドポイント（`/annotation-tasks`、`/candidates`、`/gold-annotations` 等）は runs / test_cases / context_assets の責務整理完了後に別途この文書へ追加する。
 
-## 互換レイヤの扱い
+## 現行の正規 API
 
-旧 API との互換が必要な場合は、当面次のパスを互換レイヤとして残せる。
-
-- `/projects/:projectId/test-cases`
-- `/projects/:projectId/prompt-versions`
-- `/projects/:projectId/runs`
-- `/projects/:projectId/context-files`
-- `/projects/:projectId/settings`
-
-ただし新規実装は、以下を正とする。
+project 親子前提の互換レイヤは廃止し、以下を正規 API とする。
 
 - `/test-cases`
 - `/prompt-families`
