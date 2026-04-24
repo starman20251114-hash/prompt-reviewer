@@ -283,7 +283,7 @@ export function ExecutionProfilesPage() {
             <div className={styles.formGrid}>
               <div className={styles.fieldGroup}>
                 <label htmlFor="execution-profile-name" className={styles.fieldLabel}>
-                  プロファイル名
+                  プロファイル名<span className={styles.requiredMark}>必須</span>
                 </label>
                 <input
                   id="execution-profile-name"
@@ -330,7 +330,7 @@ export function ExecutionProfilesPage() {
 
               <div className={styles.fieldGroup}>
                 <label htmlFor="execution-profile-model" className={styles.fieldLabel}>
-                  モデル
+                  モデル<span className={styles.requiredMark}>必須</span>
                 </label>
                 <select
                   id="execution-profile-model"
