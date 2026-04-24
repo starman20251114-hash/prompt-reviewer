@@ -1,12 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useState } from "react";
-import {
-  type Project,
-  createProject,
-  deleteProject,
-  getProjects,
-  updateProject,
-} from "../lib/api";
+import { type Project, createProject, deleteProject, getProjects, updateProject } from "../lib/api";
 import { clearStoredActiveLabelId, useActiveLabel } from "../lib/useActiveLabel";
 import styles from "./ProjectsPage.module.css";
 
@@ -154,12 +148,10 @@ type LabelRowProps = {
 
 function LabelRow({ project, isActive, onSelect, onEdit, onDelete }: LabelRowProps) {
   return (
-    <div
+    <button
+      type="button"
       className={`${styles.labelRow} ${isActive ? styles.labelRowActive : ""}`}
       onClick={() => onSelect(project)}
-      onKeyDown={(e) => e.key === "Enter" && onSelect(project)}
-      role="button"
-      tabIndex={0}
     >
       <span className={`${styles.labelTag} ${isActive ? styles.labelTagActive : ""}`}>
         {project.name}
@@ -172,20 +164,26 @@ function LabelRow({ project, isActive, onSelect, onEdit, onDelete }: LabelRowPro
       <div className={styles.actions}>
         <button
           type="button"
-          onClick={(e) => { e.stopPropagation(); onEdit(project); }}
+          onClick={(e) => {
+            e.stopPropagation();
+            onEdit(project);
+          }}
           className={styles.editButton}
         >
           編集
         </button>
         <button
           type="button"
-          onClick={(e) => { e.stopPropagation(); onDelete(project); }}
+          onClick={(e) => {
+            e.stopPropagation();
+            onDelete(project);
+          }}
           className={styles.deleteButton}
         >
           削除
         </button>
       </div>
-    </div>
+    </button>
   );
 }
 
@@ -272,7 +270,9 @@ export function ProjectsPage() {
       {!isLoading && !isError && projects && projects.length === 0 && (
         <div className={styles.emptyState}>
           <p style={{ fontSize: "16px" }}>ラベルがまだありません</p>
-          <p style={{ fontSize: "14px" }}>「新規ラベル作成」ボタンから最初のラベルを作成してください。</p>
+          <p style={{ fontSize: "14px" }}>
+            「新規ラベル作成」ボタンから最初のラベルを作成してください。
+          </p>
         </div>
       )}
 

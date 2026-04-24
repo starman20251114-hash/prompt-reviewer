@@ -16,7 +16,7 @@ vi.mock("better-sqlite3", () => {
 import type { DB } from "@prompt-reviewer/core";
 import { Hono } from "hono";
 import { describe, expect, it, vi } from "vitest";
-import { createScoresRouter, createVersionSummaryRouter } from "./scores.js";
+import { createScoresRouter } from "./scores.js";
 
 // ---- 型定義 ----
 
@@ -50,12 +50,6 @@ type MockScore = {
 function buildScoresApp(db: unknown) {
   const app = new Hono();
   app.route("/api/runs", createScoresRouter(db as DB));
-  return app;
-}
-
-function buildSummaryApp(db: unknown) {
-  const app = new Hono();
-  app.route("/api/projects/:projectId/prompt-versions", createVersionSummaryRouter(db as DB));
   return app;
 }
 
@@ -399,181 +393,5 @@ describe("PATCH /api/runs/:runId/score", () => {
     // updated_at は現在時刻（数値）で設定される
     expect(typeof capturedUpdateData.updated_at).toBe("number");
     expect(capturedUpdateData.updated_at).toBeGreaterThan(0);
-  });
-});
-
-// ---- GET /api/projects/:projectId/prompt-versions/:id/summary テスト ----
-
-describe("GET /api/projects/:projectId/prompt-versions/:id/summary", () => {
-  it("Run が存在しない場合は runCount=0、スコアは null を返す", async () => {
-    const db = {
-      // 1回目: versionRuns の取得 → 空
-      ...makeSelectMock([[]]),
-    };
-
-    const app = buildSummaryApp(db);
-    const res = await app.request("/api/projects/1/prompt-versions/1/summary");
-
-    expect(res.status).toBe(200);
-    const body = (await res.json()) as {
-      versionId: number;
-      avgHumanScore: null;
-      avgJudgeScore: null;
-      runCount: number;
-      scoredCount: number;
-    };
-    expect(body.versionId).toBe(1);
-    expect(body.runCount).toBe(0);
-    expect(body.scoredCount).toBe(0);
-    expect(body.avgHumanScore).toBeNull();
-    expect(body.avgJudgeScore).toBeNull();
-  });
-
-  it("is_discarded=false のスコアのみ集計する", async () => {
-    // Run が3件ある
-    const versionRuns = [{ id: 1 }, { id: 2 }, { id: 3 }];
-
-    // is_discarded=0 のスコア（DBクエリで is_discarded=0 にフィルタ済み）
-    const validScores = [
-      { id: 1, run_id: 1, human_score: 4, judge_score: null, is_discarded: false },
-      { id: 2, run_id: 2, human_score: 2, judge_score: 5, is_discarded: false },
-      // run_id=3 はスコア未評価
-    ];
-
-    const db = {
-      // 1回目: versionRuns の取得 / 2回目: is_discarded=0 のスコア取得
-      ...makeSelectMock([versionRuns, validScores]),
-    };
-
-    const app = buildSummaryApp(db);
-    const res = await app.request("/api/projects/1/prompt-versions/1/summary");
-
-    expect(res.status).toBe(200);
-    const body = (await res.json()) as {
-      versionId: number;
-      avgHumanScore: number | null;
-      avgJudgeScore: number | null;
-      runCount: number;
-      scoredCount: number;
-    };
-
-    expect(body.versionId).toBe(1);
-    expect(body.runCount).toBe(3);
-    // Run1(4) + Run2(2) の平均 = 3
-    expect(body.avgHumanScore).toBe(3);
-    // judge_score は Run2 のみ = 5
-    expect(body.avgJudgeScore).toBe(5);
-    // is_discarded=0 のスコアが 2 件
-    expect(body.scoredCount).toBe(2);
-  });
-
-  it("run_id が対象バージョン外のスコアは集計に含まれない", async () => {
-    // バージョン1の Run（id=1 のみ）
-    const versionRuns = [{ id: 1 }];
-
-    // is_discarded=0 のスコア（run_id=2 は別バージョンのRunだが is_discarded=0）
-    const validScores = [
-      { id: 1, run_id: 1, human_score: 5, judge_score: null, is_discarded: false },
-      { id: 2, run_id: 2, human_score: 1, judge_score: null, is_discarded: false },
-    ];
-
-    const db = {
-      // 1回目: versionRuns の取得 / 2回目: is_discarded=0 のスコア取得
-      ...makeSelectMock([versionRuns, validScores]),
-    };
-
-    const app = buildSummaryApp(db);
-    const res = await app.request("/api/projects/1/prompt-versions/1/summary");
-
-    expect(res.status).toBe(200);
-    const body = (await res.json()) as {
-      avgHumanScore: number | null;
-      runCount: number;
-      scoredCount: number;
-    };
-
-    // run_id=2 は versionRuns に含まれないためフィルタされる
-    expect(body.runCount).toBe(1);
-    expect(body.scoredCount).toBe(1);
-    // Run1 のみ集計: human_score=5
-    expect(body.avgHumanScore).toBe(5);
-  });
-
-  it("human_score が全て null の場合、avgHumanScore は null を返す", async () => {
-    const versionRuns = [{ id: 1 }];
-
-    const validScores = [
-      { id: 1, run_id: 1, human_score: null, judge_score: null, is_discarded: false },
-    ];
-
-    const db = {
-      ...makeSelectMock([versionRuns, validScores]),
-    };
-
-    const app = buildSummaryApp(db);
-    const res = await app.request("/api/projects/1/prompt-versions/1/summary");
-
-    expect(res.status).toBe(200);
-    const body = (await res.json()) as {
-      avgHumanScore: number | null;
-      avgJudgeScore: number | null;
-      scoredCount: number;
-    };
-
-    expect(body.avgHumanScore).toBeNull();
-    expect(body.avgJudgeScore).toBeNull();
-    // スコアレコードは存在するので scoredCount=1
-    expect(body.scoredCount).toBe(1);
-  });
-
-  it("数値以外の projectId に対して 400 を返す", async () => {
-    const db = {};
-
-    const app = buildSummaryApp(db);
-    const res = await app.request("/api/projects/abc/prompt-versions/1/summary");
-
-    expect(res.status).toBe(400);
-    const body = (await res.json()) as { error: string };
-    expect(body.error).toBe("Invalid ID");
-  });
-
-  it("数値以外のバージョンIDに対して 400 を返す", async () => {
-    const db = {};
-
-    const app = buildSummaryApp(db);
-    const res = await app.request("/api/projects/1/prompt-versions/abc/summary");
-
-    expect(res.status).toBe(400);
-    const body = (await res.json()) as { error: string };
-    expect(body.error).toBe("Invalid ID");
-  });
-
-  it("複数 Run の avgHumanScore が正確に計算される", async () => {
-    const versionRuns = [{ id: 1 }, { id: 2 }, { id: 3 }, { id: 4 }];
-
-    // human_score: 1, 3, 5 → 平均 = 3.0（id=4のRunはスコアなし）
-    const validScores = [
-      { id: 1, run_id: 1, human_score: 1, judge_score: null, is_discarded: false },
-      { id: 2, run_id: 2, human_score: 3, judge_score: null, is_discarded: false },
-      { id: 3, run_id: 3, human_score: 5, judge_score: null, is_discarded: false },
-    ];
-
-    const db = {
-      ...makeSelectMock([versionRuns, validScores]),
-    };
-
-    const app = buildSummaryApp(db);
-    const res = await app.request("/api/projects/1/prompt-versions/1/summary");
-
-    expect(res.status).toBe(200);
-    const body = (await res.json()) as {
-      runCount: number;
-      scoredCount: number;
-      avgHumanScore: number | null;
-    };
-
-    expect(body.runCount).toBe(4);
-    expect(body.scoredCount).toBe(3);
-    expect(body.avgHumanScore).toBe(3);
   });
 });

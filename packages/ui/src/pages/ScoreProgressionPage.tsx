@@ -1,6 +1,5 @@
 import { useQuery } from "@tanstack/react-query";
 import { useState } from "react";
-import { useParams } from "react-router";
 import {
   CartesianGrid,
   Legend,
@@ -13,6 +12,7 @@ import {
 } from "recharts";
 import { ScoreSectionTabs } from "../components/ScoreSectionTabs";
 import { type VersionSummary, getProject, getScoreProgressionIndependent } from "../lib/api";
+import { getStoredActiveLabelId } from "../lib/useActiveLabel";
 import styles from "./ScoreProgressionPage.module.css";
 
 type ScoreType = "human" | "judge";
@@ -247,8 +247,7 @@ function TestCaseBreakdownTable({
 
 // --------------- ScoreProgressionPage ---------------
 export function ScoreProgressionPage() {
-  const { id } = useParams<{ id?: string }>();
-  const projectId = id !== undefined ? Number(id) : null;
+  const projectId = getStoredActiveLabelId();
   const [scoreType, setScoreType] = useState<ScoreType>("human");
 
   const { data: project } = useQuery({

@@ -1,6 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useMemo, useState } from "react";
-import { useParams } from "react-router";
 import { AnnotationSectionTabs } from "../components/AnnotationSectionTabs";
 import { generateAnnotationPrompt } from "../lib/annotationPrompt";
 import {
@@ -20,6 +19,7 @@ import {
   updateAnnotationLabel,
   updateAnnotationTask,
 } from "../lib/api";
+import { getStoredActiveLabelId } from "../lib/useActiveLabel";
 import styles from "./AnnotationTaskSettingsPage.module.css";
 
 type TaskFormState = {
@@ -114,8 +114,7 @@ function buildLabelForm(label?: AnnotationLabel): LabelFormState {
 }
 
 export function AnnotationTaskSettingsPage() {
-  const { id } = useParams<{ id?: string }>();
-  const projectId = Number(id);
+  const projectId = getStoredActiveLabelId() ?? Number.NaN;
   const queryClient = useQueryClient();
 
   const [selectedTaskId, setSelectedTaskId] = useState<number | null>(null);

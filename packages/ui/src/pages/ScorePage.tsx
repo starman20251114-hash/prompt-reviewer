@@ -1,6 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useRef, useState } from "react";
-import { useParams, useSearchParams } from "react-router";
+import { useSearchParams } from "react-router";
 import { RunCompareView } from "../components/RunCompareView";
 import { ScoreSectionTabs } from "../components/ScoreSectionTabs";
 import {
@@ -16,6 +16,7 @@ import {
   getScore,
   updateScore,
 } from "../lib/api";
+import { getStoredActiveLabelId } from "../lib/useActiveLabel";
 import styles from "./ScorePage.module.css";
 
 function formatDate(timestamp: number): string {
@@ -609,8 +610,7 @@ function BulkRunRow({
 
 // --------------- ScorePage ---------------
 export function ScorePage() {
-  const { id } = useParams<{ id?: string }>();
-  const projectId = id !== undefined ? Number(id) : null;
+  const projectId = getStoredActiveLabelId();
   const queryClient = useQueryClient();
   const [searchParams] = useSearchParams();
   const focusedRunId = searchParams.get("runId") ? Number(searchParams.get("runId")) : null;

@@ -1,7 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useState } from "react";
 import { useParams, useSearchParams } from "react-router";
-import { getStoredActiveLabelId } from "../lib/useActiveLabel";
 import {
   type Project,
   type PromptExecutionStepDefinition,
@@ -19,6 +18,7 @@ import {
   updateIndependentPromptVersion,
   updatePromptFamily,
 } from "../lib/api";
+import { getStoredActiveLabelId } from "../lib/useActiveLabel";
 import styles from "./PromptsPage.module.css";
 
 const workflowStepIdPattern = /^[A-Za-z0-9_-]+$/;
@@ -819,11 +819,7 @@ export function PromptsPage() {
 
   const urlProjectId = routeProjectId ?? (projectFilterParam ? Number(projectFilterParam) : null);
   const selectedProjectId =
-    urlProjectId !== null
-      ? urlProjectId
-      : userSelectedProject
-        ? null
-        : getStoredActiveLabelId();
+    urlProjectId !== null ? urlProjectId : userSelectedProject ? null : getStoredActiveLabelId();
 
   const [selectedVersion, setSelectedVersion] = useState<PromptVersion | null>(null);
   const [compareVersion, setCompareVersion] = useState<PromptVersion | null>(null);

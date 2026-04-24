@@ -9,7 +9,6 @@ import { EditorView } from "@codemirror/view";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import CodeMirror from "@uiw/react-codemirror";
 import { useEffect, useRef, useState } from "react";
-import { getStoredActiveLabelId } from "../lib/useActiveLabel";
 import {
   type ContextAssetDetail,
   type ContextAssetFilters,
@@ -23,6 +22,7 @@ import {
   setContextAssetProjects,
   updateContextAsset,
 } from "../lib/api";
+import { getStoredActiveLabelId } from "../lib/useActiveLabel";
 import styles from "./ContextAssetsPage.module.css";
 
 function formatDate(timestamp: number): string {

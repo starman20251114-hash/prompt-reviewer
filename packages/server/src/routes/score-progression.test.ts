@@ -6,11 +6,10 @@ import { createScoreProgressionRouter } from "./score-progression.js";
 function buildApp(db: unknown) {
   const app = new Hono();
   app.route("/api/score-progression", createScoreProgressionRouter(db as DB));
-  app.route("/api/projects/:projectId/score-progression", createScoreProgressionRouter(db as DB));
   return app;
 }
 
-describe("GET /api/projects/:projectId/score-progression", () => {
+describe("GET /api/score-progression", () => {
   it("新APIでも project_id クエリで同じ集計結果を返す", async () => {
     let selectCallCount = 0;
 
@@ -233,7 +232,7 @@ describe("GET /api/projects/:projectId/score-progression", () => {
     };
 
     const app = buildApp(db);
-    const res = await app.request("/api/projects/1/score-progression");
+    const res = await app.request("/api/score-progression?project_id=1");
 
     expect(res.status).toBe(200);
     const body = (await res.json()) as {

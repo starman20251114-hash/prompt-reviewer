@@ -1,7 +1,7 @@
 import { zValidator } from "@hono/zod-validator";
 import type { DB } from "@prompt-reviewer/core";
 import { runs, scores } from "@prompt-reviewer/core";
-import { and, eq } from "drizzle-orm";
+import { eq } from "drizzle-orm";
 import { Hono } from "hono";
 import { z } from "zod";
 
@@ -31,11 +31,10 @@ function parseIntParam(value: string | undefined): number | null {
 }
 
 /**
- * スコア CRUD + バージョン別集計エンドポイントのルーター
+ * スコア CRUD のルーター
  *
- * POST   /api/runs/:runId/score          - スコア作成（1 Run に 1 Score）
- * PATCH  /api/runs/:runId/score          - スコア更新
- * GET    /api/projects/:projectId/prompt-versions/:versionId/summary - バージョン別集計
+ * POST   /api/runs/:runId/score - スコア作成（1 Run に 1 Score）
+ * PATCH  /api/runs/:runId/score - スコア更新
  */
 export function createScoresRouter(db: DB) {
   const runsRouter = new Hono<{ Variables: Record<string, unknown> }>();
@@ -153,96 +152,4 @@ export function createScoresRouter(db: DB) {
   });
 
   return runsRouter;
-}
-
-/**
- * バージョン別集計エンドポイントのルーター
- * GET /api/projects/:projectId/prompt-versions/:id/summary
- */
-export function createVersionSummaryRouter(db: DB) {
-  const router = new Hono();
-
-  // GET /api/projects/:projectId/prompt-versions/:id/summary - バージョン別集計
-  // is_discarded=true のスコアは集計から除外する
-  router.get("/:id/summary", async (c) => {
-    const projectId = parseIntParam(c.req.param("projectId"));
-    const versionId = parseIntParam(c.req.param("id"));
-
-    if (projectId === null || versionId === null) {
-      return c.json({ error: "Invalid ID" }, 400);
-    }
-
-    // バージョンに紐づく全 Run を取得（project_id + prompt_version_id でフィルタ）
-    const versionRuns = await db
-      .select({ id: runs.id })
-      .from(runs)
-      .where(and(eq(runs.project_id, projectId), eq(runs.prompt_version_id, versionId)));
-
-    const runCount = versionRuns.length;
-
-    if (runCount === 0) {
-      return c.json({
-        versionId,
-        avgHumanScore: null,
-        avgJudgeScore: null,
-        runCount: 0,
-        scoredCount: 0,
-      });
-    }
-
-    const runIds = versionRuns.map((r) => r.id);
-
-    // is_discarded=false のスコアのみ集計対象
-    // runIds に含まれる score を取得
-    const validScores = await db
-      .select({
-        id: scores.id,
-        run_id: scores.run_id,
-        human_score: scores.human_score,
-        judge_score: scores.judge_score,
-        is_discarded: scores.is_discarded,
-      })
-      .from(scores)
-      .where(
-        and(
-          // is_discarded = false のみ
-          eq(scores.is_discarded, false),
-        ),
-      );
-
-    // runIds でフィルタ（SQLite の IN 演算子の代わりにアプリ側でフィルタ）
-    const filteredScores = validScores.filter((s) => runIds.includes(s.run_id));
-
-    const scoredCount = filteredScores.length;
-
-    // avgHumanScore: human_score が null でないものの平均
-    const humanScores = filteredScores
-      .map((s) => s.human_score)
-      .filter((v): v is number => v !== null);
-
-    const avgHumanScore =
-      humanScores.length > 0
-        ? humanScores.reduce((sum, v) => sum + v, 0) / humanScores.length
-        : null;
-
-    // avgJudgeScore: judge_score が null でないものの平均
-    const judgeScores = filteredScores
-      .map((s) => s.judge_score)
-      .filter((v): v is number => v !== null);
-
-    const avgJudgeScore =
-      judgeScores.length > 0
-        ? judgeScores.reduce((sum, v) => sum + v, 0) / judgeScores.length
-        : null;
-
-    return c.json({
-      versionId,
-      avgHumanScore,
-      avgJudgeScore,
-      runCount,
-      scoredCount,
-    });
-  });
-
-  return router;
 }

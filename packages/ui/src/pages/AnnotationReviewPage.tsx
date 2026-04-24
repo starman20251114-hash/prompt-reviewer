@@ -1,6 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
-import { Link, useParams, useSearchParams } from "react-router";
+import { Link, useSearchParams } from "react-router";
 import { AnnotationSectionTabs } from "../components/AnnotationSectionTabs";
 import {
   type AnnotationCandidate,
@@ -15,11 +15,10 @@ import {
   getGoldAnnotations,
   getIndependentTestCase,
   getIndependentTestCases,
-  getRun,
   getRunIndependent,
-  getTestCase,
   updateAnnotationCandidate,
 } from "../lib/api";
+import { getStoredActiveLabelId } from "../lib/useActiveLabel";
 import styles from "./AnnotationReviewPage.module.css";
 
 function statusLabel(status: CandidateStatus): string {
@@ -333,6 +332,7 @@ function CandidateCard({
 }
 
 function AnnotationReviewStartPage({ projectId }: { projectId: number }) {
+  void projectId;
   return (
     <div className={styles.root}>
       <div className={styles.pageHeader}>
@@ -347,10 +347,7 @@ function AnnotationReviewStartPage({ projectId }: { projectId: number }) {
           Run ページで候補抽出を実行するか、既存の候補レビューリンクからこの画面を開いてください。
         </p>
         <div style={{ padding: "0 16px 16px" }}>
-          <Link
-            to={Number.isNaN(projectId) ? "/runs" : `/projects/${projectId}/runs`}
-            className={styles.backLink}
-          >
+          <Link to="/runs" className={styles.backLink}>
             ← Run に戻る
           </Link>
         </div>
@@ -369,13 +366,14 @@ function AnnotationReviewContent({
   taskId: number;
 }) {
   const queryClient = useQueryClient();
-  const runsPath = Number.isNaN(projectId) ? "/runs" : `/projects/${projectId}/runs`;
+  void projectId;
+  const runsPath = "/runs";
 
   const [activeRange, setActiveRange] = useState<{ start: number; end: number } | null>(null);
 
   const { data: run, isLoading: isRunLoading } = useQuery({
-    queryKey: Number.isNaN(projectId) ? ["runs-independent", runId] : ["runs", projectId, runId],
-    queryFn: () => (Number.isNaN(projectId) ? getRunIndependent(runId) : getRun(projectId, runId)),
+    queryKey: ["runs-independent", runId],
+    queryFn: () => getRunIndependent(runId),
     enabled: !Number.isNaN(runId),
   });
 
@@ -410,13 +408,8 @@ function AnnotationReviewContent({
   });
 
   const { data: testCase, isLoading: isTestCaseLoading } = useQuery({
-    queryKey: Number.isNaN(projectId)
-      ? ["test-cases-independent", run?.test_case_id]
-      : ["test-cases", projectId, run?.test_case_id],
-    queryFn: () =>
-      Number.isNaN(projectId)
-        ? getIndependentTestCase(run?.test_case_id as number)
-        : getTestCase(projectId, run?.test_case_id as number),
+    queryKey: ["test-cases-independent", run?.test_case_id],
+    queryFn: () => getIndependentTestCase(run?.test_case_id as number),
     enabled: run !== undefined && run.test_case_id !== null,
   });
 
@@ -573,9 +566,8 @@ function AnnotationReviewContent({
 }
 
 export function AnnotationReviewPage() {
-  const { id } = useParams<{ id?: string }>();
   const [searchParams] = useSearchParams();
-  const projectId = Number(id);
+  const projectId = getStoredActiveLabelId() ?? Number.NaN;
   const runIdParam = searchParams.get("runId");
   const mode = searchParams.get("mode");
   const runId = Number(runIdParam);

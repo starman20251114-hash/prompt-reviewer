@@ -10,29 +10,11 @@ import {
 import { and, eq, inArray } from "drizzle-orm";
 import { Hono } from "hono";
 
-/** Convert string or undefined to integer. Returns null when invalid or undefined. */
-function parseIntParam(value: string | undefined): number | null {
-  if (value === undefined) return null;
+/** Convert string or undefined to integer. Returns undefined when omitted and null when invalid. */
+function parseOptionalInt(value: string | undefined): number | null | undefined {
+  if (value === undefined) return undefined;
   const parsed = Number(value);
   return Number.isNaN(parsed) ? null : parsed;
-}
-
-function resolveProjectId(c: {
-  req: {
-    param: (name: string) => string;
-    query: (name: string) => string | undefined;
-  };
-}): number | null | undefined {
-  const legacyProjectId = parseIntParam(c.req.param("projectId"));
-  if (legacyProjectId !== null) {
-    return legacyProjectId;
-  }
-
-  if (c.req.param("projectId") !== undefined) {
-    return null;
-  }
-
-  return parseIntParam(c.req.query("project_id"));
 }
 
 export type VersionSummary = {
@@ -65,20 +47,19 @@ export type ScoreProgressionResponse = {
 
 /**
  * Score progression router
- * GET /api/projects/:projectId/score-progression
+ * GET /api/score-progression
  *
  * Returns aggregated score data for all versions in a project:
  * - versionSummaries: average scores per version (for the line chart)
  * - testCaseBreakdown: per-test-case scores broken down by version (for the table)
  *
- * project_id フィルタは prompt_version_projects / test_case_projects 基準で実装
+ * project_id フィルタはクエリパラメータ経由で prompt_version_projects / test_case_projects を参照する
  */
 export function createScoreProgressionRouter(db: DB) {
   const router = new Hono();
 
   router.get("/", async (c) => {
-    const projectId = resolveProjectId(c);
-
+    const projectId = parseOptionalInt(c.req.query("project_id"));
     if (projectId === null) {
       return c.json({ error: "Invalid projectId" }, 400);
     }
