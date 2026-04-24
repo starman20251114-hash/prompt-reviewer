@@ -195,14 +195,14 @@
 }
 
 .projectBadge {
-  composes: badge from '../styles/shared.module.css';
-  padding: 4px 10px;
+  padding: 6px 12px;
   font-size: 12px;
   color: var(--c-subtext);
   cursor: pointer;
-  background: var(--c-overlay);
+  background: transparent;
   border: 1px solid var(--c-border);
-  border-radius: 4px;
+  border-radius: 6px;
+  white-space: nowrap;
 }
 
 .projectBadgeActive {
