@@ -1209,7 +1209,7 @@ export function PromptsPage() {
           </section>
 
           <section className={styles.treePanel}>
-            <div className={styles.treePanelLabel}>バージョン履歴</div>
+            <div className={styles.treePanelLabel}>{t("prompts.versionPanelLabel")}</div>
             {selectedFamily && (
               <p className={styles.treeFamilyName}>
                 {selectedFamily.name ?? `ファミリー ${selectedFamily.id}`}
