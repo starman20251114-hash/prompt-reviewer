@@ -217,6 +217,13 @@ export function createProject(data: {
   return api.post<Project>("/projects", data);
 }
 
+export function updateProject(
+  id: number,
+  data: { name?: string; description?: string },
+): Promise<Project> {
+  return api.patch<Project>(`/projects/${id}`, data);
+}
+
 export function deleteProject(id: number): Promise<void> {
   return api.delete<void>(`/projects/${id}`);
 }
