@@ -243,6 +243,8 @@
   padding: 9px 12px;
   font-size: 14px;
   font-family: inherit;
+  -webkit-text-fill-color: var(--c-text);
+  caret-color: var(--c-text);
 }
 
 .fieldInput::placeholder,
@@ -255,6 +257,15 @@
 .fieldTextarea:focus {
   outline: none;
   border-color: var(--c-accent);
+}
+
+.fieldInput:-webkit-autofill,
+.fieldInput:-webkit-autofill:hover,
+.fieldInput:-webkit-autofill:focus,
+.fieldInput:-webkit-autofill:active {
+  -webkit-box-shadow: 0 0 0 1000px var(--c-surface) inset !important;
+  -webkit-text-fill-color: var(--c-text) !important;
+  caret-color: var(--c-text);
 }
 
 .fieldInput:disabled,
