@@ -460,7 +460,7 @@ function AnnotationReviewContent({
         <div className={styles.pageHeader}>
           <div>
             <Link to={runsPath} className={styles.backLink}>
-              ← Run 一覧に戻る
+              ← Run一覧に移動する
             </Link>
             <h2 className={styles.pageTitle}>抽出</h2>
           </div>
@@ -477,7 +477,7 @@ function AnnotationReviewContent({
       <div className={styles.pageHeader}>
         <div>
           <Link to={runsPath} className={styles.backLink}>
-            ← Run 一覧に戻る
+            ← Run一覧に移動する
           </Link>
           <h2 className={styles.pageTitle}>抽出</h2>
         </div>

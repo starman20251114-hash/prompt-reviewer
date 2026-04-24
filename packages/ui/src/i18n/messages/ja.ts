@@ -18,15 +18,16 @@ export const jaMessages = {
     tabs: {
       ariaLabel: "抽出ページ切り替え",
       settings: "設定",
-      review: "レビュー",
-      goldAnnotations: "ゴールドアノテーション",
+      review: "抽出結果確認",
+      goldAnnotations: "確定ラベル",
     },
   },
   prompts: {
     title: "プロンプト管理",
     description:
-      "プロンプトファミリー単位で履歴を管理し、必要に応じてプロジェクトラベルで絞り込みます。",
+      "プロンプトファミリー単位でバージョンを管理し、必要に応じてプロジェクトラベルで絞り込みます。",
     familyPanelLabel: "プロンプトファミリー",
+    versionPanelLabel: "プロンプトバージョン",
     familySummaryLabel: "ファミリー",
     projectFilterLabel: "プロジェクトフィルタ",
     createFamily: "+ ファミリー作成",
