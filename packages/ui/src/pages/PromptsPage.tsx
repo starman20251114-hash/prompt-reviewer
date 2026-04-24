@@ -1,6 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useState } from "react";
 import { useParams, useSearchParams } from "react-router";
+import { useI18n } from "../i18n/I18nProvider";
 import {
   type Project,
   type PromptExecutionStepDefinition,
@@ -18,7 +19,6 @@ import {
   updateIndependentPromptVersion,
   updatePromptFamily,
 } from "../lib/api";
-import { useI18n } from "../i18n/I18nProvider";
 import { getStoredActiveLabelId } from "../lib/useActiveLabel";
 import styles from "./PromptsPage.module.css";
 
@@ -1312,7 +1312,9 @@ export function PromptsPage() {
               <div className={styles.panelBody}>
                 {selectedFamily && (
                   <div className={styles.familySummaryCard}>
-                    <span className={styles.familySummaryLabel}>{t("prompts.familySummaryLabel")}</span>
+                    <span className={styles.familySummaryLabel}>
+                      {t("prompts.familySummaryLabel")}
+                    </span>
                     <strong className={styles.familySummaryName}>
                       {selectedFamily.name ?? `ファミリー ${selectedFamily.id}`}
                     </strong>

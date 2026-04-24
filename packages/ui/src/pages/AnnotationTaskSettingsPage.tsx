@@ -1066,8 +1066,7 @@ export function AnnotationTaskSettingsPage() {
                           </select>
                           {saveTargetFamilyId === "new" && (
                             <input
-                              className={styles.fieldInput}
-                              style={{ marginTop: "6px" }}
+                              className={`${styles.fieldInput} ${styles.fieldInputMt}`}
                               placeholder="新しいファミリー名（省略可）"
                               value={newFamilyName}
                               onChange={(e) => setNewFamilyName(e.target.value)}

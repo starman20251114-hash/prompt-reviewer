@@ -48,11 +48,7 @@ function SidebarNav() {
             .filter(Boolean)
             .join(" ")}
         >
-          <NavLink
-            to={to}
-            end={end}
-            className={({ isActive }) => getNavLinkClassName(isActive)}
-          >
+          <NavLink to={to} end={end} className={({ isActive }) => getNavLinkClassName(isActive)}>
             <span className={styles.navLinkParent}>
               <span>{t(labelKey)}</span>
               {children?.length ? (

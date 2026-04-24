@@ -250,6 +250,10 @@
   cursor: not-allowed;
 }
 
+.fieldInputMt {
+  margin-top: 6px;
+}
+
 .fieldTextarea {
   resize: vertical;
   min-height: 110px;
