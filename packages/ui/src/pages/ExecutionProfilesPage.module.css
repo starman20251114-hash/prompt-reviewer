@@ -1,45 +1,33 @@
 .root {
-  --bg: #111827;
-  --surface: #182235;
-  --surface-strong: #21314d;
-  --surface-soft: #0f1726;
-  --border: #30415f;
-  --text: #eff6ff;
-  --subtext: #b9c7de;
-  --muted: #7f90ac;
-  --accent: #7dd3fc;
-  --accent-strong: #38bdf8;
-  --danger: #fda4af;
-  --success: #86efac;
-
-  color: var(--text);
+  color: var(--c-text);
 }
 
 .pageHeader {
   display: flex;
-  align-items: flex-end;
+  align-items: flex-start;
   justify-content: space-between;
   gap: 16px;
-  margin-bottom: 24px;
+  margin-bottom: 28px;
 }
 
 .eyebrow {
-  margin: 0 0 8px;
-  color: var(--accent);
-  font-size: 12px;
+  margin: 0 0 6px;
+  color: var(--c-accent);
+  font-size: 11px;
   font-weight: 700;
-  letter-spacing: 0.18em;
+  letter-spacing: 0.12em;
   text-transform: uppercase;
 }
 
 .pageTitle {
-  margin: 0;
-  font-size: 28px;
+  margin: 0 0 4px;
+  font-size: 20px;
+  color: var(--c-text);
 }
 
 .layout {
   display: grid;
-  grid-template-columns: minmax(240px, 320px) minmax(0, 1fr);
+  grid-template-columns: minmax(240px, 300px) minmax(0, 1fr);
   gap: 20px;
   align-items: start;
 }
@@ -47,137 +35,136 @@
 .sidebar {
   display: flex;
   flex-direction: column;
-  gap: 16px;
+  gap: 12px;
+  background: var(--c-overlay);
+  border: 1px solid var(--c-border);
+  border-radius: 12px;
   padding: 20px;
-  background:
-    radial-gradient(circle at top right, rgba(125, 211, 252, 0.16), transparent 34%),
-    linear-gradient(180deg, rgba(24, 34, 53, 0.98), rgba(15, 23, 38, 0.98));
-  border: 1px solid var(--border);
-  border-radius: 20px;
 }
 
 .sidebarHeader {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid var(--c-border);
 }
 
 .sidebarTitle {
-  margin: 0;
-  font-size: 16px;
+  margin: 0 0 4px;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--c-text);
 }
 
 .sidebarHint {
   margin: 0;
-  color: var(--muted);
-  font-size: 13px;
+  color: var(--c-muted);
+  font-size: 12px;
   line-height: 1.5;
 }
 
 .profileList {
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: 6px;
 }
 
 .profileCard {
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  gap: 4px;
   width: 100%;
-  padding: 14px 16px;
-  background: rgba(17, 24, 39, 0.7);
-  border: 1px solid transparent;
-  border-radius: 14px;
+  padding: 10px 12px;
+  background: transparent;
+  border: 1px solid var(--c-border);
+  border-radius: 8px;
   color: inherit;
   text-align: left;
   cursor: pointer;
   transition:
-    border-color 0.16s ease,
-    background-color 0.16s ease,
-    transform 0.16s ease;
+    border-color 0.15s ease,
+    background-color 0.15s ease;
 }
 
 .profileCard:hover {
-  border-color: var(--border);
-  background: rgba(33, 49, 77, 0.64);
-  transform: translateY(-1px);
+  background: color-mix(in srgb, var(--c-accent) 8%, transparent);
 }
 
 .profileCardActive {
-  border-color: var(--accent-strong);
-  background: rgba(56, 189, 248, 0.12);
+  border-color: var(--c-accent);
+  background: color-mix(in srgb, var(--c-accent) 12%, var(--c-overlay));
 }
 
 .profileName {
+  font-size: 14px;
   font-weight: 600;
 }
 
 .profileMeta {
-  color: var(--subtext);
+  color: var(--c-subtext);
   font-size: 12px;
   word-break: break-word;
 }
 
 .emptyCard {
-  padding: 18px;
-  background: rgba(17, 24, 39, 0.72);
-  border: 1px dashed var(--border);
-  border-radius: 14px;
+  padding: 16px;
+  background: transparent;
+  border: 1px dashed var(--c-border);
+  border-radius: 8px;
 }
 
 .emptyTitle {
-  margin: 0 0 8px;
-  font-size: 14px;
+  margin: 0 0 6px;
+  font-size: 13px;
   font-weight: 600;
 }
 
 .emptyText {
   margin: 0;
-  color: var(--muted);
-  font-size: 13px;
+  color: var(--c-muted);
+  font-size: 12px;
   line-height: 1.5;
 }
 
 .content {
   display: flex;
   flex-direction: column;
-  gap: 20px;
+  gap: 16px;
 }
 
 .section {
+  background: var(--c-overlay);
+  border: 1px solid var(--c-border);
+  border-radius: 12px;
   padding: 24px;
-  background:
-    linear-gradient(180deg, rgba(24, 34, 53, 0.96), rgba(15, 23, 38, 0.98)),
-    var(--surface);
-  border: 1px solid var(--border);
-  border-radius: 20px;
-  box-shadow: 0 18px 48px rgba(0, 0, 0, 0.18);
 }
 
 .sectionHeader {
   display: flex;
   justify-content: space-between;
   gap: 16px;
+  align-items: flex-start;
+  padding-bottom: 16px;
   margin-bottom: 20px;
+  border-bottom: 1px solid var(--c-border);
 }
 
 .sectionTitle {
-  margin: 0 0 6px;
-  font-size: 18px;
+  margin: 0 0 4px;
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--c-text);
 }
 
 .sectionDescription {
   margin: 0;
-  color: var(--muted);
-  font-size: 13px;
+  color: var(--c-muted);
+  font-size: 12px;
   line-height: 1.5;
 }
 
 .formGrid {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 18px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
 }
 
 .fieldGroup {
@@ -187,13 +174,19 @@
 }
 
 .fieldGroupWide {
-  grid-column: 1 / -1;
+  /* no-op: single column layout */
 }
 
 .fieldLabel {
-  color: var(--subtext);
   font-size: 13px;
-  font-weight: 600;
+  font-weight: 500;
+  color: var(--c-subtext);
+}
+
+.requiredMark {
+  margin-left: 4px;
+  color: var(--c-danger);
+  font-size: 14px;
 }
 
 .fieldInput,
@@ -201,12 +194,13 @@
 .fieldTextarea,
 .apiKeyInput {
   width: 100%;
-  padding: 11px 12px;
-  background: var(--surface-soft);
-  border: 1px solid var(--border);
-  border-radius: 12px;
-  color: var(--text);
+  padding: 9px 12px;
+  background: var(--c-card);
+  border: 1px solid var(--c-border);
+  border-radius: 8px;
+  color: var(--c-text);
   font: inherit;
+  font-size: 14px;
   box-sizing: border-box;
 }
 
@@ -219,7 +213,7 @@
 .fieldSelect:focus,
 .fieldTextarea:focus,
 .apiKeyInput:focus {
-  border-color: var(--accent-strong);
+  border-color: var(--c-accent);
   outline: none;
 }
 
@@ -233,11 +227,11 @@
 
 .fieldHint,
 .apiKeyNote {
-  color: var(--muted);
+  color: var(--c-muted);
 }
 
 .fieldError {
-  color: var(--danger);
+  color: var(--c-danger);
 }
 
 .sliderRow {
@@ -248,13 +242,15 @@
 
 .slider {
   flex: 1;
-  accent-color: var(--accent-strong);
+  accent-color: var(--c-accent);
+  cursor: pointer;
 }
 
 .sliderValue {
   min-width: 32px;
-  color: var(--accent);
+  color: var(--c-accent);
   font-weight: 700;
+  font-size: 14px;
   text-align: right;
 }
 
@@ -263,68 +259,77 @@
   align-items: center;
   gap: 16px;
   margin-top: 24px;
-}
-
-.primaryButton,
-.secondaryButton,
-.dangerButton {
-  border-radius: 999px;
-  font: inherit;
-  font-weight: 600;
-  cursor: pointer;
-  transition:
-    transform 0.16s ease,
-    opacity 0.16s ease,
-    border-color 0.16s ease;
+  padding-top: 20px;
+  border-top: 1px solid var(--c-border);
 }
 
 .primaryButton {
-  padding: 11px 18px;
-  background: linear-gradient(135deg, var(--accent), var(--accent-strong));
+  padding: 10px 24px;
+  background: var(--c-accent);
   border: none;
-  color: #082032;
+  border-radius: 8px;
+  color: #1e1e2e;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: opacity 0.15s;
+}
+
+.primaryButton:hover:not(:disabled) {
+  opacity: 0.9;
+}
+
+.primaryButton:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
 }
 
 .secondaryButton {
-  padding: 10px 16px;
-  background: transparent;
-  border: 1px solid var(--border);
-  color: var(--subtext);
+  padding: 9px 16px;
+  background: var(--c-card);
+  border: 1px solid var(--c-border);
+  border-radius: 8px;
+  color: var(--c-subtext);
+  font-size: 13px;
+  cursor: pointer;
+  transition:
+    border-color 0.15s,
+    color 0.15s;
+}
+
+.secondaryButton:hover {
+  border-color: var(--c-accent);
+  color: var(--c-text);
 }
 
 .dangerButton {
-  padding: 10px 16px;
+  padding: 9px 16px;
   background: transparent;
-  border: 1px solid rgba(253, 164, 175, 0.36);
-  color: var(--danger);
+  border: 1px solid rgba(243, 139, 168, 0.45);
+  border-radius: 8px;
+  color: var(--c-danger);
+  font-size: 13px;
+  cursor: pointer;
 }
 
-.primaryButton:hover:not(:disabled),
-.secondaryButton:hover:not(:disabled),
-.dangerButton:hover:not(:disabled) {
-  transform: translateY(-1px);
-}
-
-.primaryButton:disabled,
-.secondaryButton:disabled,
 .dangerButton:disabled {
   opacity: 0.56;
   cursor: not-allowed;
 }
 
-.feedbackSuccess,
-.apiKeyStatusSet {
-  color: var(--success);
+.feedbackSuccess {
+  font-size: 13px;
+  color: var(--c-green);
 }
 
-.feedbackError,
-.apiKeyStatusUnset {
-  color: var(--danger);
+.feedbackError {
+  font-size: 13px;
+  color: var(--c-danger);
 }
 
 .apiKeyInputRow {
   display: flex;
-  gap: 10px;
+  gap: 8px;
 }
 
 .apiKeyStatus {
@@ -332,14 +337,23 @@
   font-size: 12px;
 }
 
+.apiKeyStatusSet {
+  color: var(--c-green);
+}
+
+.apiKeyStatusUnset {
+  color: var(--c-muted);
+}
+
 .loadingMsg,
 .errorMsg {
   padding: 36px;
   text-align: center;
+  color: var(--c-muted);
 }
 
 .errorMsg {
-  color: var(--danger);
+  color: var(--c-danger);
 }
 
 @media (max-width: 980px) {
@@ -362,6 +376,6 @@
   }
 
   .pageTitle {
-    font-size: 24px;
+    font-size: 18px;
   }
 }

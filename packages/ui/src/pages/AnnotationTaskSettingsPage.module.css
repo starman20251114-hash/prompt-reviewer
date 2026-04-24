@@ -12,6 +12,7 @@
   --c-success: #a6e3a1;
   --c-input: #11111b;
   --c-chip: rgba(249, 226, 175, 0.12);
+  --c-select: #cba6f7;
 
   color: var(--c-text);
 }
@@ -34,13 +35,14 @@
 
 .pageTitle {
   margin: 0 0 8px;
-  font-size: 26px;
+  font-size: 20px;
 }
 
 .pageDescription {
   margin: 0;
   max-width: 720px;
-  color: var(--c-subtext);
+  font-size: 13px;
+  color: var(--c-muted);
   line-height: 1.6;
 }
 
@@ -128,56 +130,61 @@
 
 .sectionTitle {
   margin: 0;
-  font-size: 18px;
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--c-text);
 }
 
 .sectionHint {
-  margin: 6px 0 0;
+  margin: 4px 0 0;
   color: var(--c-muted);
   line-height: 1.5;
   font-size: 13px;
 }
 
 .panel,
-.emptyState,
-.labelCard {
-  background:
-    linear-gradient(180deg, rgba(249, 226, 175, 0.06), transparent 28%),
-    var(--c-card);
+.emptyState {
+  background: var(--c-card);
   border: 1px solid var(--c-border);
-  border-radius: 16px;
-  padding: 18px;
+  border-radius: 10px;
+  padding: 16px;
+}
+
+.labelCard {
+  background: var(--c-card);
+  border: 1px solid var(--c-border);
+  border-radius: 10px;
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
 }
 
 .taskCard,
 .taskCardActive {
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  gap: 4px;
   width: 100%;
   text-align: left;
-  padding: 16px;
-  border-radius: 14px;
+  padding: 10px 12px;
+  border-radius: 8px;
   border: 1px solid var(--c-border);
-  background: var(--c-card);
+  background: var(--c-bg);
   color: var(--c-text);
   cursor: pointer;
   transition:
     border-color 0.15s ease,
-    transform 0.15s ease,
     background-color 0.15s ease;
 }
 
-.taskCard:hover,
-.taskCardActive:hover {
-  transform: translateY(-1px);
+.taskCard:hover {
+  border-color: var(--c-select);
 }
 
 .taskCardActive {
-  border-color: var(--c-accent-strong);
-  background:
-    linear-gradient(135deg, rgba(250, 179, 135, 0.12), rgba(249, 226, 175, 0.04)),
-    var(--c-card);
+  border-color: var(--c-select);
+  background: color-mix(in srgb, var(--c-select) 10%, var(--c-card));
 }
 
 .taskCardTitle {
@@ -204,25 +211,18 @@
 .fieldGroup {
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: 6px;
 }
 
 .fieldLabel {
-  font-size: 13px;
+  font-size: 14px;
   color: var(--c-subtext);
 }
 
 .requiredMark {
-  display: inline-flex;
-  align-items: center;
-  margin-left: 8px;
-  padding: 2px 6px;
-  border-radius: 999px;
-  background: rgba(250, 179, 135, 0.16);
-  color: var(--c-accent-strong);
-  font-size: 10px;
-  letter-spacing: 0.04em;
-  vertical-align: middle;
+  margin-left: 4px;
+  color: var(--c-danger);
+  font-size: 14px;
 }
 
 .fieldInput,
@@ -230,24 +230,45 @@
   width: 100%;
   box-sizing: border-box;
   border: 1px solid var(--c-border);
-  border-radius: 10px;
-  background: var(--c-input);
+  border-radius: 8px;
+  background: var(--c-surface);
   color: var(--c-text);
-  padding: 10px 12px;
+  padding: 9px 12px;
   font-size: 14px;
   font-family: inherit;
+  -webkit-text-fill-color: var(--c-text);
+  caret-color: var(--c-text);
+}
+
+.fieldInput::placeholder,
+.fieldTextarea::placeholder {
+  color: var(--c-subtext);
+  opacity: 0.6;
 }
 
 .fieldInput:focus,
 .fieldTextarea:focus {
   outline: none;
-  border-color: var(--c-accent-strong);
+  border-color: var(--c-accent);
+}
+
+.fieldInput:-webkit-autofill,
+.fieldInput:-webkit-autofill:hover,
+.fieldInput:-webkit-autofill:focus,
+.fieldInput:-webkit-autofill:active {
+  -webkit-box-shadow: 0 0 0 1000px var(--c-surface) inset !important;
+  -webkit-text-fill-color: var(--c-text) !important;
+  caret-color: var(--c-text);
 }
 
 .fieldInput:disabled,
 .fieldTextarea:disabled {
-  opacity: 0.75;
+  opacity: 0.6;
   cursor: not-allowed;
+}
+
+.fieldInputMt {
+  margin-top: 6px;
 }
 
 .fieldTextarea {
@@ -336,6 +357,8 @@
   background: rgba(243, 139, 168, 0.12);
   color: var(--c-danger);
   border: 1px solid rgba(243, 139, 168, 0.35);
+  white-space: nowrap;
+  flex-shrink: 0;
 }
 
 .primaryButton:disabled,
@@ -347,12 +370,6 @@
   transform: none;
 }
 
-.labelCard {
-  display: flex;
-  flex-direction: column;
-  gap: 14px;
-}
-
 .labelCardHeader {
   display: flex;
   justify-content: space-between;
@@ -362,7 +379,9 @@
 
 .labelTitle {
   margin: 0;
-  font-size: 16px;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--c-accent);
 }
 
 .labelMeta {
@@ -445,10 +464,10 @@
   flex-direction: column;
   gap: 14px;
   padding: 18px;
-  background: linear-gradient(180deg, rgba(249, 226, 175, 0.04), transparent 28%), var(--c-card);
+  background: var(--c-card);
   border: 1px solid var(--c-border);
   border-top: none;
-  border-radius: 0 0 12px 12px;
+  border-radius: 0 0 10px 10px;
 }
 
 .promptGenResult {
@@ -461,10 +480,10 @@
   width: 100%;
   box-sizing: border-box;
   border: 1px solid var(--c-border);
-  border-radius: 10px;
-  background: var(--c-input);
+  border-radius: 8px;
+  background: var(--c-surface);
   color: var(--c-text);
-  padding: 10px 12px;
+  padding: 9px 12px;
   font-size: 13px;
   font-family: monospace;
   resize: vertical;

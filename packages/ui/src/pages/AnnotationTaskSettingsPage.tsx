@@ -473,7 +473,7 @@ export function AnnotationTaskSettingsPage() {
                     onClick={() => deleteTaskMutation.mutate()}
                     disabled={deleteTaskMutation.isPending}
                   >
-                    {deleteTaskMutation.isPending ? "削除中..." : "タスクを削除"}
+                    {deleteTaskMutation.isPending ? "削除中..." : "削除"}
                   </button>
                 </div>
 
@@ -744,7 +744,7 @@ export function AnnotationTaskSettingsPage() {
                           <div className={styles.fieldGroup}>
                             <label htmlFor="label-key-input" className={styles.fieldLabel}>
                               分類ラベル/カテゴリキー
-                              <span className={styles.requiredMark}>必須</span>
+                              <span className={styles.requiredMark}>*</span>
                             </label>
                             <input
                               id="label-key-input"
@@ -862,7 +862,7 @@ export function AnnotationTaskSettingsPage() {
                       <div className={styles.fieldGroup}>
                         <label className={styles.fieldLabel} htmlFor="new-label-key">
                           分類ラベル/カテゴリキー
-                          <span className={styles.requiredMark}>必須</span>
+                          <span className={styles.requiredMark}>*</span>
                         </label>
                         <input
                           id="new-label-key"
@@ -989,7 +989,7 @@ export function AnnotationTaskSettingsPage() {
                     <div className={styles.fieldGroup}>
                       <label className={styles.fieldLabel} htmlFor="prompt-gen-target">
                         抽出対象
-                        <span className={styles.requiredMark}>必須</span>
+                        <span className={styles.requiredMark}>*</span>
                       </label>
                       <input
                         id="prompt-gen-target"
@@ -1041,7 +1041,7 @@ export function AnnotationTaskSettingsPage() {
                         <div className={styles.fieldGroup}>
                           <label className={styles.fieldLabel} htmlFor="save-prompt-family">
                             保存先プロンプトファミリー
-                            <span className={styles.requiredMark}>必須</span>
+                            <span className={styles.requiredMark}>*</span>
                           </label>
                           <select
                             id="save-prompt-family"
@@ -1066,8 +1066,7 @@ export function AnnotationTaskSettingsPage() {
                           </select>
                           {saveTargetFamilyId === "new" && (
                             <input
-                              className={styles.fieldInput}
-                              style={{ marginTop: "6px" }}
+                              className={`${styles.fieldInput} ${styles.fieldInputMt}`}
                               placeholder="新しいファミリー名（省略可）"
                               value={newFamilyName}
                               onChange={(e) => setNewFamilyName(e.target.value)}
