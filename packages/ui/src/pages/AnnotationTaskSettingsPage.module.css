@@ -128,11 +128,12 @@
 
 .sectionTitle {
   margin: 0;
-  font-size: 18px;
+  font-size: 15px;
+  font-weight: 600;
 }
 
 .sectionHint {
-  margin: 6px 0 0;
+  margin: 4px 0 0;
   color: var(--c-muted);
   line-height: 1.5;
   font-size: 13px;
@@ -141,12 +142,10 @@
 .panel,
 .emptyState,
 .labelCard {
-  background:
-    linear-gradient(180deg, rgba(249, 226, 175, 0.06), transparent 28%),
-    var(--c-card);
+  background: var(--c-card);
   border: 1px solid var(--c-border);
-  border-radius: 16px;
-  padding: 18px;
+  border-radius: 10px;
+  padding: 16px;
 }
 
 .taskCard,
@@ -156,28 +155,25 @@
   gap: 6px;
   width: 100%;
   text-align: left;
-  padding: 16px;
-  border-radius: 14px;
+  padding: 10px 12px;
+  border-radius: 8px;
   border: 1px solid var(--c-border);
-  background: var(--c-card);
+  background: transparent;
   color: var(--c-text);
   cursor: pointer;
   transition:
     border-color 0.15s ease,
-    transform 0.15s ease,
     background-color 0.15s ease;
 }
 
 .taskCard:hover,
 .taskCardActive:hover {
-  transform: translateY(-1px);
+  background: color-mix(in srgb, var(--c-accent) 8%, transparent);
 }
 
 .taskCardActive {
-  border-color: var(--c-accent-strong);
-  background:
-    linear-gradient(135deg, rgba(250, 179, 135, 0.12), rgba(249, 226, 175, 0.04)),
-    var(--c-card);
+  border-color: var(--c-accent);
+  background: color-mix(in srgb, var(--c-accent) 10%, var(--c-card));
 }
 
 .taskCardTitle {
@@ -204,11 +200,11 @@
 .fieldGroup {
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: 6px;
 }
 
 .fieldLabel {
-  font-size: 13px;
+  font-size: 14px;
   color: var(--c-subtext);
 }
 
@@ -230,8 +226,8 @@
   width: 100%;
   box-sizing: border-box;
   border: 1px solid var(--c-border);
-  border-radius: 10px;
-  background: var(--c-input);
+  border-radius: 8px;
+  background: var(--c-overlay);
   color: var(--c-text);
   padding: 10px 12px;
   font-size: 14px;
@@ -449,10 +445,10 @@
   flex-direction: column;
   gap: 14px;
   padding: 18px;
-  background: linear-gradient(180deg, rgba(249, 226, 175, 0.04), transparent 28%), var(--c-card);
+  background: var(--c-card);
   border: 1px solid var(--c-border);
   border-top: none;
-  border-radius: 0 0 12px 12px;
+  border-radius: 0 0 10px 10px;
 }
 
 .promptGenResult {
@@ -465,8 +461,8 @@
   width: 100%;
   box-sizing: border-box;
   border: 1px solid var(--c-border);
-  border-radius: 10px;
-  background: var(--c-input);
+  border-radius: 8px;
+  background: var(--c-overlay);
   color: var(--c-text);
   padding: 10px 12px;
   font-size: 13px;
