@@ -12,6 +12,7 @@
   --c-success: #a6e3a1;
   --c-input: #11111b;
   --c-chip: rgba(249, 226, 175, 0.12);
+  --c-select: #cba6f7;
 
   color: var(--c-text);
 }
@@ -178,12 +179,12 @@
 }
 
 .taskCard:hover {
-  border-color: var(--c-accent);
+  border-color: var(--c-select);
 }
 
 .taskCardActive {
-  border-color: var(--c-accent);
-  background: color-mix(in srgb, var(--c-accent) 10%, var(--c-bg));
+  border-color: var(--c-select);
+  background: color-mix(in srgb, var(--c-select) 10%, var(--c-card));
 }
 
 .taskCardTitle {
