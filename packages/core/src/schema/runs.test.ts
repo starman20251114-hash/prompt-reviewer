@@ -21,8 +21,11 @@ describe("runs スキーマ型定義", () => {
         id: number;
         execution_profile_id: number | null;
         project_id: number | null;
+        run_mode: string;
         prompt_version_id: number;
-        test_case_id: number;
+        test_case_id: number | null;
+        ad_hoc_input: string | null;
+        prompt_snapshot: string;
         conversation: string;
         execution_trace: string | null;
         structured_output: string | null;
@@ -38,8 +41,11 @@ describe("runs スキーマ型定義", () => {
           | "id"
           | "execution_profile_id"
           | "project_id"
+          | "run_mode"
           | "prompt_version_id"
           | "test_case_id"
+          | "ad_hoc_input"
+          | "prompt_snapshot"
           | "conversation"
           | "execution_trace"
           | "structured_output"
@@ -80,8 +86,8 @@ describe("runs スキーマ型定義", () => {
       expectTypeOf<Run["prompt_version_id"]>().toEqualTypeOf<number>();
     });
 
-    it("Run の test_case_id は number 型", () => {
-      expectTypeOf<Run["test_case_id"]>().toEqualTypeOf<number>();
+    it("Run の test_case_id は number | null 型", () => {
+      expectTypeOf<Run["test_case_id"]>().toEqualTypeOf<number | null>();
     });
 
     it("Run の temperature は number 型", () => {
@@ -101,8 +107,11 @@ describe("runs スキーマ型定義", () => {
     it("NewRun は id なしで作成できる（AutoIncrement）", () => {
       const newRun: NewRun = {
         project_id: 1,
+        run_mode: "evaluation",
         prompt_version_id: 1,
         test_case_id: 1,
+        ad_hoc_input: null,
+        prompt_snapshot: "サポート用のプロンプト本文",
         conversation: JSON.stringify([
           { role: "user", content: "こんにちは" },
           { role: "assistant", content: "こんにちは！" },
@@ -128,8 +137,11 @@ describe("runs スキーマ型定義", () => {
     it("ベスト回答フラグを立てた NewRun を作成できる", () => {
       const bestRun: NewRun = {
         project_id: 1,
+        run_mode: "evaluation",
         prompt_version_id: 2,
         test_case_id: 1,
+        ad_hoc_input: null,
+        prompt_snapshot: "改善版プロンプト本文",
         conversation: JSON.stringify([
           { role: "user", content: "質問です" },
           { role: "assistant", content: "詳細な回答です" },

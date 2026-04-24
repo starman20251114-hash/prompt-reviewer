@@ -15,7 +15,9 @@ import {
   getGoldAnnotations,
   getIndependentTestCase,
   getIndependentTestCases,
+  getRun,
   getRunIndependent,
+  getTestCase,
   updateAnnotationCandidate,
 } from "../lib/api";
 import styles from "./AnnotationReviewPage.module.css";
@@ -372,8 +374,8 @@ function AnnotationReviewContent({
   const [activeRange, setActiveRange] = useState<{ start: number; end: number } | null>(null);
 
   const { data: run, isLoading: isRunLoading } = useQuery({
-    queryKey: ["runs-independent", runId],
-    queryFn: () => getRunIndependent(runId),
+    queryKey: Number.isNaN(projectId) ? ["runs-independent", runId] : ["runs", projectId, runId],
+    queryFn: () => (Number.isNaN(projectId) ? getRunIndependent(runId) : getRun(projectId, runId)),
     enabled: !Number.isNaN(runId),
   });
 
@@ -402,15 +404,20 @@ function AnnotationReviewContent({
     queryFn: () =>
       getGoldAnnotations({
         annotation_task_id: taskId,
-        test_case_id: run?.test_case_id,
+        test_case_id: run?.test_case_id ?? undefined,
       }),
-    enabled: !Number.isNaN(taskId) && run !== undefined,
+    enabled: !Number.isNaN(taskId) && run !== undefined && run.test_case_id !== null,
   });
 
   const { data: testCase, isLoading: isTestCaseLoading } = useQuery({
-    queryKey: ["test-cases-independent", run?.test_case_id],
-    queryFn: () => getIndependentTestCase(run?.test_case_id as number),
-    enabled: run !== undefined && run.test_case_id !== undefined,
+    queryKey: Number.isNaN(projectId)
+      ? ["test-cases-independent", run?.test_case_id]
+      : ["test-cases", projectId, run?.test_case_id],
+    queryFn: () =>
+      Number.isNaN(projectId)
+        ? getIndependentTestCase(run?.test_case_id as number)
+        : getTestCase(projectId, run?.test_case_id as number),
+    enabled: run !== undefined && run.test_case_id !== null,
   });
 
   const updateMutation = useMutation({

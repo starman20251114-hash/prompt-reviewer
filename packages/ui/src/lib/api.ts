@@ -535,8 +535,11 @@ export type StructuredOutput = {
 export type Run = {
   id: number;
   project_id: number | null;
+  run_mode: "evaluation" | "quick";
   prompt_version_id: number;
-  test_case_id: number;
+  test_case_id: number | null;
+  ad_hoc_input: string | null;
+  prompt_snapshot: string;
   conversation: ConversationMessage[];
   execution_trace: ExecutionTraceStep[] | null;
   structured_output: StructuredOutput | null;
@@ -580,7 +583,8 @@ export function createRun(
   projectId: number,
   data: {
     prompt_version_id: number;
-    test_case_id: number;
+    test_case_id?: number;
+    ad_hoc_input?: string;
     conversation: ConversationMessage[];
     execution_trace?: ExecutionTraceStep[];
     structured_output?: StructuredOutput | null;
@@ -595,7 +599,8 @@ export function createRun(
 
 type ExecuteRunStreamOptions = {
   prompt_version_id: number;
-  test_case_id: number;
+  test_case_id?: number;
+  ad_hoc_input?: string;
   api_key: string;
   execution_profile_id?: number;
   structured_output?: StructuredOutput | null;
@@ -669,6 +674,7 @@ export async function executeRunStream(
     body: JSON.stringify({
       prompt_version_id: options.prompt_version_id,
       test_case_id: options.test_case_id,
+      ad_hoc_input: options.ad_hoc_input,
       api_key: options.api_key,
       execution_profile_id: options.execution_profile_id,
       structured_output: options.structured_output,
@@ -782,7 +788,8 @@ export function getRunsIndependent(filters?: RunFilters): Promise<Run[]> {
 
 export function createRunIndependent(data: {
   prompt_version_id: number;
-  test_case_id: number;
+  test_case_id?: number;
+  ad_hoc_input?: string;
   conversation: ConversationMessage[];
   execution_trace?: ExecutionTraceStep[];
   structured_output?: StructuredOutput | null;
@@ -793,7 +800,8 @@ export function createRunIndependent(data: {
 
 type ExecuteRunStreamIndependentOptions = {
   prompt_version_id: number;
-  test_case_id: number;
+  test_case_id?: number;
+  ad_hoc_input?: string;
   api_key: string;
   execution_profile_id: number;
   structured_output?: StructuredOutput | null;
@@ -814,6 +822,7 @@ export async function executeRunStreamIndependent(
     body: JSON.stringify({
       prompt_version_id: options.prompt_version_id,
       test_case_id: options.test_case_id,
+      ad_hoc_input: options.ad_hoc_input,
       api_key: options.api_key,
       execution_profile_id: options.execution_profile_id,
       structured_output: options.structured_output,

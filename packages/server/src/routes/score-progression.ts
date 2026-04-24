@@ -118,8 +118,9 @@ export function createScoreProgressionRouter(db: DB) {
       projectId !== undefined
         ? await db.select().from(runs).where(inArray(runs.prompt_version_id, versionIds))
         : await db.select().from(runs);
+    const evaluationRuns = allRuns.filter((run) => run.test_case_id !== null);
 
-    if (allRuns.length === 0) {
+    if (evaluationRuns.length === 0) {
       const emptySummaries: VersionSummary[] = versions.map((v) => ({
         versionId: v.id,
         versionNumber: v.version,
@@ -135,7 +136,7 @@ export function createScoreProgressionRouter(db: DB) {
       } satisfies ScoreProgressionResponse);
     }
 
-    const runIds = allRuns.map((r) => r.id);
+    const runIds = evaluationRuns.map((r) => r.id);
 
     // 対象Runのスコアを取得
     const allScores = await db
@@ -150,7 +151,7 @@ export function createScoreProgressionRouter(db: DB) {
     const versionSummaries: VersionSummary[] = versions
       .sort((a, b) => a.version - b.version)
       .map((v) => {
-        const versionRuns = allRuns.filter((r) => r.prompt_version_id === v.id);
+        const versionRuns = evaluationRuns.filter((r) => r.prompt_version_id === v.id);
         const versionScores = versionRuns
           .map((r) => scoreByRunId.get(r.id))
           .filter((s): s is NonNullable<typeof s> => s !== undefined);
@@ -192,7 +193,7 @@ export function createScoreProgressionRouter(db: DB) {
               .from(test_case_projects)
               .where(eq(test_case_projects.project_id, projectId))
           ).map((l) => l.test_case_id)
-        : [...new Set(allRuns.map((run) => run.test_case_id))];
+        : [...new Set(evaluationRuns.map((run) => run.test_case_id).filter((id) => id !== null))];
 
     if (testCaseIds.length === 0) {
       return c.json({
@@ -211,7 +212,7 @@ export function createScoreProgressionRouter(db: DB) {
         const versionScores = versions
           .sort((a, b) => a.version - b.version)
           .map((v) => {
-            const tcRuns = allRuns.filter(
+            const tcRuns = evaluationRuns.filter(
               (r) => r.prompt_version_id === v.id && r.test_case_id === tc.id,
             );
 

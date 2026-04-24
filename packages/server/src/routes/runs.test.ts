@@ -31,8 +31,11 @@ type MockConversationMessage = {
 type MockRun = {
   id: number;
   project_id: number;
+  run_mode: "evaluation" | "quick";
   prompt_version_id: number;
-  test_case_id: number;
+  test_case_id: number | null;
+  ad_hoc_input: string | null;
+  prompt_snapshot: string;
   conversation: string;
   execution_trace: string | null;
   structured_output: string | null;
@@ -64,8 +67,11 @@ const sampleConversation: MockConversationMessage[] = [
 const sampleRun: MockRun = {
   id: 1,
   project_id: 1,
+  run_mode: "evaluation",
   prompt_version_id: 1,
   test_case_id: 1,
+  ad_hoc_input: null,
+  prompt_snapshot: "既存のプロンプト本文",
   conversation: JSON.stringify(sampleConversation),
   execution_trace: null,
   structured_output: null,
@@ -581,6 +587,35 @@ describe("POST /api/projects/:projectId/runs", () => {
             from: () => ({
               where: () =>
                 Promise.resolve([{ prompt_version_id: 1, project_id: 1, created_at: 0 }]),
+            }),
+          };
+        }
+        if (selectCallCount === 2) {
+          return {
+            from: () => ({
+              where: () => Promise.resolve([{ test_case_id: 1, project_id: 1, created_at: 0 }]),
+            }),
+          };
+        }
+        if (selectCallCount === 3) {
+          return {
+            from: () => ({
+              where: () =>
+                Promise.resolve([
+                  {
+                    id: 1,
+                    prompt_family_id: 1,
+                    project_id: 1,
+                    version: 1,
+                    name: "v1",
+                    memo: null,
+                    content: "prompt",
+                    workflow_definition: null,
+                    parent_version_id: null,
+                    created_at: 0,
+                    is_selected: true,
+                  },
+                ]),
             }),
           };
         }
@@ -1498,7 +1533,6 @@ describe("POST /api/projects/:projectId/runs/execute", () => {
       },
     ]);
     expect(JSON.parse(capturedInsertValues[0]?.conversation ?? "[]")).toEqual([
-      { role: "user", content: promptMessage },
       { role: "assistant", content: "今日は晴れです。" },
     ]);
   });
@@ -2318,10 +2352,11 @@ const sampleRunWithTraceStep: MockRun = {
  *
  * selectCallCount に対応するレスポンスを配列で指定する:
  * 1. prompt_version_projects (versionIds)
- * 2. runs (run取得)
- * 3. annotation_tasks (task確認)
- * 4. annotation_labels (labelキー一覧)
- * 5. annotation_candidates (重複チェック)
+ * 2. prompt_versions directVersions
+ * 3. runs (run取得)
+ * 4. annotation_tasks (task確認)
+ * 5. annotation_labels (labelキー一覧)
+ * 6. annotation_candidates (重複チェック)
  */
 function buildExtractDb(params: {
   run?: MockRun | null;
@@ -2354,6 +2389,14 @@ function buildExtractDb(params: {
         };
       }
       if (selectCallCount === 2) {
+        // prompt_versions directVersions
+        return {
+          from: () => ({
+            where: () => Promise.resolve([]),
+          }),
+        };
+      }
+      if (selectCallCount === 3) {
         // runs
         return {
           from: () => ({
@@ -2361,7 +2404,7 @@ function buildExtractDb(params: {
           }),
         };
       }
-      if (selectCallCount === 3) {
+      if (selectCallCount === 4) {
         // annotation_tasks
         return {
           from: () => ({
@@ -2369,7 +2412,7 @@ function buildExtractDb(params: {
           }),
         };
       }
-      if (selectCallCount === 4) {
+      if (selectCallCount === 5) {
         // annotation_labels
         return {
           from: () => ({

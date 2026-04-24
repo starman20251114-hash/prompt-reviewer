@@ -662,13 +662,14 @@ export function ScorePage() {
         project_id: projectId ?? undefined,
       }),
   });
+  const evaluationRuns = runs.filter((run) => run.test_case_id !== null);
 
   // 全 Run のスコアを並列取得
   const scoreQueries = useQuery({
-    queryKey: ["scores-bulk", runs.map((r) => r.id)],
+    queryKey: ["scores-bulk", evaluationRuns.map((r) => r.id)],
     queryFn: async () => {
       const entries = await Promise.all(
-        runs.map(async (run) => {
+        evaluationRuns.map(async (run) => {
           try {
             const s = await getScore(run.id);
             return [run.id, s] as [number, Score];
@@ -679,7 +680,7 @@ export function ScorePage() {
       );
       return new Map<number, Score | null>(entries);
     },
-    enabled: runs.length > 0,
+    enabled: evaluationRuns.length > 0,
     staleTime: 1000 * 30,
   });
 
@@ -691,7 +692,7 @@ export function ScorePage() {
   function getBulkState(runId: number): BulkState {
     if (bulkEdits.has(runId)) return bulkEdits.get(runId) as BulkState;
     const score = scoresMap.get(runId) ?? null;
-    const run = runs.find((current) => current.id === runId);
+    const run = evaluationRuns.find((current) => current.id === runId);
     const parsed = run
       ? parseStructuredComment(run, score?.human_comment ?? "")
       : { generalComment: score?.human_comment ?? "", stepComments: {} };
@@ -714,7 +715,7 @@ export function ScorePage() {
 
   async function handleBulkSave() {
     setBulkSaving(true);
-    const dirty = runs.filter((r) => bulkEdits.get(r.id)?.dirty);
+    const dirty = evaluationRuns.filter((r) => bulkEdits.get(r.id)?.dirty);
 
     await Promise.all(
       dirty.map(async (run) => {
@@ -759,10 +760,12 @@ export function ScorePage() {
     return `${familyName} v${v.version}${v.name ? ` - ${v.name}` : ""}`;
   }
 
-  const dirtyCount = runs.filter((r) => bulkEdits.get(r.id)?.dirty).length;
+  const dirtyCount = evaluationRuns.filter((r) => bulkEdits.get(r.id)?.dirty).length;
 
-  const compareRunA = compareIds[0] != null ? runs.find((r) => r.id === compareIds[0]) : undefined;
-  const compareRunB = compareIds[1] != null ? runs.find((r) => r.id === compareIds[1]) : undefined;
+  const compareRunA =
+    compareIds[0] != null ? evaluationRuns.find((r) => r.id === compareIds[0]) : undefined;
+  const compareRunB =
+    compareIds[1] != null ? evaluationRuns.find((r) => r.id === compareIds[1]) : undefined;
 
   return (
     <div className={styles.root}>
@@ -838,19 +841,23 @@ export function ScorePage() {
         </div>
       </div>
 
-      {runs.length === 0 && (
-        <p className={styles.emptyMsg}>Run がありません。まず Run を作成してください。</p>
+      {evaluationRuns.length === 0 && (
+        <p className={styles.emptyMsg}>
+          採点対象の Run がありません。テストケースを選択した evaluation run を作成してください。
+        </p>
       )}
 
       {/* 個別採点タブ */}
-      {tab === "individual" && runs.length > 0 && (
+      {tab === "individual" && evaluationRuns.length > 0 && (
         <div>
-          {runs.map((run) => (
+          {evaluationRuns.map((run) => (
             <IndividualRunRow
               key={run.id}
               run={run}
               versionName={getVersionName(run.prompt_version_id)}
-              testCaseTitle={`テストケース #${run.test_case_id}`}
+              testCaseTitle={
+                run.test_case_id === null ? "かんたん実行" : `テストケース #${run.test_case_id}`
+              }
               autoFocus={focusedRunId === run.id}
               scoreMode={scoreMode}
             />
@@ -859,11 +866,11 @@ export function ScorePage() {
       )}
 
       {/* 一括採点タブ */}
-      {tab === "bulk" && runs.length > 0 && (
+      {tab === "bulk" && evaluationRuns.length > 0 && (
         <div>
           <div className={styles.bulkHeader}>
             <span className={styles.bulkCount}>
-              {runs.length} 件の Run
+              {evaluationRuns.length} 件の Run
               {dirtyCount > 0 && ` （${dirtyCount} 件に変更あり）`}
             </span>
             <div style={{ display: "flex", gap: "12px", alignItems: "center" }}>
@@ -910,12 +917,14 @@ export function ScorePage() {
             </div>
           )}
 
-          {runs.map((run) => (
+          {evaluationRuns.map((run) => (
             <BulkRunRow
               key={run.id}
               run={run}
               versionName={getVersionName(run.prompt_version_id)}
-              testCaseTitle={`テストケース #${run.test_case_id}`}
+              testCaseTitle={
+                run.test_case_id === null ? "かんたん実行" : `テストケース #${run.test_case_id}`
+              }
               score={scoresMap.get(run.id) ?? null}
               bulkState={getBulkState(run.id)}
               onBulkChange={(patch) => updateBulkEdit(run.id, patch)}

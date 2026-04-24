@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Link, useParams } from "react-router";
 import { RunCompareView } from "../components/RunCompareView";
 import { useApiKey } from "../hooks/useApiKey";
@@ -32,17 +32,17 @@ import {
 } from "../lib/api";
 import styles from "./RunsPage.module.css";
 
-function buildFullPrompt(version: PromptVersion, testCase: TestCase): string {
-  const contextBlock = testCase.context_content
+function buildFullPrompt(version: PromptVersion, testCase?: TestCase | null): string {
+  const contextBlock = testCase?.context_content
     ? `[Context]\n${testCase.context_content}\n[/Context]`
     : "";
-  const systemPrompt = testCase.context_content
+  const systemPrompt = testCase?.context_content
     ? version.content.includes("{{context}}")
       ? version.content.replace("{{context}}", contextBlock)
       : `${version.content}\n\n${contextBlock}`
     : version.content;
 
-  const turnsText = testCase.turns
+  const turnsText = (testCase?.turns ?? [])
     .map((t) => `${t.role === "user" ? "User" : "Assistant"}: ${t.content}`)
     .join("\n\n");
 
@@ -51,11 +51,11 @@ function buildFullPrompt(version: PromptVersion, testCase: TestCase): string {
     : systemPrompt;
 }
 
-function buildWorkflowPreview(version: PromptVersion, testCase: TestCase): string {
-  const turnsText = testCase.turns
+function buildWorkflowPreview(version: PromptVersion, testCase?: TestCase | null): string {
+  const turnsText = (testCase?.turns ?? [])
     .map((turn) => `${turn.role === "user" ? "User" : "Assistant"}: ${turn.content}`)
     .join("\n\n");
-  const baseContext = testCase.context_content || "(なし)";
+  const baseContext = testCase?.context_content || "(なし)";
   const stepsText = [
     `## Step 1: プロンプト本文\nid: __base_prompt__\ncontext: テストケースの context_content\n\n${version.content}`,
     ...(version.workflow_definition?.steps ?? []).map(
@@ -81,7 +81,7 @@ function CopyPromptPanel({
   testCase,
 }: {
   version: PromptVersion;
-  testCase: TestCase;
+  testCase?: TestCase | null;
 }) {
   const [open, setOpen] = useState(false);
   const [copied, setCopied] = useState(false);
@@ -366,6 +366,8 @@ function RunCard({
   const [expanded, setExpanded] = useState(false);
   const [showAnnotation, setShowAnnotation] = useState(false);
   const hasTrace = (run.execution_trace?.length ?? 0) > 0;
+  const isQuickRun = run.run_mode === "quick";
+  const isScoreDisabled = isQuickRun;
 
   return (
     <div
@@ -381,6 +383,7 @@ function RunCard({
           )}
           <span className={styles.runMeta}>
             {versionLabel} &times; {testCaseLabel}
+            {isQuickRun && run.ad_hoc_input ? " / 直接入力あり" : ""}
           </span>
           <span className={styles.runDate}>{formatDate(run.created_at)}</span>
         </div>
@@ -403,10 +406,16 @@ function RunCard({
               {isCompareSelected ? "比較解除" : "比較"}
             </button>
           )}
-          <Link to={`${scorePath}?runId=${run.id}`} className={styles.btnScore}>
-            採点
-          </Link>
-          {annotationTasks.length > 0 && (
+          {isScoreDisabled ? (
+            <span className={styles.btnScore} aria-disabled="true">
+              かんたん実行は採点対象外
+            </span>
+          ) : (
+            <Link to={`${scorePath}?runId=${run.id}`} className={styles.btnScore}>
+              採点
+            </Link>
+          )}
+          {annotationTasks.length > 0 && !isQuickRun && (
             <button
               type="button"
               onClick={() => setShowAnnotation((prev) => !prev)}
@@ -421,10 +430,14 @@ function RunCard({
               const unset = run.is_best;
               onSetBest(unset);
             }}
-            disabled={isBestPending}
+            disabled={isBestPending || isQuickRun}
             className={`${styles.btnBest} ${run.is_best ? styles.btnBestActive : styles.btnBestInactive}`}
           >
-            {run.is_best ? "ベスト設定済み（解除）" : "バージョンのベストに設定"}
+            {isQuickRun
+              ? "かんたん実行ではベスト設定不可"
+              : run.is_best
+                ? "ベスト設定済み（解除）"
+                : "バージョンのベストに設定"}
           </button>
           <button
             type="button"
@@ -521,10 +534,10 @@ export function RunsPage() {
   const [activeTab, setActiveTab] = useState<PageTab>("create");
 
   const [step, setStep] = useState<Step>("select");
-  const [selectedFamilyId, setSelectedFamilyId] = useState<number | "">("");
   const [selectedVersionId, setSelectedVersionId] = useState<number | "">("");
   const [selectedTestCaseId, setSelectedTestCaseId] = useState<number | "">("");
   const [selectedProfileId, setSelectedProfileId] = useState<number | "">("");
+  const [adHocInput, setAdHocInput] = useState("");
   const [llmResponse, setLlmResponse] = useState("");
   const [executionTrace, setExecutionTrace] = useState<ExecutionTraceStep[]>([]);
   const [streamingStepId, setStreamingStepId] = useState<string | null>(null);
@@ -549,12 +562,6 @@ export function RunsPage() {
   const { data: promptFamilies = [] } = useQuery({
     queryKey: ["prompt-families"],
     queryFn: () => getPromptFamilies(),
-  });
-
-  const { data: familyVersions = [] } = useQuery({
-    queryKey: ["prompt-versions-by-family", selectedFamilyId],
-    queryFn: () => getPromptVersionsByFamily(selectedFamilyId as number),
-    enabled: selectedFamilyId !== "",
   });
 
   const { data: allVersions = [] } = useQuery({
@@ -595,8 +602,24 @@ export function RunsPage() {
         test_case_id: selectedTestCaseId !== "" ? selectedTestCaseId : undefined,
         project_id: projectId ?? undefined,
       }),
-    enabled: step === "saved" && selectedVersionId !== "" && selectedTestCaseId !== "",
+    enabled: step === "saved" && selectedVersionId !== "",
   });
+
+  useEffect(() => {
+    if (selectedVersionId !== "" || allVersions.length === 0) {
+      return;
+    }
+
+    const selectedVersion =
+      [...allVersions]
+        .filter((version) => version.is_selected)
+        .sort((a, b) => b.created_at - a.created_at)[0] ??
+      [...allVersions].sort((a, b) => b.created_at - a.created_at)[0];
+
+    if (selectedVersion) {
+      setSelectedVersionId(selectedVersion.id);
+    }
+  }, [allVersions, selectedVersionId]);
 
   const { data: allRuns = [], isLoading: isRunsLoading } = useQuery({
     queryKey: [
@@ -615,7 +638,8 @@ export function RunsPage() {
   const createRunMutation = useMutation({
     mutationFn: (data: {
       prompt_version_id: number;
-      test_case_id: number;
+      test_case_id?: number;
+      ad_hoc_input?: string;
       conversation: ConversationMessage[];
     }) => {
       const profileId = selectedProfileId !== "" ? selectedProfileId : executionProfiles[0]?.id;
@@ -641,7 +665,11 @@ export function RunsPage() {
   });
 
   const executeRunMutation = useMutation({
-    mutationFn: (data: { prompt_version_id: number; test_case_id: number }) => {
+    mutationFn: (data: {
+      prompt_version_id: number;
+      test_case_id?: number;
+      ad_hoc_input?: string;
+    }) => {
       const profileId = selectedProfileId !== "" ? selectedProfileId : executionProfiles[0]?.id;
       if (!profileId) throw new Error("実行プロファイルを選択してください");
       const options = {
@@ -718,7 +746,7 @@ export function RunsPage() {
   });
 
   const selectedVersion =
-    selectedVersionId !== "" ? familyVersions.find((v) => v.id === selectedVersionId) : undefined;
+    selectedVersionId !== "" ? allVersions.find((v) => v.id === selectedVersionId) : undefined;
   const selectedTestCase =
     selectedTestCaseId !== "" ? testCases.find((tc) => tc.id === selectedTestCaseId) : undefined;
 
@@ -734,19 +762,18 @@ export function RunsPage() {
     return allVersions.find((pv: PromptVersion) => pv.id === versionId)?.version ?? 0;
   }
 
-  function getTestCaseLabel(testCaseId: number): string {
+  function getTestCaseLabel(testCaseId: number | null): string {
+    if (testCaseId === null) return "かんたん実行";
     const tc = testCases.find((t: TestCase) => t.id === testCaseId);
     return tc?.title ?? "不明";
   }
 
   const hasProfile = selectedProfileId !== "" || executionProfiles.length > 0;
-  const isStartDisabled =
-    selectedVersionId === "" || selectedTestCaseId === "" || !hasApiKey || !hasProfile;
+  const isStartDisabled = selectedVersionId === "" || !hasApiKey || !hasProfile;
   const isSaveDisabled =
     !llmResponse.trim() || createRunMutation.isPending || executeRunMutation.isPending;
   const isExecuteDisabled =
     selectedVersionId === "" ||
-    selectedTestCaseId === "" ||
     !hasApiKey ||
     !hasProfile ||
     executeRunMutation.isPending ||
@@ -762,17 +789,22 @@ export function RunsPage() {
   }
 
   function handleSaveRun() {
-    if (!selectedTestCase || selectedVersionId === "" || selectedTestCaseId === "") return;
+    if (selectedVersionId === "") return;
     if (!llmResponse.trim()) return;
 
-    const conversation: ConversationMessage[] = [
-      ...selectedTestCase.turns,
-      { role: "assistant", content: llmResponse.trim() },
-    ];
+    const conversation: ConversationMessage[] = selectedTestCase
+      ? [...selectedTestCase.turns, { role: "assistant", content: llmResponse.trim() }]
+      : adHocInput.trim()
+        ? [
+            { role: "user", content: adHocInput.trim() },
+            { role: "assistant", content: llmResponse.trim() },
+          ]
+        : [{ role: "assistant", content: llmResponse.trim() }];
 
     createRunMutation.mutate({
       prompt_version_id: selectedVersionId,
-      test_case_id: selectedTestCaseId,
+      test_case_id: selectedTestCaseId !== "" ? selectedTestCaseId : undefined,
+      ad_hoc_input: adHocInput.trim() || undefined,
       conversation,
     });
   }
@@ -780,7 +812,8 @@ export function RunsPage() {
   function handleNewRun() {
     if (savedRun) {
       setSelectedVersionId(savedRun.prompt_version_id);
-      setSelectedTestCaseId(savedRun.test_case_id);
+      setSelectedTestCaseId(savedRun.test_case_id ?? "");
+      setAdHocInput(savedRun.ad_hoc_input ?? "");
     }
     setSavedRun(null);
     setLlmResponse("");
@@ -794,7 +827,8 @@ export function RunsPage() {
     if (isExecuteDisabled) return;
     executeRunMutation.mutate({
       prompt_version_id: selectedVersionId as number,
-      test_case_id: selectedTestCaseId as number,
+      test_case_id: selectedTestCaseId !== "" ? (selectedTestCaseId as number) : undefined,
+      ad_hoc_input: adHocInput.trim() || undefined,
     });
   }
 
@@ -860,30 +894,6 @@ export function RunsPage() {
               <div className={styles.selectCard}>
                 <h3 className={styles.selectCardTitle}>Run を取得する</h3>
 
-                {/* プロンプトファミリー選択 */}
-                <div className={styles.fieldGroup}>
-                  <label htmlFor="select-family" className={styles.fieldLabel}>
-                    プロンプトファミリー
-                  </label>
-                  <select
-                    id="select-family"
-                    value={selectedFamilyId}
-                    onChange={(e) => {
-                      setSelectedFamilyId(e.target.value === "" ? "" : Number(e.target.value));
-                      setSelectedVersionId("");
-                    }}
-                    className={styles.fieldSelect}
-                  >
-                    <option value="">-- 選択してください --</option>
-                    {promptFamilies.map((f: PromptFamily) => (
-                      <option key={f.id} value={f.id}>
-                        {f.name ?? `Family #${f.id}`}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-
-                {/* バージョン選択 */}
                 <div className={styles.fieldGroup}>
                   <label htmlFor="select-version" className={styles.fieldLabel}>
                     プロンプトバージョン
@@ -895,26 +905,35 @@ export function RunsPage() {
                       setSelectedVersionId(e.target.value === "" ? "" : Number(e.target.value))
                     }
                     className={styles.fieldSelect}
-                    disabled={selectedFamilyId === ""}
                   >
-                    <option value="">-- 選択してください --</option>
-                    {familyVersions.map((v: PromptVersion) => (
-                      <option key={v.id} value={v.id}>
-                        v{v.version}
-                        {v.name ? ` - ${v.name}` : ""}
-                        {v.is_selected ? " ★" : ""}
-                      </option>
-                    ))}
+                    <option value="">
+                      {allVersions.length > 0
+                        ? "-- 未選択時は推奨バージョンを使用 --"
+                        : "-- プロンプトがありません --"}
+                    </option>
+                    {allVersions.map((v: PromptVersion) => {
+                      const family = promptFamilies.find(
+                        (f: PromptFamily) => f.id === v.prompt_family_id,
+                      );
+                      return (
+                        <option key={v.id} value={v.id}>
+                          {family?.name ?? `Family ${v.prompt_family_id}`} v{v.version}
+                          {v.name ? ` - ${v.name}` : ""}
+                          {v.is_selected ? " ★" : ""}
+                        </option>
+                      );
+                    })}
                   </select>
-                  {selectedFamilyId === "" && (
-                    <p className={styles.fieldHint}>先にファミリーを選択してください。</p>
+                  {allVersions.length > 0 && (
+                    <p className={styles.fieldHint}>
+                      prompt family の選択は不要です。選択済みか最新のバージョンを既定値にします。
+                    </p>
                   )}
                 </div>
 
-                {/* テストケース選択 */}
                 <div className={styles.fieldGroupLg}>
                   <label htmlFor="select-test-case" className={styles.fieldLabel}>
-                    テストケース
+                    テストケース（任意）
                   </label>
                   <select
                     id="select-test-case"
@@ -924,21 +943,24 @@ export function RunsPage() {
                     }
                     className={styles.fieldSelect}
                   >
-                    <option value="">-- 選択してください --</option>
+                    <option value="">-- 未選択なら かんたん実行 --</option>
                     {testCases.map((tc: TestCase) => (
                       <option key={tc.id} value={tc.id}>
                         {tc.title}
                       </option>
                     ))}
                   </select>
-                  {testCases.length === 0 && (
+                  {testCases.length === 0 ? (
                     <p className={styles.fieldHint}>
-                      テストケースがありません。先にテストケースを作成してください。
+                      テストケースがなくても、プロンプト単体の quick run は実行できます。
+                    </p>
+                  ) : (
+                    <p className={styles.fieldHint}>
+                      未選択なら prompt-only 実行、選択すると評価 Run として実行します。
                     </p>
                   )}
                 </div>
 
-                {/* 実行プロファイル選択 */}
                 <div className={styles.fieldGroup}>
                   <label htmlFor="select-profile" className={styles.fieldLabel}>
                     実行プロファイル
@@ -995,7 +1017,7 @@ export function RunsPage() {
               </div>
             )}
 
-            {step === "input" && selectedVersion && selectedTestCase && (
+            {step === "input" && selectedVersion && (
               <div>
                 <div className={styles.stepHeader}>
                   <button
@@ -1008,7 +1030,7 @@ export function RunsPage() {
                   <span className={styles.stepLabel}>
                     v{selectedVersion.version}
                     {selectedVersion.name ? ` - ${selectedVersion.name}` : ""} ×{" "}
-                    {selectedTestCase.title}
+                    {selectedTestCase?.title ?? "かんたん実行"}
                   </span>
                 </div>
 
@@ -1016,43 +1038,73 @@ export function RunsPage() {
 
                 <div className={styles.twoColumns}>
                   <div className={styles.panel}>
-                    <h3 className={styles.panelTitle}>テストケース: {selectedTestCase.title}</h3>
+                    <h3 className={styles.panelTitle}>
+                      {selectedTestCase
+                        ? `テストケース: ${selectedTestCase.title}`
+                        : "かんたん実行"}
+                    </h3>
 
-                    <div className={styles.chatList}>
-                      {selectedTestCase.turns.map((turn, index) => (
-                        <div
-                          key={`turn-${
-                            // biome-ignore lint/suspicious/noArrayIndexKey: ターン配列は順序で管理するため index をキーとして使用
-                            index
-                          }`}
-                          className={`${styles.bubbleWrapper} ${turn.role === "user" ? styles.bubbleWrapperUser : styles.bubbleWrapperAssistant}`}
-                        >
-                          <span className={styles.bubbleRole}>
-                            {turn.role === "user" ? "User" : "Assistant"}
-                          </span>
-                          <div
-                            className={`${styles.bubble} ${turn.role === "user" ? styles.bubbleUser : styles.bubbleAssistant}`}
-                          >
-                            {turn.content}
-                          </div>
+                    {selectedTestCase ? (
+                      <>
+                        <div className={styles.chatList}>
+                          {selectedTestCase.turns.map((turn, index) => (
+                            <div
+                              key={`turn-${
+                                // biome-ignore lint/suspicious/noArrayIndexKey: ターン配列は順序で管理するため index をキーとして使用
+                                index
+                              }`}
+                              className={`${styles.bubbleWrapper} ${turn.role === "user" ? styles.bubbleWrapperUser : styles.bubbleWrapperAssistant}`}
+                            >
+                              <span className={styles.bubbleRole}>
+                                {turn.role === "user" ? "User" : "Assistant"}
+                              </span>
+                              <div
+                                className={`${styles.bubble} ${turn.role === "user" ? styles.bubbleUser : styles.bubbleAssistant}`}
+                              >
+                                {turn.content}
+                              </div>
+                            </div>
+                          ))}
                         </div>
-                      ))}
-                    </div>
 
-                    {selectedTestCase.context_content && (
-                      <div className={styles.expectedBox}>
-                        <p className={styles.expectedLabel}>コンテキスト</p>
-                        <p className={styles.expectedText}>{selectedTestCase.context_content}</p>
-                      </div>
-                    )}
+                        {selectedTestCase.context_content && (
+                          <div className={styles.expectedBox}>
+                            <p className={styles.expectedLabel}>コンテキスト</p>
+                            <p className={styles.expectedText}>
+                              {selectedTestCase.context_content}
+                            </p>
+                          </div>
+                        )}
 
-                    {selectedTestCase.expected_description && (
-                      <div className={styles.expectedBox}>
-                        <p className={styles.expectedLabel}>期待される応答の説明</p>
-                        <p className={styles.expectedText}>
-                          {selectedTestCase.expected_description}
+                        {selectedTestCase.expected_description && (
+                          <div className={styles.expectedBox}>
+                            <p className={styles.expectedLabel}>期待される応答の説明</p>
+                            <p className={styles.expectedText}>
+                              {selectedTestCase.expected_description}
+                            </p>
+                          </div>
+                        )}
+                      </>
+                    ) : (
+                      <>
+                        <p className={styles.inputDescription}>
+                          テストケース未選択のため quick run
+                          です。必要ならユーザー入力を1件だけ付けて実行できます。
                         </p>
-                      </div>
+                        <div className={styles.fieldGroupLg}>
+                          <label htmlFor="ad-hoc-input" className={styles.fieldLabel}>
+                            任意入力
+                          </label>
+                          <textarea
+                            id="ad-hoc-input"
+                            value={adHocInput}
+                            onChange={(e) => setAdHocInput(e.target.value)}
+                            placeholder="未入力ならプロンプト単体で実行します。"
+                            className={styles.responseTextarea}
+                            rows={8}
+                          />
+                        </div>
+                      </>
                     )}
                   </div>
 
@@ -1114,7 +1166,7 @@ export function RunsPage() {
               </div>
             )}
 
-            {step === "saved" && savedRun && selectedVersion && selectedTestCase && (
+            {step === "saved" && savedRun && selectedVersion && (
               <div>
                 <div className={styles.successBanner}>Run を保存しました（ID: {savedRun.id}）</div>
 
@@ -1129,7 +1181,7 @@ export function RunsPage() {
                   <p className={styles.savedMeta}>
                     v{selectedVersion.version}
                     {selectedVersion.name ? ` - ${selectedVersion.name}` : ""} ×{" "}
-                    {selectedTestCase.title} · {formatDate(savedRun.created_at)}
+                    {getTestCaseLabel(savedRun.test_case_id)} · {formatDate(savedRun.created_at)}
                   </p>
                   <div className={`${styles.chatList} ${styles.chatListStatic}`}>
                     {savedRun.conversation.map((msg, index) => (
