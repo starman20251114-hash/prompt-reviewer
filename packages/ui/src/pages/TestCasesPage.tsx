@@ -1,6 +1,7 @@
 import { useMutation, useQueries, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useState } from "react";
 import { useParams, useSearchParams } from "react-router";
+import { useI18n } from "../i18n/I18nProvider";
 import {
   type ContextAssetSummary,
   type Project,
@@ -17,7 +18,6 @@ import {
   setTestCaseProjects,
   updateIndependentTestCase,
 } from "../lib/api";
-import { useI18n } from "../i18n/I18nProvider";
 import { getStoredActiveLabelId } from "../lib/useActiveLabel";
 import styles from "./TestCasesPage.module.css";
 
@@ -269,9 +269,7 @@ function ContextAssetPicker({
           {isImporting ? "取込中..." : "内容を取り込む"}
         </button>
       </div>
-      <p className={styles.contextImportHint}>
-        {t("testCases.contextImportHint")}
-      </p>
+      <p className={styles.contextImportHint}>{t("testCases.contextImportHint")}</p>
     </div>
   );
 }
@@ -366,7 +364,6 @@ function TestCaseModal({
     });
   }
 
-
   const isSubmittable = formData.title.trim() !== "";
 
   return (
@@ -433,7 +430,6 @@ function TestCaseModal({
               className={styles.fieldTextareaContext}
             />
           </div>
-
 
           <div className={styles.fieldGroupLg}>
             <label htmlFor="test-case-expected" className={styles.fieldLabel}>

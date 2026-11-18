@@ -46,12 +46,10 @@ export const enMessages = {
   },
   testCases: {
     title: "Test Case Management",
-    description:
-      "Manage test cases and link context assets or projects later as needed.",
+    description: "Manage test cases and link context assets or projects later as needed.",
     turnUser: "User",
     turnAssistant: "Assistant",
-    contextImportHint:
-      "Import the selected asset content into the context field as a snapshot.",
+    contextImportHint: "Import the selected asset content into the context field as a snapshot.",
     titleHint:
       "If the prompt does not reference anything else, you can create it by entering only a title.",
     projectLabelHint: "Tag any projects you need.",
