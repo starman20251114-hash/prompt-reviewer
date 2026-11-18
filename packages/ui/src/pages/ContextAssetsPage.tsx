@@ -9,6 +9,7 @@ import { EditorView } from "@codemirror/view";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import CodeMirror from "@uiw/react-codemirror";
 import { useEffect, useRef, useState } from "react";
+import { useI18n } from "../i18n/I18nProvider";
 import {
   type ContextAssetDetail,
   type ContextAssetFilters,
@@ -22,7 +23,6 @@ import {
   setContextAssetProjects,
   updateContextAsset,
 } from "../lib/api";
-import { useI18n } from "../i18n/I18nProvider";
 import { getStoredActiveLabelId } from "../lib/useActiveLabel";
 import styles from "./ContextAssetsPage.module.css";
 
@@ -469,9 +469,7 @@ export function ContextAssetsPage() {
                   className={styles.propertiesToggle}
                 >
                   {t("contextAssets.properties")}
-                  <span className={styles.propertiesToggleIcon}>
-                    {showProperties ? "▾" : "▸"}
-                  </span>
+                  <span className={styles.propertiesToggleIcon}>{showProperties ? "▾" : "▸"}</span>
                 </button>
                 {showProperties && (
                   <div className={styles.propertiesBody}>
