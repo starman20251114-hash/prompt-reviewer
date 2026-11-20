@@ -84,7 +84,9 @@ function countSqlStatements(sql: string): number {
 const KNOWN_MULTI_STATEMENT_MIGRATIONS = ["0011_outstanding_the_call", "0012_sad_white_tiger"];
 
 /**
- * when が直前までの最大値より古い既存のマイグレーション（#211 で対応予定）。
+ * when が直前までの最大値より古い既存のマイグレーション（#211）。
+ * journal を直すと、手作業で列を追加済みのDBで再適用されて migrate が失敗するため、journal は変更しない。
+ * 既存DBで飛ばされた 0013・0016 は、migrate の後に実行する修復（db/skipped-migrations-repair.ts）で補う。
  * ここに新しいエントリを追加してはいけない。
  */
 const KNOWN_NON_MONOTONIC_WHEN = [

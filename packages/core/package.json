@@ -15,7 +15,7 @@
     "build": "tsc",
     "build:watch": "tsc --watch --preserveWatchOutput",
     "generate": "drizzle-kit generate",
-    "migrate": "drizzle-kit migrate",
+    "migrate": "drizzle-kit migrate && tsx src/db/repair-skipped-migrations-cli.ts",
     "seed": "tsx src/seed.ts"
   },
   "dependencies": {

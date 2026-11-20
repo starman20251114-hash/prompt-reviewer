@@ -5,5 +5,13 @@
 export * from "./schema/index";
 export * from "./llm/index.js";
 export { db } from "./db/client";
-export { assertRequiredSchema, getMissingSchemaColumns } from "./db/schema-check";
+export { assertRequiredSchema, getMissingSchemaColumns, getSchemaIssues } from "./db/schema-check";
+export { inspectSchema } from "./db/schema-inspection";
+export type { SchemaIssues } from "./db/schema-inspection";
+export {
+  SkippedMigrationsRepairError,
+  repairSkippedMigrations,
+} from "./db/skipped-migrations-repair";
+export type { SkippedMigrationsRepairResult } from "./db/skipped-migrations-repair";
+export { resolveSqliteFilePath } from "./db/sqlite-path";
 export type { DB } from "./db/client";
