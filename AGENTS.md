@@ -47,11 +47,13 @@ schema: [
 ]
 ```
 
-### better-sqlite3 を使うテスト
+### DB を使うテストの方針
 
-- Vitest から DB 接続まで行うとネイティブビルド起因で不安定になりやすい
-- スキーマのテストは `expectTypeOf` を使った型検証中心にする
-- 実マイグレーションの確認は `pnpm --filter @prompt-reviewer/core migrate` で行う
+- クエリ条件・絞り込み・制約など、実際の DB 動作を検証する統合テストでは in-memory SQLite を使う。DB は `packages/server/src/test-utils/create-test-db.ts` の `createTestDb()` で作成し、テストごとに作成して `afterEach` で閉じる（例: `packages/server/src/routes/runs.integration.test.ts`）
+- DB を必要としない単体テスト（入力検証・レスポンス整形など）は、従来どおりモックを使ってよい
+- モック DB は `where()` などの条件を無視して固定値を返すため、絞り込みの正しさは検証できない。テスト環境の問題を回避するためだけに、検出能力の低いモックテストへ置き換えない
+- スキーマの型テストは `expectTypeOf` で行う
+- 実 DB ファイルへのマイグレーション確認は `pnpm --filter @prompt-reviewer/core migrate` で行う
 
 ## Git / Worktree 必須ルール
 
