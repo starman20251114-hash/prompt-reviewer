@@ -100,6 +100,12 @@
   font-family: inherit;
 }
 
+.fieldInput::placeholder,
+.fieldTextarea::placeholder {
+  color: var(--c-subtext);
+  opacity: 0.45;
+}
+
 .formActions {
   display: flex;
   gap: 12px;

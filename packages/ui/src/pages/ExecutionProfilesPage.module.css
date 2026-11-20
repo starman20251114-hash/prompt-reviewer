@@ -36,7 +36,7 @@
   display: flex;
   flex-direction: column;
   gap: 12px;
-  background: var(--c-overlay);
+  background: var(--c-card);
   border: 1px solid var(--c-border);
   border-radius: 12px;
   padding: 20px;
@@ -90,7 +90,7 @@
 
 .profileCardActive {
   border-color: var(--c-accent);
-  background: color-mix(in srgb, var(--c-accent) 12%, var(--c-overlay));
+  background: color-mix(in srgb, var(--c-accent) 10%, var(--c-card));
 }
 
 .profileName {
@@ -131,7 +131,7 @@
 }
 
 .section {
-  background: var(--c-overlay);
+  background: var(--c-card);
   border: 1px solid var(--c-border);
   border-radius: 12px;
   padding: 24px;
@@ -202,11 +202,20 @@
   font: inherit;
   font-size: 14px;
   box-sizing: border-box;
+  -webkit-text-fill-color: var(--c-text);
+  caret-color: var(--c-text);
 }
 
 .fieldTextarea {
   resize: vertical;
   min-height: 88px;
+}
+
+.fieldInput::placeholder,
+.fieldTextarea::placeholder,
+.apiKeyInput::placeholder {
+  color: var(--c-subtext);
+  opacity: 0.45;
 }
 
 .fieldInput:focus,
@@ -215,6 +224,19 @@
 .apiKeyInput:focus {
   border-color: var(--c-accent);
   outline: none;
+}
+
+.fieldInput:-webkit-autofill,
+.fieldInput:-webkit-autofill:hover,
+.fieldInput:-webkit-autofill:focus,
+.fieldInput:-webkit-autofill:active,
+.apiKeyInput:-webkit-autofill,
+.apiKeyInput:-webkit-autofill:hover,
+.apiKeyInput:-webkit-autofill:focus,
+.apiKeyInput:-webkit-autofill:active {
+  -webkit-box-shadow: 0 0 0 1000px var(--c-card) inset !important;
+  -webkit-text-fill-color: var(--c-text) !important;
+  caret-color: var(--c-text);
 }
 
 .fieldHint,
@@ -264,12 +286,11 @@
 }
 
 .primaryButton {
-  padding: 10px 24px;
-  background: var(--c-accent);
-  border: none;
-  border-radius: 8px;
-  color: #1e1e2e;
-  font-size: 14px;
+  composes: btnPrimary from '../styles/shared.module.css';
+  padding: 9px 16px;
+  border-radius: 6px;
+  color: var(--c-overlay);
+  font-size: 13px;
   font-weight: 600;
   cursor: pointer;
   transition: opacity 0.15s;
@@ -285,10 +306,10 @@
 }
 
 .secondaryButton {
+  composes: btnSecondary from '../styles/shared.module.css';
   padding: 9px 16px;
-  background: var(--c-card);
-  border: 1px solid var(--c-border);
-  border-radius: 8px;
+  border-radius: 6px;
+  background: transparent;
   color: var(--c-subtext);
   font-size: 13px;
   cursor: pointer;
@@ -305,8 +326,8 @@
 .dangerButton {
   padding: 9px 16px;
   background: transparent;
-  border: 1px solid rgba(243, 139, 168, 0.45);
-  border-radius: 8px;
+  border: 1px solid var(--c-danger);
+  border-radius: 6px;
   color: var(--c-danger);
   font-size: 13px;
   cursor: pointer;

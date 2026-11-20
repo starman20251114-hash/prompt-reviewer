@@ -5,6 +5,7 @@ import { generateAnnotationPrompt } from "../lib/annotationPrompt";
 import {
   type AnnotationLabel,
   ApiError,
+  type PromptFamily,
   createAnnotationLabel,
   createAnnotationTask,
   createIndependentPromptVersion,
@@ -13,7 +14,6 @@ import {
   deleteAnnotationTask,
   getAnnotationTask,
   getAnnotationTasks,
-  getProject,
   getPromptFamilies,
   setPromptVersionProjects,
   updateAnnotationLabel,
@@ -113,6 +113,25 @@ function buildLabelForm(label?: AnnotationLabel): LabelFormState {
   };
 }
 
+function buildAutoPromptFamilyName(promptFamilies: PromptFamily[]): string {
+  const prefix = "自動カテゴリ抽出用";
+  const pattern = /^自動カテゴリ抽出用（(\d+)）$/;
+  const maxNumber = promptFamilies.reduce((currentMax, family) => {
+    const name = family.name?.trim() ?? "";
+    if (name === prefix) {
+      return Math.max(currentMax, 1);
+    }
+
+    const match = name.match(pattern);
+    if (!match) return currentMax;
+
+    const parsed = Number(match[1]);
+    return Number.isFinite(parsed) ? Math.max(currentMax, parsed) : currentMax;
+  }, 0);
+
+  return `${prefix}（${maxNumber + 1}）`;
+}
+
 export function AnnotationTaskSettingsPage() {
   const projectId = getStoredActiveLabelId() ?? Number.NaN;
   const queryClient = useQueryClient();
@@ -127,12 +146,6 @@ export function AnnotationTaskSettingsPage() {
   const [feedbackTone, setFeedbackTone] = useState<"success" | "error" | null>(null);
   const [taskFormMode, setTaskFormMode] = useState<"create" | "edit" | null>(null);
   const [labelCreateOpen, setLabelCreateOpen] = useState(false);
-
-  const { data: project } = useQuery({
-    queryKey: ["project", projectId],
-    queryFn: () => getProject(projectId),
-    enabled: !Number.isNaN(projectId),
-  });
 
   const tasksQuery = useQuery({
     queryKey: ["annotation-tasks"],
@@ -334,7 +347,8 @@ export function AnnotationTaskSettingsPage() {
 
       let familyId: number;
       if (saveTargetFamilyId === "new") {
-        const family = await createPromptFamily({ name: newFamilyName.trim() || undefined });
+        const familyName = newFamilyName.trim() || buildAutoPromptFamilyName(promptFamilies);
+        const family = await createPromptFamily({ name: familyName });
         await refetchPromptFamilies();
         setSaveTargetFamilyId(family.id);
         familyId = family.id;
@@ -365,10 +379,16 @@ export function AnnotationTaskSettingsPage() {
   function handleGeneratePrompt() {
     const labels = sortedLabels;
     const taskName = taskDetailQuery.data?.name ?? "";
+    const extractionTarget =
+      promptGenTarget.trim() ||
+      labels
+        .map((label) => label.name.trim())
+        .filter((name) => name.length > 0)
+        .join("、");
     const prompt = generateAnnotationPrompt({
       taskName,
       labels,
-      extractionTarget: promptGenTarget.trim(),
+      extractionTarget,
       criteria: promptGenCriteria.trim() || undefined,
     });
     setGeneratedPrompt(prompt);
@@ -399,11 +419,10 @@ export function AnnotationTaskSettingsPage() {
     <div className={styles.root}>
       <div className={styles.pageHeader}>
         <div>
-          <p className={styles.eyebrow}>Annotation Task Settings</p>
           <h2 className={styles.pageTitle}>抽出</h2>
           <p className={styles.pageDescription}>
-            {project?.name ?? "全体"} で使う annotation task と label を準備します。
-            現在の初期実装では output mode は <code>span_label</code> 固定です。
+            抽出タスクとラベルを準備します。
+            現在の初期実装では出力形式は <code>span_label</code> 固定です。
           </p>
           <AnnotationSectionTabs />
         </div>
@@ -419,7 +438,7 @@ export function AnnotationTaskSettingsPage() {
           <div className={styles.sectionHeader}>
             <div>
               <h3 className={styles.sectionTitle}>タスク一覧</h3>
-              <p className={styles.sectionHint}>Review 用に使う task を選択できます。</p>
+              <p className={styles.sectionHint}>自動抽出用に使うタスクを選択できます。</p>
             </div>
           </div>
 
@@ -430,7 +449,7 @@ export function AnnotationTaskSettingsPage() {
             )}
             {!tasksQuery.isLoading && (tasksQuery.data?.length ?? 0) === 0 && (
               <p className={styles.stateText}>
-                まだ task はありません。まず 1 件追加してください。
+                まだタスクはありません。まず 1 件追加してください。
               </p>
             )}
             {(tasksQuery.data ?? []).map((task) => {
@@ -464,17 +483,9 @@ export function AnnotationTaskSettingsPage() {
                   <div>
                     <h3 className={styles.sectionTitle}>タスク設定</h3>
                     <p className={styles.sectionHint}>
-                      Review に使う task 本体の名前と説明を編集します。
+                      レビューに使うタスク本体の名前と説明を編集します。
                     </p>
                   </div>
-                  <button
-                    type="button"
-                    className={styles.dangerButton}
-                    onClick={() => deleteTaskMutation.mutate()}
-                    disabled={deleteTaskMutation.isPending}
-                  >
-                    {deleteTaskMutation.isPending ? "削除中..." : "削除"}
-                  </button>
                 </div>
 
                 {taskFormMode === "edit" ? (
@@ -489,6 +500,7 @@ export function AnnotationTaskSettingsPage() {
                       <div className={styles.fieldGroup}>
                         <label className={styles.fieldLabel} htmlFor="task-name">
                           タスク名
+                          <span className={styles.requiredMark}>*</span>
                         </label>
                         <input
                           id="task-name"
@@ -502,7 +514,7 @@ export function AnnotationTaskSettingsPage() {
 
                       <div className={styles.fieldGroup}>
                         <label className={styles.fieldLabel} htmlFor="task-output-mode">
-                          Output mode
+                          出力形式
                         </label>
                         <input
                           id="task-output-mode"
@@ -519,7 +531,7 @@ export function AnnotationTaskSettingsPage() {
                       </label>
                       <textarea
                         id="task-description"
-                        className={styles.fieldTextarea}
+                        className={`${styles.fieldTextarea} ${styles.compactTextarea}`}
                         value={taskForm.description}
                         onChange={(event) =>
                           setTaskForm((current) => ({
@@ -538,7 +550,7 @@ export function AnnotationTaskSettingsPage() {
                         className={styles.primaryButton}
                         disabled={!canUpdateTask}
                       >
-                        {updateTaskMutation.isPending ? "保存中..." : "タスク設定を保存"}
+                        {updateTaskMutation.isPending ? "保存中..." : "保存"}
                       </button>
                       <button
                         type="button"
@@ -547,6 +559,14 @@ export function AnnotationTaskSettingsPage() {
                         disabled={updateTaskMutation.isPending}
                       >
                         キャンセル
+                      </button>
+                      <button
+                        type="button"
+                        className={`${styles.dangerButton} ${styles.formFooterDanger}`}
+                        onClick={() => deleteTaskMutation.mutate()}
+                        disabled={deleteTaskMutation.isPending}
+                      >
+                        {deleteTaskMutation.isPending ? "削除中..." : "削除"}
                       </button>
                     </div>
                   </form>
@@ -558,7 +578,7 @@ export function AnnotationTaskSettingsPage() {
                         <dd className={styles.summaryValue}>{taskDetailQuery.data.name}</dd>
                       </div>
                       <div className={styles.summaryRow}>
-                        <dt className={styles.summaryLabel}>Output mode</dt>
+                        <dt className={styles.summaryLabel}>出力形式</dt>
                         <dd className={styles.summaryValue}>span_label</dd>
                       </div>
                       <div className={styles.summaryRow}>
@@ -571,59 +591,64 @@ export function AnnotationTaskSettingsPage() {
                   </div>
                 )}
 
-                <div className={styles.leftAlignedAction}>
-                  <button
-                    type="button"
-                    className={styles.secondaryButton}
-                    onClick={() =>
-                      setTaskFormMode((current) => (current === "edit" ? null : "edit"))
-                    }
-                    aria-expanded={taskFormMode === "edit"}
-                  >
-                    {taskFormMode === "edit" ? "タスク編集を閉じる" : "タスクを編集"}
-                  </button>
-                </div>
+                {taskFormMode !== "edit" && (
+                  <div className={styles.leftAlignedAction}>
+                    <button
+                      type="button"
+                      className={styles.secondaryButton}
+                      onClick={() => setTaskFormMode("edit")}
+                      aria-expanded={false}
+                    >
+                      タスクを編集
+                    </button>
+                  </div>
+                )}
               </section>
             )}
 
           <div className={styles.createTaskSection}>
             {taskFormMode === "create" && (
               <form
-                className={styles.panel}
+                className={`${styles.panel} ${styles.stackedForm}`}
                 onSubmit={(event) => {
                   event.preventDefault();
                   createTaskMutation.mutate();
                 }}
               >
-                <label className={styles.fieldLabel} htmlFor="new-task-name">
-                  新規タスク名
-                </label>
-                <input
-                  id="new-task-name"
-                  className={styles.fieldInput}
-                  value={newTaskForm.name}
-                  onChange={(event) =>
-                    setNewTaskForm((current) => ({ ...current, name: event.target.value }))
-                  }
-                  placeholder="例: 回答品質アノテーション"
-                />
+                <div className={styles.fieldGroup}>
+                  <label className={styles.fieldLabel} htmlFor="new-task-name">
+                    新規タスク名
+                    <span className={styles.requiredMark}>*</span>
+                  </label>
+                  <input
+                    id="new-task-name"
+                    className={styles.fieldInput}
+                    value={newTaskForm.name}
+                    onChange={(event) =>
+                      setNewTaskForm((current) => ({ ...current, name: event.target.value }))
+                    }
+                    placeholder="例: 回答品質アノテーション"
+                  />
+                </div>
 
-                <label className={styles.fieldLabel} htmlFor="new-task-description">
-                  説明
-                </label>
-                <textarea
-                  id="new-task-description"
-                  className={styles.fieldTextarea}
-                  value={newTaskForm.description}
-                  onChange={(event) =>
-                    setNewTaskForm((current) => ({ ...current, description: event.target.value }))
-                  }
-                  placeholder="任意: この task の目的や判定基準"
-                  rows={4}
-                />
+                <div className={styles.fieldGroup}>
+                  <label className={styles.fieldLabel} htmlFor="new-task-description">
+                    説明
+                  </label>
+                  <textarea
+                    id="new-task-description"
+                    className={`${styles.fieldTextarea} ${styles.compactTextarea}`}
+                    value={newTaskForm.description}
+                    onChange={(event) =>
+                      setNewTaskForm((current) => ({ ...current, description: event.target.value }))
+                    }
+                    placeholder="任意: このタスクの目的や判定基準"
+                    rows={4}
+                  />
+                </div>
 
                 <div className={styles.outputModeBox}>
-                  <span className={styles.outputModeLabel}>Output mode</span>
+                  <span className={styles.outputModeLabel}>出力形式</span>
                   <strong className={styles.outputModeValue}>span_label</strong>
                   <p className={styles.outputModeHint}>初期実装では固定です。</p>
                 </div>
@@ -664,7 +689,7 @@ export function AnnotationTaskSettingsPage() {
             <div className={styles.emptyState}>
               <h3 className={styles.sectionTitle}>タスクを選択してください</h3>
               <p className={styles.sectionHint}>
-                左側から task を選ぶと、説明や label を編集できます。
+                左側からタスクを選ぶと、説明やラベルを編集できます。
               </p>
             </div>
           ) : taskDetailQuery.isLoading ? (
@@ -681,7 +706,7 @@ export function AnnotationTaskSettingsPage() {
                 <div>
                   <h3 className={styles.sectionTitle}>ラベル設定</h3>
                   <p className={styles.sectionHint}>
-                    カテゴリキー・カテゴリ名・色・表示順を UI から管理できます。
+                    カテゴリキー・カテゴリ名・色・表示順を画面から管理できます。
                   </p>
                 </div>
               </div>
@@ -690,7 +715,7 @@ export function AnnotationTaskSettingsPage() {
                 {sortedLabels.length === 0 ? (
                   <div className={styles.emptyState}>
                     <p className={styles.stateText}>
-                      まだ label はありません。Review で選びたいラベルを追加してください。
+                      まだラベルはありません。自動抽出で選びたいラベルを追加してください。
                     </p>
                   </div>
                 ) : (
@@ -704,7 +729,7 @@ export function AnnotationTaskSettingsPage() {
                           <div>
                             <h4 className={styles.labelTitle}>{label.name}</h4>
                             <p className={styles.labelMeta}>
-                              key: <code>{label.key}</code>
+                              キー: <code>{label.key}</code>
                             </p>
                           </div>
                           <div className={styles.labelActions}>
@@ -760,7 +785,7 @@ export function AnnotationTaskSettingsPage() {
                             />
                             {isEditing && (
                               <p className={styles.fieldHint}>
-                                未入力ならカテゴリ名から自動生成します。
+                                未入力ならアイデアから自動生成します。
                               </p>
                             )}
                           </div>
@@ -871,9 +896,9 @@ export function AnnotationTaskSettingsPage() {
                           onChange={(event) =>
                             setNewLabelForm((current) => ({ ...current, key: event.target.value }))
                           }
-                          placeholder="例: missing_evidence"
+                          placeholder="例: idea"
                         />
-                        <p className={styles.fieldHint}>未入力ならカテゴリ名から自動生成します。</p>
+                        <p className={styles.fieldHint}>未入力ならアイデアから自動生成します。</p>
                       </div>
 
                       <div className={styles.fieldGroup}>
@@ -887,8 +912,9 @@ export function AnnotationTaskSettingsPage() {
                           onChange={(event) =>
                             setNewLabelForm((current) => ({ ...current, name: event.target.value }))
                           }
-                          placeholder="未入力ならカテゴリキーをそのまま使います"
+                          placeholder="例: アイデア"
                         />
+                        <p className={styles.fieldHint}>未入力ならカテゴリキーをそのまま使います。</p>
                       </div>
 
                       <div className={styles.fieldGroup}>
@@ -980,8 +1006,8 @@ export function AnnotationTaskSettingsPage() {
                   aria-expanded={promptGenOpen}
                 >
                   {promptGenOpen
-                    ? "▲ アノテーション用プロンプトを閉じる"
-                    : "▼ アノテーション用プロンプトを生成"}
+                    ? "▲ 自動抽出用プロンプトを閉じる"
+                    : "▼ 自動抽出用プロンプトを生成"}
                 </button>
 
                 {promptGenOpen && (
@@ -989,15 +1015,17 @@ export function AnnotationTaskSettingsPage() {
                     <div className={styles.fieldGroup}>
                       <label className={styles.fieldLabel} htmlFor="prompt-gen-target">
                         抽出対象
-                        <span className={styles.requiredMark}>*</span>
                       </label>
                       <input
                         id="prompt-gen-target"
                         className={styles.fieldInput}
                         value={promptGenTarget}
                         onChange={(e) => setPromptGenTarget(e.target.value)}
-                        placeholder="例: AIとの会話ログ、学習メモ、議事録"
+                        placeholder="例: アイデア"
                       />
+                      <p className={styles.fieldHint}>
+                        未入力の場合は、設定されたラベルのカテゴリ名を「、」区切りで使います。
+                      </p>
                     </div>
 
                     <div className={styles.fieldGroup}>
@@ -1012,6 +1040,9 @@ export function AnnotationTaskSettingsPage() {
                         placeholder="例: アイデアとは新しい発見や方針転換を含む記述を指す"
                         rows={3}
                       />
+                      <p className={styles.fieldHint}>
+                        必要なすべてのカテゴリに関する抽出判定条件を記述してください。
+                      </p>
                     </div>
 
                     <div className={styles.formFooter}>
@@ -1019,7 +1050,7 @@ export function AnnotationTaskSettingsPage() {
                         type="button"
                         className={styles.primaryButton}
                         onClick={handleGeneratePrompt}
-                        disabled={!promptGenTarget.trim() || sortedLabels.length === 0}
+                        disabled={sortedLabels.length === 0}
                       >
                         生成
                       </button>

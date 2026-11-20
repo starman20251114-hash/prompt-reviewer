@@ -18,14 +18,15 @@ export const enMessages = {
     tabs: {
       ariaLabel: "Extraction page tabs",
       settings: "Settings",
-      review: "Review",
-      goldAnnotations: "Gold Annotations",
+      review: "Review Results",
+      goldAnnotations: "Confirmed Labels",
     },
   },
   prompts: {
     title: "Prompt Management",
-    description: "Manage history by prompt family and filter by project label when needed.",
+    description: "Manage versions by prompt family and filter by project label when needed.",
     familyPanelLabel: "Prompt Families",
+    versionPanelLabel: "Prompt Versions",
     familySummaryLabel: "Family",
     projectFilterLabel: "Project Filter",
     createFamily: "+ Create Family",

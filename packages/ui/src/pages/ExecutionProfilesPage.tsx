@@ -47,6 +47,7 @@ export function ExecutionProfilesPage() {
 
   const [apiKeyInput, setApiKeyInput] = useState(apiKey);
   const [selectedProfileId, setSelectedProfileId] = useState<number | null>(null);
+  const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [formState, setFormState] = useState<ProfileFormState>(DEFAULT_FORM_STATE);
   const [saveFeedback, setSaveFeedback] = useState<SaveFeedback>(null);
   const [apiKeySaved, setApiKeySaved] = useState(false);
@@ -95,6 +96,7 @@ export function ExecutionProfilesPage() {
       return;
     }
 
+    setIsCreateOpen(false);
     setFormState({
       name: selectedProfile.name,
       description: selectedProfile.description ?? "",
@@ -145,6 +147,7 @@ export function ExecutionProfilesPage() {
     },
     onSuccess: async (savedProfile) => {
       setSaveFeedback("success");
+      setIsCreateOpen(false);
       setSelectedProfileId(savedProfile.id);
       await queryClient.invalidateQueries({ queryKey: ["execution-profiles"] });
       setTimeout(() => setSaveFeedback(null), 3000);
@@ -159,6 +162,7 @@ export function ExecutionProfilesPage() {
     mutationFn: (id: number) => deleteExecutionProfile(id),
     onSuccess: async () => {
       setSelectedProfileId(null);
+      setIsCreateOpen(false);
       setFormState(DEFAULT_FORM_STATE);
       await queryClient.invalidateQueries({ queryKey: ["execution-profiles"] });
     },
@@ -172,9 +176,13 @@ export function ExecutionProfilesPage() {
   }
 
   function handleCreateNew() {
-    setSelectedProfileId(null);
-    setFormState(DEFAULT_FORM_STATE);
-    setSaveFeedback(null);
+    setIsCreateOpen((current) => {
+      const next = !current;
+      setSelectedProfileId(null);
+      setFormState(DEFAULT_FORM_STATE);
+      setSaveFeedback(null);
+      return next;
+    });
   }
 
   function handleDelete() {
@@ -219,11 +227,10 @@ export function ExecutionProfilesPage() {
     <div className={styles.root}>
       <div className={styles.pageHeader}>
         <div>
-          <p className={styles.eyebrow}>Execution Profiles</p>
           <h2 className={styles.pageTitle}>実行設定</h2>
         </div>
         <button type="button" onClick={handleCreateNew} className={styles.primaryButton}>
-          新規プロファイル
+          {isCreateOpen ? "新規プロファイル作成を閉じる" : "新規プロファイル"}
         </button>
       </div>
 
@@ -239,7 +246,11 @@ export function ExecutionProfilesPage() {
               <button
                 type="button"
                 key={profile.id}
-                onClick={() => setSelectedProfileId(profile.id)}
+                onClick={() => {
+                  setIsCreateOpen(false);
+                  setSelectedProfileId(profile.id);
+                  setSaveFeedback(null);
+                }}
                 className={`${styles.profileCard} ${selectedProfileId === profile.id ? styles.profileCardActive : ""}`}
               >
                 <span className={styles.profileName}>{profile.name}</span>
@@ -258,7 +269,19 @@ export function ExecutionProfilesPage() {
         </aside>
 
         <div className={styles.content}>
-          <section className={styles.section}>
+          {!(selectedProfile || isCreateOpen) && (
+            <section className={styles.section}>
+              <div className={styles.emptyCard}>
+                <p className={styles.emptyTitle}>新規プロファイルはまだ開いていません</p>
+                <p className={styles.emptyText}>
+                  新規プロファイルボタンを押すと作成フォームが開きます。
+                </p>
+              </div>
+            </section>
+          )}
+
+          {(selectedProfile || isCreateOpen) && (
+            <section className={styles.section}>
             <div className={styles.sectionHeader}>
               <div>
                 <h3 className={styles.sectionTitle}>
@@ -442,7 +465,8 @@ export function ExecutionProfilesPage() {
                 <span className={styles.feedbackError}>保存に失敗しました</span>
               )}
             </div>
-          </section>
+            </section>
+          )}
 
           <section className={styles.section}>
             <h3 className={styles.sectionTitle}>モデル候補取得用 API キー</h3>
