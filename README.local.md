@@ -47,12 +47,17 @@ pnpm build:local
 # DB migration
 pnpm migrate:local
 
-# サンプルデータ投入
+# サンプルデータ投入（既存のデータがあるDBには投入しない）
 pnpm seed:local
+
+# 既存のデータをすべて削除してから投入する場合だけ --reset を付ける
+pnpm seed:local --reset
 
 # ローカル試用版の起動
 pnpm start:local
 ```
+
+`pnpm seed:local` は、`data/prompt-reviewer.sqlite` にデータがあると、DBを変更せずに中止します。`--reset` を付けると、アノテーションなどを含む既存のデータがすべて削除されます。
 
 ## 環境変数
 
