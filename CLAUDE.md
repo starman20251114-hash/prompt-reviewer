@@ -71,10 +71,13 @@ schema: [
 ],
 ```
 
-### better-sqlite3 のテストはDB接続しない
+### DBを使うテストの方針
 
-`better-sqlite3` はネイティブバイナリのビルドが必要なため、Vitest からDBに接続するとビルドエラーになりやすい。
-スキーマのテストは `expectTypeOf` による型検証のみとし、実際のマイグレーション動作は `pnpm run migrate` で別途確認する。
+- クエリ条件・絞り込み・制約など、実際のDB動作を検証する統合テストでは in-memory SQLite を使う。DBは `packages/server/src/test-utils/create-test-db.ts` の `createTestDb()` で作成し、テストごとに作成して `afterEach` で閉じる（例: `packages/server/src/routes/runs.integration.test.ts`）
+- DBを必要としない単体テスト（入力検証・レスポンス整形など）は、従来どおりモックを使ってよい
+- モックDBは `where()` などの条件を無視して固定値を返すため、絞り込みの正しさは検証できない。テスト環境の問題を回避するためだけに、検出能力の低いモックテストへ置き換えない
+- スキーマの型テストは `expectTypeOf` で行う。`better-sqlite3` のネイティブバイナリは uv の Python でビルドできる（「環境情報」参照）
+- 実DBファイルへのマイグレーション確認は `pnpm --filter @prompt-reviewer/core migrate` で行う
 
 ## 実装手順
 
