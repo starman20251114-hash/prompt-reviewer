@@ -1,13 +1,5 @@
+/* カラートークンは styles/variables.css の :root から継承する */
 .root {
-  --c-bg: #1e1e2e;
-  --c-card: #313244;
-  --c-border: #45475a;
-  --c-text: #cdd6f4;
-  --c-subtext: #a6adc8;
-  --c-accent: #cba6f7;
-  --c-danger: #f38ba8;
-  --c-overlay: #181825;
-  --c-muted: #6c7086;
 }
 
 .header {
