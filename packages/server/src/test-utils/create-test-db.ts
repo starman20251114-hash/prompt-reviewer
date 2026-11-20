@@ -13,7 +13,7 @@ type Journal = { entries: { idx: number; tag: string }[] };
  * journal に記録されたマイグレーションSQLを適用順に読み込む。
  * journal と .sql ファイルが食い違っている場合は、適用漏れを防ぐため例外にする。
  */
-function loadMigrationSqls(): string[] {
+export function loadMigrations(): { tag: string; sql: string }[] {
   const journal = JSON.parse(readFileSync(`${migrationsDir}meta/_journal.json`, "utf8")) as Journal;
   const entries = [...journal.entries].sort((a, b) => a.idx - b.idx);
 
@@ -27,7 +27,10 @@ function loadMigrationSqls(): string[] {
     );
   }
 
-  return journalFiles.map((name) => readFileSync(`${migrationsDir}${name}`, "utf8"));
+  return entries.map((entry) => ({
+    tag: entry.tag,
+    sql: readFileSync(`${migrationsDir}${entry.tag}.sql`, "utf8"),
+  }));
 }
 
 /**
@@ -37,13 +40,14 @@ function loadMigrationSqls(): string[] {
  * マイグレーション（0011・0012）を適用できないため、journal の順に better-sqlite3 の
  * exec() で適用する。exec() は複数文を実行でき、SQL が失敗すると例外を投げる。
  *
- * 注意: drizzle-kit migrate で作成したDBには 0011・0012 の UNIQUE インデックスが
- * 作成されない問題がある（#209）。このヘルパーで作成したDBには作成される。
+ * 注意: drizzle-kit migrate では 0011・0012 の UNIQUE インデックスが作成されないため、
+ * 0020 で補修している（#209）。このヘルパーでは 0011・0012 の時点で作成され、
+ * 0020 の CREATE UNIQUE INDEX IF NOT EXISTS は何もしない。
  */
 export function createTestDb(): { db: DB; close: () => void } {
   const sqlite = new Database(":memory:");
   try {
-    for (const sql of loadMigrationSqls()) {
+    for (const { sql } of loadMigrations()) {
       sqlite.exec(sql);
     }
     sqlite.pragma("foreign_keys = ON");

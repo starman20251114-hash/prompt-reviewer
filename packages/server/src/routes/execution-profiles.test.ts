@@ -81,6 +81,11 @@ describe("POST /api/execution-profiles", () => {
     let capturedValues: Record<string, unknown> = {};
 
     const db = {
+      select: () => ({
+        from: () => ({
+          where: () => Promise.resolve([]),
+        }),
+      }),
       insert: () => ({
         values: (values: Record<string, unknown>) => {
           capturedValues = values;
@@ -109,6 +114,59 @@ describe("POST /api/execution-profiles", () => {
     expect(typeof capturedValues.created_at).toBe("number");
     expect(typeof capturedValues.updated_at).toBe("number");
     await expect(res.json()).resolves.toEqual(created);
+  });
+
+  it("事前確認の後に同じ名前が登録され UNIQUE 制約違反になった場合は 409 を返す", async () => {
+    const constraintError = new Error("Failed query", {
+      cause: Object.assign(new Error("UNIQUE constraint failed: execution_profiles.name"), {
+        code: "SQLITE_CONSTRAINT_UNIQUE",
+      }),
+    });
+    const db = {
+      select: () => ({ from: () => ({ where: () => Promise.resolve([]) }) }),
+      insert: () => ({
+        values: () => ({ returning: () => Promise.reject(constraintError) }),
+      }),
+    };
+
+    const res = await buildApp(db).request("/api/execution-profiles", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        name: "A",
+        model: "claude",
+        temperature: 0.5,
+        api_provider: "anthropic",
+      }),
+    });
+
+    expect(res.status).toBe(409);
+    await expect(res.json()).resolves.toEqual({ error: "Execution profile name already exists" });
+  });
+
+  it("UNIQUE 制約違反以外のDBエラーは 409 にしない", async () => {
+    const db = {
+      select: () => ({ from: () => ({ where: () => Promise.resolve([]) }) }),
+      insert: () => ({
+        values: () => ({
+          returning: () =>
+            Promise.reject(Object.assign(new Error("disk I/O error"), { code: "SQLITE_IOERR" })),
+        }),
+      }),
+    };
+
+    const res = await buildApp(db).request("/api/execution-profiles", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        name: "A",
+        model: "claude",
+        temperature: 0.5,
+        api_provider: "anthropic",
+      }),
+    });
+
+    expect(res.status).toBe(500);
   });
 
   it("temperature が範囲外なら 400 を返す", async () => {
@@ -205,6 +263,41 @@ describe("PATCH /api/execution-profiles/:id", () => {
     expect(capturedValues.temperature).toBe(0.9);
     expect(typeof capturedValues.updated_at).toBe("number");
     await expect(res.json()).resolves.toEqual(updated);
+  });
+
+  it("事前確認の後に同じ名前が登録され UNIQUE 制約違反になった場合は 409 を返す", async () => {
+    let selectCount = 0;
+    const db = {
+      select: () => ({
+        from: () => ({
+          where: () => {
+            selectCount += 1;
+            return Promise.resolve(selectCount === 1 ? [sampleProfile] : []);
+          },
+        }),
+      }),
+      update: () => ({
+        set: () => ({
+          where: () => ({
+            returning: () =>
+              Promise.reject(
+                Object.assign(new Error("UNIQUE constraint failed: execution_profiles.name"), {
+                  code: "SQLITE_CONSTRAINT_UNIQUE",
+                }),
+              ),
+          }),
+        }),
+      }),
+    };
+
+    const res = await buildApp(db).request("/api/execution-profiles/1", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ name: "別の名前" }),
+    });
+
+    expect(res.status).toBe(409);
+    await expect(res.json()).resolves.toEqual({ error: "Execution profile name already exists" });
   });
 
   it("対象が存在しない場合は 404 を返す", async () => {

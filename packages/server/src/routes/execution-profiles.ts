@@ -1,9 +1,10 @@
 import { zValidator } from "@hono/zod-validator";
 import type { DB } from "@prompt-reviewer/core";
 import { execution_profiles, runs } from "@prompt-reviewer/core";
-import { eq } from "drizzle-orm";
+import { and, eq, ne } from "drizzle-orm";
 import { Hono } from "hono";
 import { z } from "zod";
+import { isUniqueConstraintError } from "../lib/db-errors.js";
 import {
   type ExecutionProfileModelClientFactory,
   defaultExecutionProfileModelClientFactory,
@@ -63,6 +64,8 @@ type ExecutionProfilesRouterOptions = {
   modelClientFactory?: ExecutionProfileModelClientFactory;
 };
 
+const DUPLICATE_NAME_ERROR = { error: "Execution profile name already exists" } as const;
+
 function parseIdParam(value: string): number | null {
   const parsed = Number(value);
   return Number.isInteger(parsed) ? parsed : null;
@@ -85,12 +88,27 @@ export function createExecutionProfilesRouter(
     const body = c.req.valid("json");
     const now = Date.now();
 
-    const [created] = await db
-      .insert(execution_profiles)
-      .values(buildCreateValues(body, now))
-      .returning();
+    const [duplicate] = await db
+      .select({ id: execution_profiles.id })
+      .from(execution_profiles)
+      .where(eq(execution_profiles.name, body.name));
+    if (duplicate) {
+      return c.json(DUPLICATE_NAME_ERROR, 409);
+    }
 
-    return c.json(created, 201);
+    try {
+      const [created] = await db
+        .insert(execution_profiles)
+        .values(buildCreateValues(body, now))
+        .returning();
+      return c.json(created, 201);
+    } catch (error) {
+      // 事前確認の後に同じ名前が登録された場合も、500 ではなく 409 を返す
+      if (isUniqueConstraintError(error)) {
+        return c.json(DUPLICATE_NAME_ERROR, 409);
+      }
+      throw error;
+    }
   });
 
   router.get("/:id", async (c) => {
@@ -125,13 +143,30 @@ export function createExecutionProfilesRouter(
     }
 
     const body = c.req.valid("json");
-    const [updated] = await db
-      .update(execution_profiles)
-      .set(buildUpdateValues(body, Date.now()))
-      .where(eq(execution_profiles.id, id))
-      .returning();
+    if (body.name !== undefined && body.name !== existing.name) {
+      const [duplicate] = await db
+        .select({ id: execution_profiles.id })
+        .from(execution_profiles)
+        .where(and(eq(execution_profiles.name, body.name), ne(execution_profiles.id, id)));
+      if (duplicate) {
+        return c.json(DUPLICATE_NAME_ERROR, 409);
+      }
+    }
 
-    return c.json(updated);
+    try {
+      const [updated] = await db
+        .update(execution_profiles)
+        .set(buildUpdateValues(body, Date.now()))
+        .where(eq(execution_profiles.id, id))
+        .returning();
+      return c.json(updated);
+    } catch (error) {
+      // 事前確認の後に同じ名前が登録された場合も、500 ではなく 409 を返す
+      if (isUniqueConstraintError(error)) {
+        return c.json(DUPLICATE_NAME_ERROR, 409);
+      }
+      throw error;
+    }
   });
 
   router.delete("/:id", async (c) => {
