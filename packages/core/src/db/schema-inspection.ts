@@ -5,7 +5,8 @@ import type Database from "better-sqlite3";
  */
 const requiredColumns = {
   prompt_versions: ["workflow_definition"],
-  runs: ["execution_trace", "structured_output"],
+  // run_mode / prompt_snapshot / ad_hoc_input は 0019（runs の作り直し）で追加される
+  runs: ["execution_trace", "structured_output", "run_mode", "prompt_snapshot", "ad_hoc_input"],
   // 0016。#211 で既存DBから飛ばされることがある
   execution_profiles: ["max_tokens"],
   project_settings: ["max_tokens"],
