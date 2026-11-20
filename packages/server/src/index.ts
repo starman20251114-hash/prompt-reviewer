@@ -1,7 +1,7 @@
 import { readFile } from "node:fs/promises";
 import path from "node:path";
 import { serve } from "@hono/node-server";
-import { assertRequiredSchema, db } from "@prompt-reviewer/core";
+import { DEFAULT_DEV_DB_PATH, assertRequiredSchema, db } from "@prompt-reviewer/core";
 import { Hono } from "hono";
 import { cors } from "hono/cors";
 import {
@@ -22,7 +22,7 @@ import { createScoreProgressionRouter } from "./routes/score-progression.js";
 import { createScoresRouter } from "./routes/scores.js";
 import { createTestCasesRouter } from "./routes/test-cases.js";
 
-const dbPath = process.env.DB_PATH ?? "../../dev.db";
+const dbPath = process.env.DB_PATH ?? DEFAULT_DEV_DB_PATH;
 assertRequiredSchema(dbPath);
 
 const app = new Hono();

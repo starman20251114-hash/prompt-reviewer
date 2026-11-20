@@ -47,6 +47,8 @@ pnpm migrate:local
 > ```bash
 > pnpm --filter @prompt-reviewer/core seed
 > ```
+> `DB_PATH` を指定しない場合は、`pnpm dev` と同じルートの `dev.db` に投入されます。
+> **既存のデータは削除されます。** 別のDBに投入する場合は `DB_PATH` を指定してください。
 
 ### 開発サーバーの起動
 
@@ -81,7 +83,7 @@ pnpm start:local
 | 変数名 | デフォルト値 | 説明 |
 |---|---|---|
 | `PORT` | `3001` | API サーバーのポート番号 |
-| `DB_PATH` | `./data/prompt-reviewer.db` | SQLite データベースのパス |
+| `DB_PATH` | ルートの `dev.db`（`packages/<name>` から見た `../../dev.db`） | SQLite データベースのパス。相対パスは各コマンドの作業ディレクトリ（`packages/<name>`）が基準。`pnpm dev`・`migrate:dev`・`check:db:dev`・seed で共通 |
 | `VITE_API_BASE_URL` | `http://localhost:3001` | UI から参照する API のベース URL |
 
 ### その他のコマンド

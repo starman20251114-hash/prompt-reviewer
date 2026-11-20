@@ -1,8 +1,9 @@
 import Database from "better-sqlite3";
 import { drizzle } from "drizzle-orm/better-sqlite3";
 import * as schema from "../schema/index";
+import { DEFAULT_DEV_DB_PATH } from "./sqlite-path";
 
-const dbPath = process.env.DB_PATH ?? "../../dev.db";
+const dbPath = process.env.DB_PATH ?? DEFAULT_DEV_DB_PATH;
 const sqlite = new Database(dbPath);
 export const db = drizzle(sqlite, { schema });
 export type DB = typeof db;

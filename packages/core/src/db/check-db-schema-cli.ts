@@ -2,15 +2,15 @@
  * DBスキーマの検査コマンド（`pnpm check:db:dev` / `pnpm check:db:local`）。
  *
  * 判定はサーバー起動時の assertRequiredSchema と同じ inspectSchema を使う（#215）。
- * 検査対象：第1引数 → DB_PATH → ../../dev.db の順（相対パスは作業ディレクトリ基準、file: URL も可）。
+ * 検査対象：第1引数 → DB_PATH → DEFAULT_DEV_DB_PATH（ルートの dev.db）の順（相対パスは作業ディレクトリ基準、file: URL も可）。
  * DBは読み取り専用で開き、変更しない。問題があれば exit 1。
  */
 import { existsSync } from "node:fs";
 import { getSchemaIssues } from "./schema-check";
-import { resolveSqliteFilePath } from "./sqlite-path";
+import { DEFAULT_DEV_DB_PATH, resolveSqliteFilePath } from "./sqlite-path";
 
 function main(): number {
-  const configuredPath = process.argv[2] ?? process.env.DB_PATH ?? "../../dev.db";
+  const configuredPath = process.argv[2] ?? process.env.DB_PATH ?? DEFAULT_DEV_DB_PATH;
   const dbFilePath = resolveSqliteFilePath(configuredPath, process.cwd());
 
   console.log(`DB schema check target: ${dbFilePath}`);

@@ -2,16 +2,18 @@
  * サンプルデータ投入スクリプト
  *
  * 全テーブルにサンプルデータを投入して動作確認に使用する。
- * 実行: pnpm run seed
+ * 実行: pnpm --filter @prompt-reviewer/core seed
+ * 対象: DB_PATH。未指定時は DEFAULT_DEV_DB_PATH（`pnpm dev` と同じルートの dev.db）
  *
  * ※ 既存データは削除されるため、開発環境のみで使用すること
  */
 import Database from "better-sqlite3";
 import { drizzle } from "drizzle-orm/better-sqlite3";
+import { DEFAULT_DEV_DB_PATH } from "./db/sqlite-path.js";
 import * as schema from "./schema/index.js";
 import type { ConversationMessage } from "./schema/runs.js";
 
-const dbPath = process.env.DB_PATH ?? "./dev.db";
+const dbPath = process.env.DB_PATH ?? DEFAULT_DEV_DB_PATH;
 const sqlite = new Database(dbPath);
 const db = drizzle(sqlite, { schema });
 

@@ -1,9 +1,10 @@
 import path from "node:path";
 import { pathToFileURL } from "node:url";
 import { defineConfig } from "drizzle-kit";
+import { DEFAULT_DEV_DB_PATH } from "./src/db/sqlite-path";
 
 function resolveDrizzleDbUrl(): string {
-  const configuredPath = process.env.DB_PATH ?? "../../dev.db";
+  const configuredPath = process.env.DB_PATH ?? DEFAULT_DEV_DB_PATH;
 
   if (/^(file:|libsql:|https?:|wss?:)/.test(configuredPath)) {
     return configuredPath;

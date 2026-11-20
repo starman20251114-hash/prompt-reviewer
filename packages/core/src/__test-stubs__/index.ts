@@ -13,7 +13,7 @@ export {
   SkippedMigrationsRepairError,
   repairSkippedMigrations,
 } from "../db/skipped-migrations-repair.js";
-export { resolveSqliteFilePath } from "../db/sqlite-path.js";
+export { DEFAULT_DEV_DB_PATH, resolveSqliteFilePath } from "../db/sqlite-path.js";
 
 // DB型のみエクスポート（実際のDBインスタンスは含まない）
 export type { DB } from "../db/client.js";
