@@ -47,6 +47,13 @@ pnpm migrate:local
 > ```bash
 > pnpm --filter @prompt-reviewer/core seed
 > ```
+> - 対象のDB：`DB_PATH` で指定します。指定しない場合は、`pnpm dev` と同じルートの `dev.db` です。
+> - **既存のデータがあるDBには投入しません。** DBを変更せずに中止し、データのあるテーブルと件数を表示します。DBファイルがない場合も中止します（先に `pnpm migrate:dev` を実行してください）。
+> - 既存のデータを**すべて削除して**投入し直す場合だけ、`--reset` を指定します。`DB_PATH` を指定しただけでは削除されません。
+>   ```bash
+>   pnpm --filter @prompt-reviewer/core seed --reset
+>   ```
+>   `--reset` では、アノテーションなど seed が作らないデータも削除されます。マイグレーションの記録（`__drizzle_migrations`）と、マイグレーションの退避用テーブル（`__` で始まるもの）は残ります。削除と投入は1つのトランザクションで行うため、途中で失敗した場合は元の状態に戻ります。
 
 ### 開発サーバーの起動
 
@@ -81,7 +88,7 @@ pnpm start:local
 | 変数名 | デフォルト値 | 説明 |
 |---|---|---|
 | `PORT` | `3001` | API サーバーのポート番号 |
-| `DB_PATH` | `./data/prompt-reviewer.db` | SQLite データベースのパス |
+| `DB_PATH` | ルートの `dev.db`（`packages/<name>` から見た `../../dev.db`） | SQLite データベースのパス。相対パスは各コマンドの作業ディレクトリ（`packages/<name>`）が基準。`pnpm dev`・`migrate:dev`・`check:db:dev`・seed で共通 |
 | `VITE_API_BASE_URL` | `http://localhost:3001` | UI から参照する API のベース URL |
 
 ### その他のコマンド

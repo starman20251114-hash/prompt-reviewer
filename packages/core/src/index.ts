@@ -13,5 +13,5 @@ export {
   repairSkippedMigrations,
 } from "./db/skipped-migrations-repair";
 export type { SkippedMigrationsRepairResult } from "./db/skipped-migrations-repair";
-export { resolveSqliteFilePath } from "./db/sqlite-path";
+export { DEFAULT_DEV_DB_PATH, resolveSqliteFilePath } from "./db/sqlite-path";
 export type { DB } from "./db/client";

@@ -2,17 +2,61 @@
  * サンプルデータ投入スクリプト
  *
  * 全テーブルにサンプルデータを投入して動作確認に使用する。
- * 実行: pnpm run seed
+ * 実行: pnpm --filter @prompt-reviewer/core seed [--reset]
+ * 対象: DB_PATH。未指定時は DEFAULT_DEV_DB_PATH（`pnpm dev` と同じルートの dev.db）
  *
- * ※ 既存データは削除されるため、開発環境のみで使用すること
+ * 既存のデータがあるDBには投入しない（DBを変更せずに終了する）。
+ * `--reset` を指定したときだけ、既存のデータをすべて削除してから投入する。
+ * DB_PATH の指定は対象DBを選ぶだけで、削除の許可にはならない（#217）。
+ * 削除と投入は1つのトランザクションで行い、失敗した場合は元に戻す。
  */
+import { existsSync } from "node:fs";
+import path from "node:path";
 import Database from "better-sqlite3";
 import { drizzle } from "drizzle-orm/better-sqlite3";
+import {
+  type SeedOptions,
+  SeedUsageError,
+  clearDataTables,
+  findExistingData,
+  formatExistingDataRefusal,
+  parseSeedArgs,
+} from "./db/seed-safety.js";
+import { DEFAULT_DEV_DB_PATH } from "./db/sqlite-path.js";
 import * as schema from "./schema/index.js";
 import type { ConversationMessage } from "./schema/runs.js";
 
-const dbPath = process.env.DB_PATH ?? "./dev.db";
-const sqlite = new Database(dbPath);
+const dbPath = process.env.DB_PATH ?? DEFAULT_DEV_DB_PATH;
+const dbFilePath = path.resolve(dbPath);
+
+let options: SeedOptions;
+try {
+  options = parseSeedArgs(process.argv.slice(2));
+} catch (error) {
+  console.error(error instanceof SeedUsageError ? error.message : error);
+  process.exit(2);
+}
+
+// 空のDBファイルを作ってしまわないよう、存在しなければ中止する
+if (!existsSync(dbFilePath)) {
+  console.error(
+    `DB ファイルが見つかりません: ${dbFilePath}。先に migrate を実行するか、DB_PATH を指定してください。`,
+  );
+  process.exit(1);
+}
+
+// 既存データの確認は読み取り専用で行い、中止するときはDBに一切書き込まない
+{
+  const readonly = new Database(dbFilePath, { readonly: true, fileMustExist: true });
+  const existing = findExistingData(readonly);
+  readonly.close();
+  if (existing.length > 0 && !options.reset) {
+    console.error(formatExistingDataRefusal(dbFilePath, existing));
+    process.exit(1);
+  }
+}
+
+const sqlite = new Database(dbFilePath, { fileMustExist: true });
 const db = drizzle(sqlite, { schema });
 
 /**
@@ -30,15 +74,19 @@ function getFirstOrThrow<T>(rows: T[], label: string): T {
 async function seed() {
   console.log("サンプルデータの投入を開始します...");
 
-  // 既存データをクリア（外部キー制約の順序に従って削除）
-  sqlite.exec("DELETE FROM scores");
-  sqlite.exec("DELETE FROM runs");
-  sqlite.exec("DELETE FROM prompt_versions");
-  sqlite.exec("DELETE FROM prompt_families");
-  sqlite.exec("DELETE FROM test_cases");
-  sqlite.exec("DELETE FROM project_settings");
-  sqlite.exec("DELETE FROM projects");
-  console.log("既存データを削除しました");
+  // 削除と投入を1つのトランザクションにする（失敗時は catch で ROLLBACK する）
+  sqlite.exec("BEGIN IMMEDIATE");
+
+  if (options.reset) {
+    clearDataTables(sqlite);
+    console.log("既存データを削除しました（--reset）");
+  } else {
+    // 確認から書き込みまでの間に、別の処理がデータを入れていないことを確かめる
+    const existing = findExistingData(sqlite);
+    if (existing.length > 0) {
+      throw new Error(formatExistingDataRefusal(dbFilePath, existing));
+    }
+  }
 
   // 1. プロジェクト作成
   const now = Date.now();
@@ -291,6 +339,7 @@ async function seed() {
   );
   console.log(`スコア2作成: id=${score2.id}, human_score=${score2.human_score}`);
 
+  sqlite.exec("COMMIT");
   console.log("\nサンプルデータの投入が完了しました！");
   console.log(`
 投入データのサマリー:
@@ -310,6 +359,10 @@ seed()
     process.exit(0);
   })
   .catch((error) => {
+    if (sqlite.inTransaction) {
+      sqlite.exec("ROLLBACK");
+      console.error("変更をすべて元に戻しました。");
+    }
     console.error("シードデータの投入に失敗しました:", error);
     sqlite.close();
     process.exit(1);

@@ -93,7 +93,8 @@ switch (action) {
     break;
   case "seed":
     ensureDataDir();
-    runPnpm(["--filter", "@prompt-reviewer/core", "seed"], localEnv);
+    // `pnpm seed:local --reset` のように渡された引数を seed に渡す（既存データの削除は --reset のときだけ）
+    runPnpm(["--filter", "@prompt-reviewer/core", "seed", ...process.argv.slice(3)], localEnv);
     break;
   case "start":
     ensureDataDir();

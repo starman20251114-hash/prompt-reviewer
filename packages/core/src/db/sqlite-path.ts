@@ -2,6 +2,15 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 
 /**
+ * DB_PATH を指定しないときの開発用DB（モノレポ直下の dev.db）。
+ *
+ * 開発用のコマンド（`pnpm dev` の server、`pnpm --filter @prompt-reviewer/core migrate` / `seed` など）は
+ * どれも packages/<name> を作業ディレクトリとして実行されるため、そこからの相対パスで指定する。
+ * 既定値はこの定数だけを使い、各ファイルにパスを書かないこと（#217）。
+ */
+export const DEFAULT_DEV_DB_PATH = "../../dev.db";
+
+/**
  * DB_PATH（相対パス・絶対パス・file: URL）をローカルの SQLite ファイルの絶対パスにする。
  * drizzle.config.ts と同じく、相対パスは作業ディレクトリを基準にする。
  * リモートの URL（libsql: / http(s): / ws(s):）は直接開けないため例外にする。
